@@ -1,8 +1,100 @@
-﻿@{
-    ViewData["Title"] = "Home Page";
+﻿@model IEnumerable<RentRight.Models.Property>
+
+@{
+    ViewData["Title"] = "Welcome to RentRight";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="container py-5">
+
+    <!-- Hero section -->
+    <div class="text-center mb-5">
+        <h1 class="display-4 fw-bold">Welcome to <span class="text-primary">RentRight</span></h1>
+        <p class="lead text-muted">
+            Simplify property management for landlords and tenants — all in one secure platform.
+        </p>
+        @if (User.Identity?.IsAuthenticated ?? false)
+        {
+            <a asp-controller="Properties" asp-action="Index" class="btn btn-success btn-lg me-2">View Properties</a>
+            <a asp-area="Identity" asp-page="/Account/Manage/Index" class="btn btn-outline-secondary btn-lg">My Account</a>
+        }
+        else
+        {
+            <a asp-area="Identity" asp-page="/Account/Register" class="btn btn-primary btn-lg me-2">Get Started</a>
+            <a asp-area="Identity" asp-page="/Account/Login" class="btn btn-outline-primary btn-lg">Sign In</a>
+        }
+
+    </div>
+
+    <!-- Feature grid -->
+    <div class="row text-center g-4 mb-5">
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100 border-0">
+                <div class="card-body">
+                    <i class="bi bi-building display-5 text-primary mb-3"></i>
+                    <h5 class="card-title fw-bold">For Landlords</h5>
+                    <p class="text-muted">
+                        List your properties, manage maintenance requests, and review tenants in a simple dashboard.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100 border-0">
+                <div class="card-body">
+                    <i class="bi bi-person-check display-5 text-success mb-3"></i>
+                    <h5 class="card-title fw-bold">For Tenants</h5>
+                    <p class="text-muted">
+                        Find rental listings, submit maintenance tickets, and communicate directly with landlords.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100 border-0">
+                <div class="card-body">
+                    <i class="bi bi-shield-lock display-5 text-warning mb-3"></i>
+                    <h5 class="card-title fw-bold">For Admins</h5>
+                    <p class="text-muted">
+                        Manage users, roles, and permissions — keeping the system secure and running smoothly.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dynamic Latest Properties Section -->
+    <h3 class="fw-bold text-center mb-4">🏡 Latest Properties</h3>
+    @if (Model != null && Model.Any())
+    {
+        <div class="row g-4">
+            @foreach (var property in Model)
+            {
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">@property.Title</h5>
+                            <p class="text-muted">@property.Address</p>
+                            <p class="fw-bold text-primary">€@property.RentAmount.ToString("F2") / month</p>
+                            @if (!string.IsNullOrEmpty(property.Description))
+                            {
+                                <p>@property.Description.Substring(0, Math.Min(property.Description.Length, 80))...</p>
+                            }
+                            <a asp-controller="Properties" asp-action="Details" asp-route-id="@property.Id" class="btn btn-sm btn-outline-primary">View Details</a>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <p class="text-center text-muted">No properties listed yet. Be the first to <a asp-controller="Properties" asp-action="Create">add one</a>!</p>
+    }
+
+    <!-- CTA section -->
+    <div class="p-5 bg-light rounded-3 text-center mt-5">
+        <h3 class="fw-bold mb-3">Manage your rentals smarter with RentRight.</h3>
+        <p class="text-muted mb-4">Built with ASP.NET Core, EF, and Identity — a secure modern platform for property management.</p>
+        <a asp-controller="Properties" asp-action="Index" class="btn btn-primary btn-lg">View All Properties</a>
+    </div>
 </div>

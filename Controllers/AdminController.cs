@@ -5,7 +5,7 @@ using RentRight.Models;
 
 namespace RentRight.Controllers
 {
-    [Authorize(Roles = "Admin")] // ✅ Only Admins can access
+    [Authorize(Roles = "Admin")]
     public class AdminController : Controller
     {
         private readonly UserManager<ApplicationUser> _userManager;
@@ -21,6 +21,7 @@ namespace RentRight.Controllers
         public async Task<IActionResult> Index()
         {
             var users = _userManager.Users.ToList();
+            var allRoles = _roleManager.Roles.Select(r => r.Name!).ToList();
 
             var userRoles = new List<(ApplicationUser user, IList<string> roles)>();
             foreach (var user in users)
@@ -29,7 +30,29 @@ namespace RentRight.Controllers
                 userRoles.Add((user, roles));
             }
 
+            ViewBag.AllRoles = allRoles;
             return View(userRoles);
+        }
+
+        // POST: /Admin/UpdateRoles
+        [HttpPost]
+        public async Task<IActionResult> UpdateRoles(string userId, List<string> selectedRoles)
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null) return NotFound();
+
+            var currentRoles = await _userManager.GetRolesAsync(user);
+            var rolesToAdd = selectedRoles.Except(currentRoles);
+            var rolesToRemove = currentRoles.Except(selectedRoles);
+
+            if (rolesToAdd.Any())
+                await _userManager.AddToRolesAsync(user, rolesToAdd);
+
+            if (rolesToRemove.Any())
+                await _userManager.RemoveFromRolesAsync(user, rolesToRemove);
+
+            TempData["Success"] = $"Updated roles for {user.Email}";
+            return RedirectToAction(nameof(Index));
         }
     }
 }

@@ -1,17 +1,23 @@
 @model List<(RentRight.Models.ApplicationUser user, IList<string> roles)>
-
 @{
     ViewData["Title"] = "Admin Panel";
+    var allRoles = ViewBag.AllRoles as List<string>;
 }
 
-<h2 class="mb-3">Admin Panel</h2>
+<h2 class="mb-3">Admin Panel – User Role Management</h2>
 
-<table class="table table-bordered table-striped">
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
+
+<table class="table table-bordered table-striped align-middle">
     <thead class="table-light">
     <tr>
         <th>Full Name</th>
         <th>Email</th>
         <th>Roles</th>
+        <th style="width: 250px;">Update Roles</th>
     </tr>
     </thead>
     <tbody>
@@ -21,32 +27,18 @@
             <td>@user.FullName</td>
             <td>@user.Email</td>
             <td>@string.Join(", ", roles)</td>
-        </tr>
-    }
-    </tbody>
-</table>@model List<(RentRight.Models.ApplicationUser user, IList<string> roles)>
-
-@{
-    ViewData["Title"] = "Admin Panel";
-}
-
-<h2 class="mb-3">Admin Panel</h2>
-
-<table class="table table-bordered table-striped">
-    <thead class="table-light">
-    <tr>
-        <th>Full Name</th>
-        <th>Email</th>
-        <th>Roles</th>
-    </tr>
-    </thead>
-    <tbody>
-    @foreach (var (user, roles) in Model)
-    {
-        <tr>
-            <td>@user.FullName</td>
-            <td>@user.Email</td>
-            <td>@string.Join(", ", roles)</td>
+            <td>
+                <form asp-action="UpdateRoles" method="post" class="d-flex flex-column gap-2">
+                    <input type="hidden" name="userId" value="@user.Id" />
+                    <select name="selectedRoles" multiple class="form-select form-select-sm">
+                        @foreach (var role in allRoles)
+                        {
+                            <option value="@role" selected="@(roles.Contains(role))">@role</option>
+                        }
+                    </select>
+                    <button type="submit" class="btn btn-sm btn-primary">Update</button>
+                </form>
+            </td>
         </tr>
     }
     </tbody>
