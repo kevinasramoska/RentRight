@@ -1,0 +1,39 @@
+@model IEnumerable<RentRight.Models.Property>
+
+@{
+    ViewData["Title"] = "Properties";
+}
+
+<h2>Properties</h2>
+
+<p>
+    <a class="btn btn-primary" asp-action="Create">Create New Property</a>
+</p>
+
+<table class="table table-striped">
+    <thead>
+    <tr>
+        <th>Title</th>
+        <th>Address</th>
+        <th>Rent Amount</th>
+        <th>Landlord Id</th>
+        <th></th>
+    </tr>
+    </thead>
+    <tbody>
+    @foreach (var item in Model)
+    {
+        <tr>
+            <td>@item.Title</td>
+            <td>@item.Address</td>
+            <td>@item.RentAmount.ToString("C")</td>
+            <td>@item.LandlordId</td>
+            <td>
+                <a class="btn btn-sm btn-info" asp-action="Details" asp-route-id="@item.Id">Details</a>
+                <a class="btn btn-sm btn-warning" asp-action="Edit" asp-route-id="@item.Id">Edit</a>
+                <a class="btn btn-sm btn-danger" asp-action="Delete" asp-route-id="@item.Id">Delete</a>
+            </td>
+        </tr>
+    }
+    </tbody>
+</table>

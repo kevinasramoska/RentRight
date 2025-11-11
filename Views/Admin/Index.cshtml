@@ -1,0 +1,53 @@
+@model List<(RentRight.Models.ApplicationUser user, IList<string> roles)>
+
+@{
+    ViewData["Title"] = "Admin Panel";
+}
+
+<h2 class="mb-3">Admin Panel</h2>
+
+<table class="table table-bordered table-striped">
+    <thead class="table-light">
+    <tr>
+        <th>Full Name</th>
+        <th>Email</th>
+        <th>Roles</th>
+    </tr>
+    </thead>
+    <tbody>
+    @foreach (var (user, roles) in Model)
+    {
+        <tr>
+            <td>@user.FullName</td>
+            <td>@user.Email</td>
+            <td>@string.Join(", ", roles)</td>
+        </tr>
+    }
+    </tbody>
+</table>@model List<(RentRight.Models.ApplicationUser user, IList<string> roles)>
+
+@{
+    ViewData["Title"] = "Admin Panel";
+}
+
+<h2 class="mb-3">Admin Panel</h2>
+
+<table class="table table-bordered table-striped">
+    <thead class="table-light">
+    <tr>
+        <th>Full Name</th>
+        <th>Email</th>
+        <th>Roles</th>
+    </tr>
+    </thead>
+    <tbody>
+    @foreach (var (user, roles) in Model)
+    {
+        <tr>
+            <td>@user.FullName</td>
+            <td>@user.Email</td>
+            <td>@string.Join(", ", roles)</td>
+        </tr>
+    }
+    </tbody>
+</table>
