@@ -261,6 +261,7 @@
 /Users/kevinasramoska/Desktop/Property Manager/RentRight/obj/Debug/net9.0/RentRight.MvcApplicationPartsAssemblyInfo.cache
 /Users/kevinasramoska/Desktop/Property Manager/RentRight/obj/Debug/net9.0/RentRight.RazorAssemblyInfo.cache
 /Users/kevinasramoska/Desktop/Property Manager/RentRight/obj/Debug/net9.0/RentRight.RazorAssemblyInfo.cs
+/Users/kevinasramoska/Desktop/Property Manager/RentRight/obj/Debug/net9.0/RentRight.sourcelink.json
 /Users/kevinasramoska/Desktop/Property Manager/RentRight/obj/Debug/net9.0/rjimswa.dswa.cache.json
 /Users/kevinasramoska/Desktop/Property Manager/RentRight/obj/Debug/net9.0/rjsmrazor.dswa.cache.json
 /Users/kevinasramoska/Desktop/Property Manager/RentRight/obj/Debug/net9.0/rjsmcshtml.dswa.cache.json
@@ -329,6 +330,7 @@
 /Users/kevinasramoska/Desktop/Property Manager/RentRight/obj/Debug/net9.0/compressed/nezrqnk58p-muycvpuwrr.gz
 /Users/kevinasramoska/Desktop/Property Manager/RentRight/obj/Debug/net9.0/compressed/v0zgfp0y55-87fc7y1x7t.gz
 /Users/kevinasramoska/Desktop/Property Manager/RentRight/obj/Debug/net9.0/compressed/yfc7ypekbg-mlv21k5csn.gz
+/Users/kevinasramoska/Desktop/Property Manager/RentRight/obj/Debug/net9.0/compressed/7oosb5xo1n-uustdt1q7x.gz
 /Users/kevinasramoska/Desktop/Property Manager/RentRight/obj/Debug/net9.0/compressed/gjcc647xfb-61n19gt1b8.gz
 /Users/kevinasramoska/Desktop/Property Manager/RentRight/obj/Debug/net9.0/compressed/cs22x1ztaz-xtxxf3hu2r.gz
 /Users/kevinasramoska/Desktop/Property Manager/RentRight/obj/Debug/net9.0/compressed/8fhva4p9xg-bqjiyaj88i.gz
@@ -402,5 +404,3 @@
 /Users/kevinasramoska/Desktop/Property Manager/RentRight/obj/Debug/net9.0/RentRight.pdb
 /Users/kevinasramoska/Desktop/Property Manager/RentRight/obj/Debug/net9.0/RentRight.genruntimeconfig.cache
 /Users/kevinasramoska/Desktop/Property Manager/RentRight/obj/Debug/net9.0/ref/RentRight.dll
-/Users/kevinasramoska/Desktop/Property Manager/RentRight/obj/Debug/net9.0/RentRight.sourcelink.json
-/Users/kevinasramoska/Desktop/Property Manager/RentRight/obj/Debug/net9.0/compressed/7oosb5xo1n-uustdt1q7x.gz

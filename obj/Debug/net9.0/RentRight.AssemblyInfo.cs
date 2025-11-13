@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("RentRight")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+fd4b9a8fbecb7a41258639ff9b74348633ad9c6f")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b871dda94dfec56a5c7eb4bbe3573bfe691438a5")]
 [assembly: System.Reflection.AssemblyProductAttribute("RentRight")]
 [assembly: System.Reflection.AssemblyTitleAttribute("RentRight")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

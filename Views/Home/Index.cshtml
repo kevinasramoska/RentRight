@@ -14,7 +14,7 @@
         </p>
         @if (User.Identity?.IsAuthenticated ?? false)
         {
-            <a asp-controller="Properties" asp-action="Index" class="btn btn-success btn-lg me-2">View Properties</a>
+            <a asp-controller="Dashboard" asp-action="Index" class="btn btn-success btn-lg me-2">Go to Dashboard</a>
             <a asp-area="Identity" asp-page="/Account/Manage/Index" class="btn btn-outline-secondary btn-lg">My Account</a>
         }
         else
@@ -22,6 +22,7 @@
             <a asp-area="Identity" asp-page="/Account/Register" class="btn btn-primary btn-lg me-2">Get Started</a>
             <a asp-area="Identity" asp-page="/Account/Login" class="btn btn-outline-primary btn-lg">Sign In</a>
         }
+
 
     </div>
 

@@ -1,0 +1,30 @@
+@model (int totalUsers, int totalProperties)
+
+@{
+    ViewData["Title"] = "Admin Dashboard";
+}
+
+<div class="container py-5">
+    <h2 class="fw-bold mb-4">Admin Dashboard</h2>
+
+    <div class="row text-center">
+        <div class="col-md-6 mb-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <h5 class="text-muted">Total Users</h5>
+                    <h2 class="fw-bold">@Model.totalUsers</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <h5 class="text-muted">Total Properties</h5>
+                    <h2 class="fw-bold">@Model.totalProperties</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <a asp-controller="Properties" asp-action="Index" class="btn btn-primary">Manage Properties</a>
+</div>
