@@ -1,0 +1,25 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+
+# IDE and OS files
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.DS_Store
+
+# Local configuration and secrets
+appsettings.Local.json
+appsettings.*.Local.json
+secrets.json
+*.pfx
+*.snk
+
+# Test and tooling output
+TestResults/
+coverage/
+*.coverage
+*.coveragexml

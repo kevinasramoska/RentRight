@@ -28,9 +28,7 @@ builder.Services.AddRazorPages(); // ✅ needed for Identity UI
 
 var app = builder.Build();
 
-// -----------------
-// Seed Roles + Admin User
-// -----------------
+// Seed roles and, in development, an optional administrator configured outside source control.
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
@@ -46,24 +44,28 @@ using (var scope = app.Services.CreateScope())
             await roleManager.CreateAsync(new IdentityRole(role));
     }
 
-    // Create default admin user
-    string adminEmail = "admin@rentright.com";
-    string adminPassword = "Admin!123";
+    var adminEmail = builder.Configuration["SeedAdmin:Email"];
+    var adminPassword = builder.Configuration["SeedAdmin:Password"];
 
-    var adminUser = await userManager.FindByEmailAsync(adminEmail);
-    if (adminUser == null)
+    if (app.Environment.IsDevelopment() &&
+        !string.IsNullOrWhiteSpace(adminEmail) &&
+        !string.IsNullOrWhiteSpace(adminPassword))
     {
-        var newAdmin = new ApplicationUser
+        var adminUser = await userManager.FindByEmailAsync(adminEmail);
+        if (adminUser == null)
         {
-            UserName = adminEmail,
-            Email = adminEmail,
-            EmailConfirmed = true,
-            FullName = "Admin User"
-        };
+            var newAdmin = new ApplicationUser
+            {
+                UserName = adminEmail,
+                Email = adminEmail,
+                EmailConfirmed = true,
+                FullName = "Admin User"
+            };
 
-        var createAdmin = await userManager.CreateAsync(newAdmin, adminPassword);
-        if (createAdmin.Succeeded)
-            await userManager.AddToRoleAsync(newAdmin, "Admin");
+            var createAdmin = await userManager.CreateAsync(newAdmin, adminPassword);
+            if (createAdmin.Succeeded)
+                await userManager.AddToRoleAsync(newAdmin, "Admin");
+        }
     }
 }
 

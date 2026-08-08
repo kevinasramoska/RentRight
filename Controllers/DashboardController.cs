@@ -22,6 +22,8 @@ namespace RentRight.Controllers
         public async Task<IActionResult> Index()
         {
             var user = await _userManager.GetUserAsync(User);
+            if (user == null) return Challenge();
+
             var roles = await _userManager.GetRolesAsync(user);
 
             if (roles.Contains("Admin"))
@@ -50,6 +52,8 @@ namespace RentRight.Controllers
         public async Task<IActionResult> LandlordDashboard()
         {
             var user = await _userManager.GetUserAsync(User);
+            if (user == null) return Challenge();
+
             var myProperties = await _context.Properties
                 .Where(p => p.LandlordId == user.Id)
                 .ToListAsync();

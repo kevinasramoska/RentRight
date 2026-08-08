@@ -91,9 +91,15 @@ namespace RentRight.Controllers
         {
             if (id != property.Id) return NotFound();
 
-            // ensure we don’t lose LandlordId on update
             var existing = await _context.Properties.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id);
             if (existing == null) return NotFound();
+
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null) return Challenge();
+
+            if (User.IsInRole("Landlord") && existing.LandlordId != user.Id)
+                return Forbid();
+
             property.LandlordId = existing.LandlordId;
 
             if (ModelState.IsValid)
@@ -114,6 +120,12 @@ namespace RentRight.Controllers
             var property = await _context.Properties.FirstOrDefaultAsync(p => p.Id == id);
             if (property == null) return NotFound();
 
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null) return Challenge();
+
+            if (User.IsInRole("Landlord") && property.LandlordId != user.Id)
+                return Forbid();
+
             return View(property);
         }
 
@@ -126,6 +138,12 @@ namespace RentRight.Controllers
             var property = await _context.Properties.FindAsync(id);
             if (property != null)
             {
+                var user = await _userManager.GetUserAsync(User);
+                if (user == null) return Challenge();
+
+                if (User.IsInRole("Landlord") && property.LandlordId != user.Id)
+                    return Forbid();
+
                 _context.Properties.Remove(property);
                 await _context.SaveChangesAsync();
             }
