@@ -1,7 +1,7 @@
 @model List<(RentRight.Models.ApplicationUser user, IList<string> roles)>
 @{
     ViewData["Title"] = "Admin Panel";
-    var allRoles = ViewBag.AllRoles as List<string>;
+    var allRoles = ViewBag.AllRoles as List<string> ?? [];
 }
 
 <h2 class="mb-3">Admin Panel – User Role Management</h2>

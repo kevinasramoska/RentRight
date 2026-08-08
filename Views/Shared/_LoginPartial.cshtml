@@ -7,12 +7,14 @@
     @if (SignInManager.IsSignedIn(User))
     {
         var currentUser = await UserManager.GetUserAsync(User);
-        var roles = await UserManager.GetRolesAsync(currentUser);
+        var roles = currentUser is null
+            ? Array.Empty<string>()
+            : await UserManager.GetRolesAsync(currentUser);
 
         // ✅ Greet the user
         <li class="nav-item">
             <span class="nav-link text-dark">
-                Hello @currentUser.FullName!
+                Hello @currentUser?.FullName!
             </span>
         </li>
 
