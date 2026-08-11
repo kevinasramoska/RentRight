@@ -29,19 +29,53 @@ public class MaintenanceServiceTests
         Assert.Null(store.CreatedRequest);
     }
 
-    [Fact]
-    public async Task CreateAsync_DescriptionOverMaximumLength_ReturnsValidation()
+    [Theory]
+    [InlineData(9, MaintenanceOutcomeStatus.Validation)]
+    [InlineData(10, MaintenanceOutcomeStatus.Success)]
+    [InlineData(2000, MaintenanceOutcomeStatus.Success)]
+    [InlineData(2001, MaintenanceOutcomeStatus.Validation)]
+    public async Task CreateAsync_DescriptionLengthBoundary_ReturnsExpectedOutcome(
+        int descriptionLength,
+        MaintenanceOutcomeStatus expectedStatus)
     {
         var store = CreateStoreWithActiveTenancy();
         var service = CreateCommandService(store, "tenant-1", "Tenant");
 
         var outcome = await service.CreateAsync(
-            new CreateMaintenanceRequestCommand(1, new string('x', 2001)),
+            new CreateMaintenanceRequestCommand(1, new string('x', descriptionLength)),
             CancellationToken.None);
 
-        Assert.Equal(MaintenanceOutcomeStatus.Validation, outcome.Status);
-        Assert.Contains(outcome.Errors!, error => error.Field == "Description");
-        Assert.Null(store.CreatedRequest);
+        Assert.Equal(expectedStatus, outcome.Status);
+        if (expectedStatus == MaintenanceOutcomeStatus.Success)
+        {
+            Assert.Equal(descriptionLength, store.CreatedRequest!.Description.Length);
+        }
+        else
+        {
+            Assert.Contains(outcome.Errors!, error => error.Field == "Description");
+            Assert.Null(store.CreatedRequest);
+        }
+    }
+
+    [Fact]
+    public async Task CreateAsync_TenancyStartingAndEndingToday_IsActive()
+    {
+        var today = DateOnly.FromDateTime(Now);
+        var store = new FakeMaintenanceStore();
+        store.Tenancies.Add(CreateTenancy(
+            id: 1,
+            tenantId: "tenant-1",
+            TenancyStatus.Active,
+            today,
+            today));
+        var service = CreateCommandService(store, "tenant-1", "Tenant");
+
+        var outcome = await service.CreateAsync(
+            new CreateMaintenanceRequestCommand(1, "A valid maintenance description"),
+            CancellationToken.None);
+
+        Assert.Equal(MaintenanceOutcomeStatus.Success, outcome.Status);
+        Assert.NotNull(store.CreatedRequest);
     }
 
     [Theory]
