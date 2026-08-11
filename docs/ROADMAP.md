@@ -12,13 +12,13 @@ RentRight should evolve by completing its core rental domain first, then adding 
 
 The recommended target remains a single deployable application. ASP.NET Core hosts MVC, Identity, the REST API, and the built React assets. EF Core remains the data-access technology and SQL Server remains the system of record. This is enough to demonstrate full-stack and cloud engineering without introducing distributed-system complexity.
 
-An early framework upgrade is recommended. The repository targets .NET 9. As of this review, .NET 9 is an STS release in maintenance and reaches end of support on 10 November 2026, while .NET 10 is the active LTS release through November 2028. A portfolio application presented as production-ready should move to a supported LTS baseline before substantial feature work. See the [official .NET support policy](https://dotnet.microsoft.com/en-us/platform/support/policy).
+The repository now targets .NET 10, the active LTS release through November 2028. This replaces the original .NET 9 STS baseline before substantial feature work. See the [official .NET support policy](https://dotnet.microsoft.com/en-us/platform/support/policy).
 
 ## Inspection summary
 
 ### Current repository shape
 
-- One root web project, `RentRight.csproj`, targeting `net9.0`; there is no solution file.
+- One root web project, `RentRight.csproj`, and one xUnit project, both targeting `net10.0`, with `RentRight.slnx` as the solution entry point.
 - MVC controllers for home, dashboard, admin, properties, and an empty maintenance-request controller.
 - Razor views for public property browsing, property CRUD, dashboards, and admin role management.
 - `ApplicationDbContext` inherits from `IdentityDbContext<ApplicationUser>` and exposes `Properties` and `MaintenanceRequests`.
@@ -43,11 +43,11 @@ These files should be reviewed and committed as an intentional baseline rather t
 
 ### Verified technical findings
 
-- `dotnet test RentRight.Tests/RentRight.Tests.csproj --configuration Release` passes 2/2 tests.
-- `dotnet ef migrations has-pending-model-changes` fails, reporting model drift.
-- EF Core warns that `Property.RentAmount` has no explicit precision and could be silently truncated.
-- ASP.NET Core/EF package versions are mixed between `9.0.0` and `9.0.10`; the installed/current supported patch line should be aligned during the framework upgrade.
-- The NuGet vulnerability audit reports a high-severity advisory in transitive `Microsoft.Build 17.10.4` and low-severity advisories in transitive `NuGet.Packaging`/`NuGet.Protocol 6.11.0`, reached through the current tooling dependency graph. Remove or update development-time scaffolding/tooling dependencies and rerun the audit; do not assume these are application runtime exposures without tracing the resolved assets.
+- `dotnet test RentRight.slnx --configuration Release` passes 13/13 tests on .NET 10.
+- `dotnet ef migrations has-pending-model-changes` reports no model drift.
+- `Property.RentAmount` has explicit decimal precision in the EF Core model.
+- ASP.NET Core and EF Core package versions are aligned on the supported .NET 10 patch line.
+- Removing the unused scaffolding dependency eliminates the previously reported transitive `Microsoft.Build` and NuGet advisories; the solution vulnerability audit is clean.
 - Property and maintenance text columns are mostly `nvarchar(max)` and domain indexes are limited to foreign-key indexes.
 - Public property queries are unpaged and tracked. The admin user/role page performs an Identity role lookup per user.
 - Controllers lack cancellation tokens and mostly expose EF entities directly to Razor model binding.

@@ -10,13 +10,13 @@ Every behavior-changing task includes tests. The dedicated testing phase creates
 
 ## Phase 1 — Existing domain completion
 
-Implementation checkpoint (2026-08-11): the focused core-domain request is implemented and documented in [PHASE1_MANUAL_VERIFICATION.md](PHASE1_MANUAL_VERIFICATION.md). P01-01 remains partial because the .NET 10/package upgrade was intentionally excluded from this domain-only change. P01-02 and P01-03 remain partial against their broader original acceptance criteria; the delivered portions are recorded below rather than overstated as complete.
+Implementation checkpoint (2026-08-11): the focused core-domain request is implemented and documented in [PHASE1_MANUAL_VERIFICATION.md](PHASE1_MANUAL_VERIFICATION.md). P01-01 now includes the solution entry point, .NET 10 SDK pin, package alignment, CI update, and dependency audit; database-backed startup and migration rehearsal remain environment-dependent. P01-02 and P01-03 remain partial against their broader original acceptance criteria; the delivered portions are recorded below rather than overstated as complete.
 
 ### P01-01 — Establish a supported, reproducible baseline
 
-- **Implementation status:** Partial — added `RentRight.slnx` and verified solution build/test commands; .NET 10 and dependency remediation remain outstanding.
+- **Implementation status:** Partial — added `RentRight.slnx`, upgraded both projects to .NET 10, aligned Microsoft packages, removed unused scaffolding dependencies, pinned the SDK, and updated CI; database-backed startup and migration rehearsal remain outstanding.
 
-- **Why it matters:** The current working tree contains valuable but uncommitted test/CI/view-model work, has no solution entry point, mixes .NET 9 package patches, and targets an STS framework nearing end of support. A stable baseline prevents later work from being built on ambiguous state.
+- **Why it matters:** The initial working tree contained valuable but uncommitted test/CI/view-model work, had no solution entry point, mixed .NET 9 package patches, and targeted an STS framework nearing end of support. A stable baseline prevents later work from being built on ambiguous state.
 - **Files/components likely affected:** `RentRight.csproj`, `RentRight.Tests/RentRight.Tests.csproj`, `Program.cs`, a new solution file (`.slnx` or `.sln`), optional `global.json`/`Directory.Build.props`, `.github/workflows/ci.yml`, `README.md`, current uncommitted `ViewModels` and admin/dashboard changes.
 - **Implementation steps:**
   1. Review and commit the existing local changes as an intentional, isolated baseline; do not mix them with the framework upgrade.
