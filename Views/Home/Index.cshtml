@@ -1,4 +1,4 @@
-﻿@model IEnumerable<RentRight.Models.Property>
+﻿@model IReadOnlyList<RentRight.Features.Properties.Contracts.LatestPropertyListItem>
 
 @{
     ViewData["Title"] = "Welcome to RentRight";
@@ -89,7 +89,14 @@
     }
     else
     {
-        <p class="text-center text-muted">No properties listed yet. Be the first to <a asp-controller="Properties" asp-action="Create">add one</a>!</p>
+        @if (User.IsInRole("Landlord") || User.IsInRole("Admin"))
+        {
+            <p class="text-center text-muted">No properties listed yet. Be the first to <a asp-controller="Properties" asp-action="Create">add one</a>!</p>
+        }
+        else
+        {
+            <p class="text-center text-muted">No properties listed yet.</p>
+        }
     }
 
     <!-- CTA section -->

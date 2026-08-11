@@ -31,6 +31,16 @@ public sealed class PropertyService(
         return PropertyQueryOutcome<IReadOnlyList<PropertyListItem>>.Success(items);
     }
 
+    public async Task<PropertyQueryOutcome<IReadOnlyList<LatestPropertyListItem>>> ListLatestAsync(
+        LatestPropertiesQuery query,
+        CancellationToken cancellationToken)
+    {
+        var limit = Math.Clamp(query.Limit, 1, LatestPropertiesQuery.MaximumLimit);
+        var properties = await propertyStore.ListLatestAsync(limit, cancellationToken);
+
+        return PropertyQueryOutcome<IReadOnlyList<LatestPropertyListItem>>.Success(properties);
+    }
+
     public async Task<PropertyQueryOutcome<PropertyDetails>> GetDetailsAsync(
         int propertyId,
         CancellationToken cancellationToken)

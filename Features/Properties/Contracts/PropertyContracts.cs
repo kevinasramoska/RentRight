@@ -15,6 +15,19 @@ public sealed record PropertyListItem(
     decimal RentAmount,
     bool CanManage);
 
+public sealed record LatestPropertiesQuery(int Limit = 6)
+{
+    public const int DefaultLimit = 6;
+    public const int MaximumLimit = 12;
+}
+
+public sealed record LatestPropertyListItem(
+    int Id,
+    string Title,
+    string Address,
+    decimal RentAmount,
+    string? Description);
+
 public sealed record PropertyDetails(
     int Id,
     string Title,

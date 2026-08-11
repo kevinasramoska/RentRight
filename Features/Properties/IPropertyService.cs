@@ -8,6 +8,10 @@ public interface IPropertyService
         PropertyListQuery query,
         CancellationToken cancellationToken);
 
+    Task<PropertyQueryOutcome<IReadOnlyList<LatestPropertyListItem>>> ListLatestAsync(
+        LatestPropertiesQuery query,
+        CancellationToken cancellationToken);
+
     Task<PropertyQueryOutcome<PropertyDetails>> GetDetailsAsync(
         int propertyId,
         CancellationToken cancellationToken);

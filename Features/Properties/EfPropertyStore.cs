@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RentRight.Data;
+using RentRight.Features.Properties.Contracts;
 using RentRight.Models;
 
 namespace RentRight.Features.Properties;
@@ -21,6 +22,21 @@ public sealed class EfPropertyStore(ApplicationDbContext context) : IPropertySto
                 property.Address,
                 property.RentAmount,
                 property.LandlordId))
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<LatestPropertyListItem>> ListLatestAsync(
+        int limit,
+        CancellationToken cancellationToken) =>
+        await context.Properties
+            .AsNoTracking()
+            .OrderByDescending(property => property.Id)
+            .Take(limit)
+            .Select(property => new LatestPropertyListItem(
+                property.Id,
+                property.Title,
+                property.Address,
+                property.RentAmount,
+                property.Description))
             .ToListAsync(cancellationToken);
 
     public Task<PropertyRecord?> FindAsync(
