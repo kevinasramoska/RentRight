@@ -56,6 +56,8 @@ public class DashboardServiceTests
     [Theory]
     [InlineData(false, null, "Landlord", DashboardQueryStatus.Unauthenticated)]
     [InlineData(true, null, "Landlord", DashboardQueryStatus.Unauthenticated)]
+    [InlineData(true, "", "Landlord", DashboardQueryStatus.Unauthenticated)]
+    [InlineData(true, "   ", "Landlord", DashboardQueryStatus.Unauthenticated)]
     [InlineData(true, "user-1", "Tenant", DashboardQueryStatus.Forbidden)]
     public async Task LandlordQuery_UserWithoutLandlordAccess_ReturnsAuthorizationOutcomeWithoutQuerying(
         bool isAuthenticated,
@@ -114,6 +116,8 @@ public class DashboardServiceTests
     [Theory]
     [InlineData(false, null)]
     [InlineData(true, null)]
+    [InlineData(true, "")]
+    [InlineData(true, "   ")]
     public async Task TenantQuery_UserWithoutAuthenticatedIdentity_ReturnsUnauthenticatedWithoutQuerying(
         bool isAuthenticated,
         string? userId)
@@ -129,6 +133,23 @@ public class DashboardServiceTests
         Assert.Equal(DashboardQueryStatus.Unauthenticated, outcome.Status);
         Assert.Null(store.TenancyTenantId);
         Assert.Null(store.MaintenanceTenantId);
+    }
+
+    [Fact]
+    public async Task TenantQuery_AuthenticatedTenant_ForwardsCancellationTokenToBothQueries()
+    {
+        var store = new FakeDashboardDataStore();
+        var service = new TenantDashboardQueryService(
+            store,
+            new FakeCurrentUser(true, "tenant-9", ["Tenant"]),
+            new FakeClock(new DateTime(2026, 8, 11, 12, 0, 0, DateTimeKind.Utc)));
+        using var cancellationSource = new CancellationTokenSource();
+
+        var outcome = await service.QueryAsync(cancellationSource.Token);
+
+        Assert.Equal(DashboardQueryStatus.Success, outcome.Status);
+        Assert.Equal(cancellationSource.Token, store.TenancyCancellationToken);
+        Assert.Equal(cancellationSource.Token, store.MaintenanceCancellationToken);
     }
 
     [Fact]
@@ -205,6 +226,21 @@ public class DashboardServiceTests
         Assert.Equal(4, outcome.Dashboard.TotalProperties);
     }
 
+    [Fact]
+    public async Task AdminQuery_AdminUser_ForwardsCancellationToken()
+    {
+        var store = new FakeDashboardDataStore();
+        var service = new AdminDashboardQueryService(
+            store,
+            new FakeCurrentUser(true, "admin-1", ["Admin"]));
+        using var cancellationSource = new CancellationTokenSource();
+
+        var outcome = await service.QueryAsync(cancellationSource.Token);
+
+        Assert.Equal(DashboardQueryStatus.Success, outcome.Status);
+        Assert.Equal(cancellationSource.Token, store.AdminCancellationToken);
+    }
+
     [Theory]
     [InlineData(false, "Admin", DashboardQueryStatus.Unauthenticated)]
     [InlineData(true, "Tenant", DashboardQueryStatus.Forbidden)]
@@ -228,14 +264,17 @@ public class DashboardServiceTests
     {
         public AdminDashboardSummary AdminSummary { get; init; } = new(0, 0);
         public bool AdminQueried { get; private set; }
+        public CancellationToken AdminCancellationToken { get; private set; }
         public IReadOnlyList<LandlordPropertySummary> LandlordProperties { get; init; } = [];
         public string? LandlordId { get; private set; }
         public int LandlordMaximumResults { get; private set; }
         public string? TenancyTenantId { get; private set; }
         public int TenancyMaximumResults { get; private set; }
+        public CancellationToken TenancyCancellationToken { get; private set; }
         public DateOnly? Today { get; private set; }
         public string? MaintenanceTenantId { get; private set; }
         public int MaintenanceMaximumResults { get; private set; }
+        public CancellationToken MaintenanceCancellationToken { get; private set; }
         public IReadOnlyList<TenantTenancySummary> TenantTenancies { get; init; } = [];
         public IReadOnlyList<TenantMaintenanceSummary> TenantMaintenanceRequests
             { get; init; } = [];
@@ -244,6 +283,7 @@ public class DashboardServiceTests
             CancellationToken cancellationToken)
         {
             AdminQueried = true;
+            AdminCancellationToken = cancellationToken;
             return Task.FromResult(AdminSummary);
         }
 
@@ -266,6 +306,7 @@ public class DashboardServiceTests
             TenancyTenantId = tenantId;
             Today = today;
             TenancyMaximumResults = maximumResults;
+            TenancyCancellationToken = cancellationToken;
             return Task.FromResult(TenantTenancies);
         }
 
@@ -276,6 +317,7 @@ public class DashboardServiceTests
         {
             MaintenanceTenantId = tenantId;
             MaintenanceMaximumResults = maximumResults;
+            MaintenanceCancellationToken = cancellationToken;
             return Task.FromResult(TenantMaintenanceRequests);
         }
     }

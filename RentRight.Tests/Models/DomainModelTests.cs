@@ -55,6 +55,30 @@ public class DomainModelTests
         Assert.Equal(expected, current.CanTransitionTo(next));
     }
 
+    [Theory]
+    [InlineData(MaintenanceRequestStatus.Submitted, MaintenanceRequestStatus.InProgress)]
+    [InlineData(MaintenanceRequestStatus.InProgress, MaintenanceRequestStatus.Resolved)]
+    [InlineData(
+        MaintenanceRequestStatus.Resolved,
+        MaintenanceRequestStatus.InProgress,
+        MaintenanceRequestStatus.Closed)]
+    [InlineData(MaintenanceRequestStatus.Closed)]
+    public void MaintenanceStatusAllowedTransitions_EachWorkflowState_ReturnsExactNextStates(
+        MaintenanceRequestStatus current,
+        params MaintenanceRequestStatus[] expected)
+    {
+        Assert.Equal(expected, current.GetAllowedTransitions());
+    }
+
+    [Fact]
+    public void MaintenanceStatusTransitions_UndefinedStatus_HasNoAllowedTransitions()
+    {
+        var undefined = (MaintenanceRequestStatus)999;
+
+        Assert.Empty(undefined.GetAllowedTransitions());
+        Assert.False(MaintenanceRequestStatus.Submitted.CanTransitionTo(undefined));
+    }
+
     [Fact]
     public void Tenancy_RejectsEndDateBeforeStartDate()
     {
@@ -80,6 +104,8 @@ public class DomainModelTests
 
     [Theory]
     [InlineData(TenancyStatus.Active, "2026-08-01", null, "2026-08-11", true)]
+    [InlineData(TenancyStatus.Active, "2026-08-11", null, "2026-08-11", true)]
+    [InlineData(TenancyStatus.Active, "2026-08-01", "2026-08-11", "2026-08-11", true)]
     [InlineData(TenancyStatus.Active, "2026-08-12", null, "2026-08-11", false)]
     [InlineData(TenancyStatus.Active, "2026-08-01", "2026-08-10", "2026-08-11", false)]
     [InlineData(TenancyStatus.Ended, "2026-08-01", null, "2026-08-11", false)]
