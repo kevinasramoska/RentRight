@@ -288,6 +288,11 @@ Route shape should express resource relationships, while the service layer remai
 
 ### 6.2 Contract conventions
 
+P03-01 implements the shared conventions below in `RentRight.Api` and
+`Controllers/Api/V1/ApiV1ControllerBase.cs`. The exact runtime contract, stable error
+codes, pagination bounds, and browser request requirements are documented in
+[`API.md`](API.md). Resource routes remain future work starting with P03-02.
+
 - JSON uses a documented naming convention and ISO-8601 UTC timestamps.
 - Use dedicated request and response DTOs with bounded validation.
 - `201 Created` includes a location for successful creation.
@@ -312,7 +317,7 @@ Expose an intentional opaque version value for mutable resources. A client submi
 - A configured external OpenID Connect provider is an additional sign-in method, not a replacement account database or authorization server.
 - External subject/provider keys link to a local Identity account. Roles remain local and are never trusted directly from arbitrary external claims without an explicit mapping policy.
 - React is hosted on the same origin and uses the application cookie with `credentials: include`.
-- Unsafe MVC and API requests require antiforgery validation. React obtains a request token through a small authenticated endpoint or host-page bootstrap and sends it in a documented header.
+- Unsafe MVC and API requests require antiforgery validation. React obtains a request token through a small authenticated endpoint or host-page bootstrap and sends it in the documented `X-CSRF-TOKEN` header.
 - Authentication secrets live in user secrets locally and Key Vault/environment configuration in Azure.
 
 Do not add a custom JWT issuer. If a future separately hosted/mobile client creates a real bearer-token requirement, use a managed standards-compliant identity provider and document the new threat model.
@@ -504,4 +509,3 @@ Create short ADRs as these decisions are implemented:
 - Native mobile apps.
 - Real-time chat or notification infrastructure.
 - High-scale multi-region, sharding, event sourcing, or eventual-consistency design.
-

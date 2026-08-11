@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using RentRight.Api;
 using RentRight.Application;
 using RentRight.Data;
 using RentRight.Features.Administration;
@@ -35,7 +36,11 @@ builder.Services.AddPropertiesFeature();
 builder.Services.AddTenanciesAndDashboardsFeature();
 builder.Services.AddMaintenanceFeature();
 builder.Services.AddControllersWithViews(options =>
-    options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute()));
+{
+    options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute());
+})
+.AddApiJsonConventions();
+builder.Services.AddApiConventions();
 builder.Services.AddRazorPages(); // ✅ needed for Identity UI
 
 var app = builder.Build();
@@ -99,12 +104,19 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();
+app.UseApiProblemDetails();
 app.UseAuthentication();
 app.UseAuthorization();
 
 // -----------------
 // Routes
 // -----------------
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+}
+
+app.MapControllers();
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
@@ -125,3 +137,5 @@ static void EnsureIdentitySucceeded(IdentityResult result, string operation)
         result.Errors.Select(error => $"{error.Code}: {error.Description}"));
     throw new InvalidOperationException($"Unable to {operation}. {errors}");
 }
+
+public partial class Program;

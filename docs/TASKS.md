@@ -115,6 +115,13 @@ Implementation checkpoint (2026-08-11): the focused core-domain request is imple
 
 ### P03-01 — Establish versioned API conventions and OpenAPI
 
+- **Implementation status:** Complete — added the `/api/v1` controller convention,
+  camel-case JSON and bounded pagination contracts, RFC 7807 outcome/validation/error
+  mapping with stable codes and trace IDs, API-specific cookie challenge behavior,
+  global unsafe-request antiforgery coverage with a documented header, safe exception
+  responses, and runtime OpenAPI exposed only in Development. No resource or smoke
+  endpoint was added; integration coverage uses a test-only application part.
+
 - **Why it matters:** A professional API needs predictable routing, errors, validation, documentation, auth behavior, and testable contracts before resource endpoints multiply.
 - **Files/components likely affected:** `Controllers/Api/V1/*`, API conventions/options, `Program.cs`, `ProblemDetails` customization, OpenAPI setup, shared result-to-HTTP mapper, API documentation.
 - **Implementation steps:**
