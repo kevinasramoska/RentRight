@@ -50,7 +50,8 @@ public sealed class MaintenanceCommandService(
             return CreateMaintenanceRequestOutcome.ConcealedNotFound();
         }
 
-        var today = DateOnly.FromDateTime(clock.UtcNow);
+        var now = clock.UtcNow;
+        var today = DateOnly.FromDateTime(now);
         if (!IsActiveOn(tenancy, today))
         {
             return CreateMaintenanceRequestOutcome.Validation(
@@ -59,7 +60,6 @@ public sealed class MaintenanceCommandService(
                     "Select a tenancy that is currently active for your account.")]);
         }
 
-        var now = clock.UtcNow;
         try
         {
             var requestId = await store.CreateAsync(
