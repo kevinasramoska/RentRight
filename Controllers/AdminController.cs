@@ -1,92 +1,112 @@
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using RentRight.Models;
+using RentRight.Features.Administration;
+using RentRight.Features.Administration.Contracts;
 using RentRight.ViewModels;
 
 namespace RentRight.Controllers
 {
     [Authorize(Roles = "Admin")]
-    public class AdminController : Controller
+    public class AdminController(IAdministrationService administrationService) : Controller
     {
-        private readonly UserManager<ApplicationUser> _userManager;
-        private readonly RoleManager<IdentityRole> _roleManager;
-
-        public AdminController(UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager)
-        {
-            _userManager = userManager;
-            _roleManager = roleManager;
-        }
-
         // GET: /Admin
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(
+            int page = 1,
+            CancellationToken cancellationToken = default)
         {
-            var users = _userManager.Users.OrderBy(user => user.Email).ToList();
-            var allRoles = _roleManager.Roles
-                .Select(role => role.Name!)
-                .OrderBy(role => role)
-                .ToList();
+            var outcome = await administrationService.ListUsersAsync(
+                new AdministrationUsersQuery(page),
+                cancellationToken);
 
-            var userRoles = new List<UserRoleRowViewModel>();
-            foreach (var user in users)
+            return outcome.Status switch
             {
-                var roles = await _userManager.GetRolesAsync(user);
-                userRoles.Add(new UserRoleRowViewModel
-                {
-                    User = user,
-                    Roles = roles.ToList()
-                });
-            }
-
-            return View(new AdminUserRolesViewModel
-            {
-                Users = userRoles,
-                AvailableRoles = allRoles
-            });
+                ListAdministrationUsersStatus.Success => View(ToViewModel(outcome.Page!)),
+                ListAdministrationUsersStatus.Unauthenticated => Challenge(),
+                ListAdministrationUsersStatus.Forbidden => Forbid(),
+                _ => throw new InvalidOperationException("Unknown Administration list outcome.")
+            };
         }
 
         // POST: /Admin/UpdateRoles
         [HttpPost]
-        public async Task<IActionResult> UpdateRoles(string userId, List<string>? selectedRoles)
+        public async Task<IActionResult> UpdateRoles(
+            string userId,
+            List<string>? selectedRoles,
+            CancellationToken cancellationToken = default)
         {
-            var user = await _userManager.FindByIdAsync(userId);
-            if (user == null) return NotFound();
-
-            var requestedRoles = (selectedRoles ?? [])
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-            var validRoles = _roleManager.Roles
-                .Select(role => role.Name!)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-            if (requestedRoles.Any(role => !validRoles.Contains(role)))
+            if (string.IsNullOrWhiteSpace(userId))
             {
-                TempData["Error"] = "One or more selected roles are invalid.";
+                AddValidationError(nameof(userId), "A user is required.");
                 return RedirectToAction(nameof(Index));
             }
 
-            var currentRoles = await _userManager.GetRolesAsync(user);
-            if (currentRoles.Contains("Admin") && !requestedRoles.Contains("Admin", StringComparer.OrdinalIgnoreCase))
-            {
-                var administrators = await _userManager.GetUsersInRoleAsync("Admin");
-                if (administrators.Count == 1)
-                {
-                    TempData["Error"] = "At least one administrator account must remain assigned to the Admin role.";
-                    return RedirectToAction(nameof(Index));
-                }
-            }
+            var outcome = await administrationService.UpdateUserRolesAsync(
+                new UpdateUserRolesCommand(userId, selectedRoles ?? []),
+                cancellationToken);
 
-            var rolesToAdd = requestedRoles.Except(currentRoles);
-            var rolesToRemove = currentRoles.Except(requestedRoles);
-
-            if (rolesToAdd.Any())
-                await _userManager.AddToRolesAsync(user, rolesToAdd);
-
-            if (rolesToRemove.Any())
-                await _userManager.RemoveFromRolesAsync(user, rolesToRemove);
-
-            TempData["Success"] = $"Updated roles for {user.Email}";
-            return RedirectToAction(nameof(Index));
+            return MapUpdateOutcome(outcome);
         }
+
+        private IActionResult MapUpdateOutcome(UpdateUserRolesOutcome outcome)
+        {
+            switch (outcome.Status)
+            {
+                case UpdateUserRolesStatus.Success:
+                    TempData["Success"] = $"Updated roles for {outcome.UserEmail}";
+                    return RedirectToAction(nameof(Index));
+                case UpdateUserRolesStatus.Unauthenticated:
+                    return Challenge();
+                case UpdateUserRolesStatus.Forbidden:
+                    return Forbid();
+                case UpdateUserRolesStatus.UserNotFound:
+                    return NotFound();
+                case UpdateUserRolesStatus.InvalidRoles:
+                    AddValidationError(
+                        "selectedRoles",
+                        "One or more selected roles are invalid.");
+                    return RedirectToAction(nameof(Index));
+                case UpdateUserRolesStatus.LastAdministrator:
+                    AddValidationError(
+                        "selectedRoles",
+                        "At least one administrator account must remain assigned to the Admin role.");
+                    return RedirectToAction(nameof(Index));
+                case UpdateUserRolesStatus.IdentityFailure:
+                    AddValidationError(
+                        "selectedRoles",
+                        $"Unable to update roles. {string.Join(" ", outcome.Errors ?? [])}");
+                    return RedirectToAction(nameof(Index));
+                case UpdateUserRolesStatus.ConcurrentUpdate:
+                    AddValidationError(
+                        "selectedRoles",
+                        "Roles changed concurrently. Reload the page and try again.");
+                    return RedirectToAction(nameof(Index));
+                default:
+                    throw new InvalidOperationException("Unknown Administration update outcome.");
+            }
+        }
+
+        private void AddValidationError(string key, string message)
+        {
+            ModelState.AddModelError(key, message);
+            TempData["Error"] = message;
+        }
+
+        private static AdminUserRolesViewModel ToViewModel(AdministrationUsersPage page) =>
+            new()
+            {
+                Users = page.Users
+                    .Select(user => new UserRoleRowViewModel
+                    {
+                        UserId = user.UserId,
+                        FullName = user.FullName,
+                        Email = user.Email,
+                        Roles = user.Roles
+                    })
+                    .ToArray(),
+                AvailableRoles = page.AvailableRoles,
+                Page = page.Page,
+                TotalPages = page.TotalPages,
+                TotalUsers = page.TotalUsers
+            };
     }
 }

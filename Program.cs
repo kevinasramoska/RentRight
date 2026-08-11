@@ -1,7 +1,12 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using RentRight.Application;
 using RentRight.Data;
+using RentRight.Features.Administration;
+using RentRight.Features.Maintenance;
+using RentRight.Features.Properties;
+using RentRight.Features.Tenancies;
 using RentRight.Models;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -24,6 +29,11 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
 .AddDefaultTokenProviders()
 .AddDefaultUI(); // ✅ enables /Identity/Account/Login etc.
 
+builder.Services.AddApplicationFoundation();
+builder.Services.AddAdministrationFeature();
+builder.Services.AddPropertiesFeature();
+builder.Services.AddTenanciesAndDashboardsFeature();
+builder.Services.AddMaintenanceFeature();
 builder.Services.AddControllersWithViews(options =>
     options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute()));
 builder.Services.AddRazorPages(); // ✅ needed for Identity UI
@@ -43,7 +53,10 @@ using (var scope = app.Services.CreateScope())
     foreach (var role in roles)
     {
         if (!await roleManager.RoleExistsAsync(role))
-            await roleManager.CreateAsync(new IdentityRole(role));
+        {
+            var createRoleResult = await roleManager.CreateAsync(new IdentityRole(role));
+            EnsureIdentitySucceeded(createRoleResult, $"create the {role} role");
+        }
     }
 
     var adminEmail = builder.Configuration["SeedAdmin:Email"];
@@ -64,9 +77,11 @@ using (var scope = app.Services.CreateScope())
                 FullName = "Admin User"
             };
 
-            var createAdmin = await userManager.CreateAsync(newAdmin, adminPassword);
-            if (createAdmin.Succeeded)
-                await userManager.AddToRoleAsync(newAdmin, "Admin");
+            var createAdminResult = await userManager.CreateAsync(newAdmin, adminPassword);
+            EnsureIdentitySucceeded(createAdminResult, "create the configured development administrator");
+
+            var addAdminRoleResult = await userManager.AddToRoleAsync(newAdmin, "Admin");
+            EnsureIdentitySucceeded(addAdminRoleResult, "assign the Admin role to the development administrator");
         }
     }
 }
@@ -97,3 +112,16 @@ app.MapControllerRoute(
 app.MapRazorPages(); // ✅ enables Identity UI routing
 
 app.Run();
+
+static void EnsureIdentitySucceeded(IdentityResult result, string operation)
+{
+    if (result.Succeeded)
+    {
+        return;
+    }
+
+    var errors = string.Join(
+        "; ",
+        result.Errors.Select(error => $"{error.Code}: {error.Description}"));
+    throw new InvalidOperationException($"Unable to {operation}. {errors}");
+}
