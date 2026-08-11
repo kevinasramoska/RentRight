@@ -5,6 +5,8 @@
 
 <h2 class="mb-3">Admin Panel – User Role Management</h2>
 
+<p class="text-muted">Showing page @Model.Page of @Model.TotalPages (@Model.TotalUsers users).</p>
+
 @if (TempData["Success"] != null)
 {
     <div class="alert alert-success">@TempData["Success"]</div>
@@ -28,16 +30,16 @@
     @foreach (var item in Model.Users)
     {
         <tr>
-            <td>@item.User.FullName</td>
-            <td>@item.User.Email</td>
+            <td>@item.FullName</td>
+            <td>@item.Email</td>
             <td>@string.Join(", ", item.Roles)</td>
             <td>
                 <form asp-action="UpdateRoles" method="post" class="d-flex flex-column gap-2">
-                    <input type="hidden" name="userId" value="@item.User.Id" />
+                    <input type="hidden" name="userId" value="@item.UserId" />
                     <select name="selectedRoles" multiple class="form-select form-select-sm">
                         @foreach (var role in Model.AvailableRoles)
                         {
-                            <option value="@role" selected="@(item.Roles.Contains(role))">@role</option>
+                            <option value="@role" selected="@(item.Roles.Contains(role, StringComparer.OrdinalIgnoreCase))">@role</option>
                         }
                     </select>
                     <button type="submit" class="btn btn-sm btn-primary">Update</button>
@@ -47,3 +49,20 @@
     }
     </tbody>
 </table>
+
+@if (Model.TotalPages > 1)
+{
+    <nav aria-label="User role pages">
+        <ul class="pagination">
+            <li class="page-item @(Model.Page == 1 ? "disabled" : null)">
+                <a class="page-link" asp-action="Index" asp-route-page="@(Model.Page - 1)">Previous</a>
+            </li>
+            <li class="page-item disabled">
+                <span class="page-link">Page @Model.Page of @Model.TotalPages</span>
+            </li>
+            <li class="page-item @(Model.Page == Model.TotalPages ? "disabled" : null)">
+                <a class="page-link" asp-action="Index" asp-route-page="@(Model.Page + 1)">Next</a>
+            </li>
+        </ul>
+    </nav>
+}
