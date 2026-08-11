@@ -1,10 +1,7 @@
-@model IEnumerable<RentRight.Models.Property>
-@using Microsoft.AspNetCore.Identity
-@inject UserManager<ApplicationUser> UserManager
+@model IReadOnlyList<RentRight.Features.Properties.Contracts.PropertyListItem>
 
 @{
     ViewData["Title"] = "Properties";
-    var currentUserId = UserManager.GetUserId(User);
 }
 
 <h2>Properties</h2>
@@ -39,7 +36,7 @@
             <td>@item.RentAmount.ToString("C")</td>
             <td>
                 <a class="btn btn-sm btn-info" asp-action="Details" asp-route-id="@item.Id">Details</a>
-                @if (User.IsInRole("Admin") || (User.IsInRole("Landlord") && item.LandlordId == currentUserId))
+                @if (item.CanManage)
                 {
                     <a class="btn btn-sm btn-warning" asp-action="Edit" asp-route-id="@item.Id">Edit</a>
                     <a class="btn btn-sm btn-danger" asp-action="Delete" asp-route-id="@item.Id">Delete</a>

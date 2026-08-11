@@ -15,6 +15,11 @@
     <div class="alert alert-success">@successMessage</div>
 }
 
+@if (TempData["Error"] is string errorMessage)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
 @if (Model.Tenancies.Count == 0)
 {
     <div class="alert alert-info">No tenancies have been created.</div>

@@ -5,7 +5,8 @@ namespace RentRight.ViewModels;
 public class TenantDashboardViewModel
 {
     public IReadOnlyList<TenantTenancySummaryViewModel> Tenancies { get; init; } = [];
-    public IReadOnlyList<MaintenanceRequestRowViewModel> RecentMaintenanceRequests { get; init; } = [];
+    public IReadOnlyList<TenantDashboardMaintenanceRequestViewModel> RecentMaintenanceRequests
+        { get; init; } = [];
 }
 
 public class TenantTenancySummaryViewModel
@@ -17,4 +18,12 @@ public class TenantTenancySummaryViewModel
     public DateOnly? EndDate { get; init; }
     public TenancyStatus Status { get; init; }
     public bool IsCurrentlyActive { get; init; }
+}
+
+public class TenantDashboardMaintenanceRequestViewModel
+{
+    public int Id { get; init; }
+    public required string PropertyTitle { get; init; }
+    public DateTime DateSubmitted { get; init; }
+    public MaintenanceRequestStatus Status { get; init; }
 }

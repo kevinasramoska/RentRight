@@ -1,120 +1,119 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using RentRight.Data;
-using RentRight.Models;
-using Microsoft.AspNetCore.Identity;
+using RentRight.Features.Dashboards;
+using RentRight.Features.Dashboards.Contracts;
 using RentRight.ViewModels;
 
-namespace RentRight.Controllers
+namespace RentRight.Controllers;
+
+[Authorize]
+public class DashboardController(
+    IDashboardRouteService routeService,
+    IAdminDashboardQueryService adminDashboardService,
+    ILandlordDashboardQueryService landlordDashboardService,
+    ITenantDashboardQueryService tenantDashboardService) : Controller
 {
-    [Authorize]
-    public class DashboardController : Controller
+    public IActionResult Index()
     {
-        private readonly ApplicationDbContext _context;
-        private readonly UserManager<ApplicationUser> _userManager;
-
-        public DashboardController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+        var outcome = routeService.Resolve();
+        if (outcome.Status == DashboardQueryStatus.Unauthenticated)
         {
-            _context = context;
-            _userManager = userManager;
+            return Challenge();
         }
 
-        public async Task<IActionResult> Index()
+        return outcome.Destination switch
         {
-            var user = await _userManager.GetUserAsync(User);
-            if (user == null) return Challenge();
+            DashboardDestination.Admin => RedirectToAction(nameof(AdminDashboard)),
+            DashboardDestination.Landlord => RedirectToAction(nameof(LandlordDashboard)),
+            DashboardDestination.Tenant => RedirectToAction(nameof(TenantDashboard)),
+            DashboardDestination.Generic => View("GenericDashboard"),
+            _ => throw new InvalidOperationException("Unknown dashboard destination.")
+        };
+    }
 
-            var roles = await _userManager.GetRolesAsync(user);
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> AdminDashboard(CancellationToken cancellationToken)
+    {
+        var outcome = await adminDashboardService.QueryAsync(cancellationToken);
 
-            if (roles.Contains("Admin"))
-                return RedirectToAction(nameof(AdminDashboard));
-
-            if (roles.Contains("Landlord"))
-                return RedirectToAction(nameof(LandlordDashboard));
-
-            if (roles.Contains("Tenant"))
-                return RedirectToAction(nameof(TenantDashboard));
-
-            return View("GenericDashboard");
-        }
-
-        // --- ADMIN DASHBOARD ---
-        [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> AdminDashboard()
+        return outcome.Status switch
         {
-            var totalUsers = await _context.Users.CountAsync();
-            var totalProperties = await _context.Properties.CountAsync();
-            return View("AdminDashboard", new AdminDashboardViewModel
-            {
-                TotalUsers = totalUsers,
-                TotalProperties = totalProperties
-            });
-        }
-
-        // --- LANDLORD DASHBOARD ---
-        [Authorize(Roles = "Landlord")]
-        public async Task<IActionResult> LandlordDashboard()
-        {
-            var user = await _userManager.GetUserAsync(User);
-            if (user == null) return Challenge();
-
-            var myProperties = await _context.Properties
-                .Where(p => p.LandlordId == user.Id)
-                .ToListAsync();
-
-            return View("LandlordDashboard", myProperties);
-        }
-
-        // --- TENANT DASHBOARD ---
-        [Authorize(Roles = "Tenant")]
-        public async Task<IActionResult> TenantDashboard(CancellationToken cancellationToken)
-        {
-            var userId = _userManager.GetUserId(User);
-            if (userId == null) return Challenge();
-
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
-            var tenancies = await _context.Tenancies
-                .AsNoTracking()
-                .Where(tenancy => tenancy.TenantId == userId)
-                .OrderByDescending(tenancy => tenancy.Status == TenancyStatus.Active)
-                .ThenByDescending(tenancy => tenancy.StartDate)
-                .Select(tenancy => new TenantTenancySummaryViewModel
+            DashboardQueryStatus.Success => View(
+                "AdminDashboard",
+                new AdminDashboardViewModel
                 {
-                    Id = tenancy.Id,
-                    PropertyTitle = tenancy.Property!.Title,
-                    PropertyAddress = tenancy.Property.Address,
-                    StartDate = tenancy.StartDate,
-                    EndDate = tenancy.EndDate,
-                    Status = tenancy.Status,
-                    IsCurrentlyActive = tenancy.Status == TenancyStatus.Active &&
-                        tenancy.StartDate <= today &&
-                        (tenancy.EndDate == null || tenancy.EndDate >= today)
-                })
-                .ToListAsync(cancellationToken);
+                    TotalUsers = outcome.Dashboard!.TotalUsers,
+                    TotalProperties = outcome.Dashboard.TotalProperties
+                }),
+            DashboardQueryStatus.Unauthenticated => Challenge(),
+            DashboardQueryStatus.Forbidden => Forbid(),
+            _ => throw new InvalidOperationException("Unknown Admin dashboard outcome.")
+        };
+    }
 
-            var recentRequests = await _context.MaintenanceRequests
-                .AsNoTracking()
-                .Where(request => request.Tenancy!.TenantId == userId)
-                .OrderByDescending(request => request.DateSubmitted)
-                .Take(5)
-                .Select(request => new MaintenanceRequestRowViewModel
+    [Authorize(Roles = "Landlord")]
+    public async Task<IActionResult> LandlordDashboard(CancellationToken cancellationToken)
+    {
+        var outcome = await landlordDashboardService.QueryAsync(cancellationToken);
+
+        return outcome.Status switch
+        {
+            DashboardQueryStatus.Success => View(
+                "LandlordDashboard",
+                new LandlordDashboardViewModel
                 {
-                    Id = request.Id,
-                    PropertyTitle = request.Tenancy!.Property!.Title,
-                    TenantName = request.Tenancy.Tenant!.FullName,
-                    Description = request.Description,
-                    DateSubmitted = request.DateSubmitted,
-                    Status = request.Status,
-                    CanUpdateStatus = false
-                })
-                .ToListAsync(cancellationToken);
+                    Properties = outcome.Dashboard!.Properties
+                        .Select(property => new LandlordDashboardPropertyViewModel
+                        {
+                            Id = property.Id,
+                            Title = property.Title,
+                            Address = property.Address,
+                            RentAmount = property.RentAmount
+                        })
+                        .ToArray()
+                }),
+            DashboardQueryStatus.Unauthenticated => Challenge(),
+            DashboardQueryStatus.Forbidden => Forbid(),
+            _ => throw new InvalidOperationException("Unknown Landlord dashboard outcome.")
+        };
+    }
 
-            return View(new TenantDashboardViewModel
-            {
-                Tenancies = tenancies,
-                RecentMaintenanceRequests = recentRequests
-            });
-        }
+    [Authorize(Roles = "Tenant")]
+    public async Task<IActionResult> TenantDashboard(CancellationToken cancellationToken)
+    {
+        var outcome = await tenantDashboardService.QueryAsync(cancellationToken);
+
+        return outcome.Status switch
+        {
+            DashboardQueryStatus.Success => View(
+                "TenantDashboard",
+                new TenantDashboardViewModel
+                {
+                    Tenancies = outcome.Dashboard!.Tenancies
+                        .Select(tenancy => new TenantTenancySummaryViewModel
+                        {
+                            Id = tenancy.Id,
+                            PropertyTitle = tenancy.PropertyTitle,
+                            PropertyAddress = tenancy.PropertyAddress,
+                            StartDate = tenancy.StartDate,
+                            EndDate = tenancy.EndDate,
+                            Status = tenancy.Status,
+                            IsCurrentlyActive = tenancy.IsCurrentlyActive
+                        })
+                        .ToArray(),
+                    RecentMaintenanceRequests = outcome.Dashboard.RecentMaintenanceRequests
+                        .Select(request => new TenantDashboardMaintenanceRequestViewModel
+                        {
+                            Id = request.Id,
+                            PropertyTitle = request.PropertyTitle,
+                            DateSubmitted = request.DateSubmitted,
+                            Status = request.Status
+                        })
+                        .ToArray()
+                }),
+            DashboardQueryStatus.Unauthenticated => Challenge(),
+            DashboardQueryStatus.Forbidden => Forbid(),
+            _ => throw new InvalidOperationException("Unknown Tenant dashboard outcome.")
+        };
     }
 }

@@ -1,163 +1,221 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using RentRight.Data;
-using RentRight.Models;
-using Microsoft.AspNetCore.Identity;
+using RentRight.Features.Properties;
+using RentRight.Features.Properties.Contracts;
 
-namespace RentRight.Controllers
+namespace RentRight.Controllers;
+
+[Authorize]
+public class PropertiesController(IPropertyService propertyService) : Controller
 {
-    [Authorize]
-    public class PropertiesController : Controller
+    // GET: Properties
+    [AllowAnonymous]
+    public async Task<IActionResult> Index(
+        CancellationToken cancellationToken = default)
     {
-        private readonly ApplicationDbContext _context;
-        private readonly UserManager<ApplicationUser> _userManager;
-
-        public PropertiesController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+        var outcome = await propertyService.ListAsync(
+            new PropertyListQuery(),
+            cancellationToken);
+        return outcome.Status switch
         {
-            _context = context;
-            _userManager = userManager;
+            PropertyOperationStatus.Success => View(outcome.Value),
+            _ => throw new InvalidOperationException("Unknown property list outcome.")
+        };
+    }
+
+    // GET: Properties/Details/5
+    [AllowAnonymous]
+    public async Task<IActionResult> Details(
+        int? id,
+        CancellationToken cancellationToken = default)
+    {
+        if (id is null)
+        {
+            return NotFound();
         }
 
-        // GET: Properties
-        [AllowAnonymous]
-        public async Task<IActionResult> Index()
+        var outcome = await propertyService.GetDetailsAsync(id.Value, cancellationToken);
+        return outcome.Status switch
         {
-            var properties = await _context.Properties.ToListAsync();
-            return View(properties);
+            PropertyOperationStatus.Success => View(outcome.Value),
+            PropertyOperationStatus.NotFound => NotFound(),
+            _ => throw new InvalidOperationException("Unknown property details outcome.")
+        };
+    }
+
+    // GET: Properties/Create
+    [Authorize(Roles = "Landlord,Admin")]
+    public IActionResult Create() => View(new PropertyCreateInput());
+
+    // POST: Properties/Create
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Authorize(Roles = "Landlord,Admin")]
+    public async Task<IActionResult> Create(
+        PropertyCreateInput input,
+        CancellationToken cancellationToken = default)
+    {
+        if (!ModelState.IsValid)
+        {
+            return View(input);
         }
 
-        // GET: Properties/Details/5
-        [AllowAnonymous]
-        public async Task<IActionResult> Details(int? id)
+        var outcome = await propertyService.CreateAsync(input, cancellationToken);
+        return MapCreateOutcome(outcome, input);
+    }
+
+    // GET: Properties/Edit/5
+    [Authorize(Roles = "Landlord,Admin")]
+    public async Task<IActionResult> Edit(
+        int? id,
+        CancellationToken cancellationToken = default)
+    {
+        if (id is null)
         {
-            if (id == null) return NotFound();
-
-            var property = await _context.Properties
-                .FirstOrDefaultAsync(m => m.Id == id);
-
-            if (property == null) return NotFound();
-
-            return View(property);
+            return NotFound();
         }
 
-        // GET: Properties/Create
-        [Authorize(Roles = "Landlord,Admin")]
-        public IActionResult Create()
+        var outcome = await propertyService.GetEditAsync(id.Value, cancellationToken);
+        return MapQueryOutcome(outcome);
+    }
+
+    // POST: Properties/Edit/5
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Authorize(Roles = "Landlord,Admin")]
+    public async Task<IActionResult> Edit(
+        int id,
+        PropertyEditInput input,
+        CancellationToken cancellationToken = default)
+    {
+        if (id != input.Id)
         {
-            return View();
+            return NotFound();
         }
 
-        // POST: Properties/Create
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        [Authorize(Roles = "Landlord,Admin")]
-        public async Task<IActionResult> Create(Property property)
+        if (!ModelState.IsValid)
         {
-            var user = await _userManager.GetUserAsync(User);
-            if (user == null) return Challenge();
-
-            if (ModelState.IsValid)
+            var accessOutcome = await propertyService.GetEditAsync(id, cancellationToken);
+            return accessOutcome.Status switch
             {
-                property.LandlordId = user.Id;
-
-                _context.Add(property);
-                await _context.SaveChangesAsync();
-                return RedirectToAction(nameof(Index));
-            }
-            return View(property);
+                PropertyOperationStatus.Success => View(input),
+                PropertyOperationStatus.Unauthenticated => Challenge(),
+                PropertyOperationStatus.Forbidden => Forbid(),
+                PropertyOperationStatus.NotFound => NotFound(),
+                _ => throw new InvalidOperationException("Unknown property edit outcome.")
+            };
         }
 
-        // GET: Properties/Edit/5
-        [Authorize(Roles = "Landlord,Admin")]
-        public async Task<IActionResult> Edit(int? id)
+        var outcome = await propertyService.UpdateAsync(id, input, cancellationToken);
+        return MapUpdateOutcome(outcome, input);
+    }
+
+    // GET: Properties/Delete/5
+    [Authorize(Roles = "Landlord,Admin")]
+    public async Task<IActionResult> Delete(
+        int? id,
+        CancellationToken cancellationToken = default)
+    {
+        if (id is null)
         {
-            if (id == null) return NotFound();
-
-            var property = await _context.Properties.FindAsync(id);
-            if (property == null) return NotFound();
-
-            // security: only allow editing own properties if landlord
-            var user = await _userManager.GetUserAsync(User);
-            if (user == null) return Challenge();
-
-            if (!User.IsInRole("Admin") && property.LandlordId != user.Id)
-                return Forbid();
-
-            return View(property);
+            return NotFound();
         }
 
-        // POST: Properties/Edit/5
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        [Authorize(Roles = "Landlord,Admin")]
-        public async Task<IActionResult> Edit(int id, Property property)
+        var outcome = await propertyService.GetDeleteAsync(id.Value, cancellationToken);
+        return MapQueryOutcome(outcome);
+    }
+
+    // POST: Properties/DeleteConfirmed/5
+    [HttpPost]
+    [ActionName("DeleteConfirmed")]
+    [ValidateAntiForgeryToken]
+    [Authorize(Roles = "Landlord,Admin")]
+    public async Task<IActionResult> DeleteConfirmed(
+        int id,
+        CancellationToken cancellationToken = default)
+    {
+        var outcome = await propertyService.DeleteAsync(id, cancellationToken);
+        return outcome.Status switch
         {
-            if (id != property.Id) return NotFound();
+            PropertyOperationStatus.Success => RedirectToAction(nameof(Index)),
+            PropertyOperationStatus.Unauthenticated => Challenge(),
+            PropertyOperationStatus.Forbidden => Forbid(),
+            PropertyOperationStatus.NotFound => NotFound(),
+            PropertyOperationStatus.HasHistory => RedirectWithError(
+                "A property with tenancy history cannot be deleted."),
+            PropertyOperationStatus.Conflict => RedirectWithError(
+                "The property could not be deleted because it changed. Reload the page and try again."),
+            _ => throw new InvalidOperationException("Unknown property deletion outcome.")
+        };
+    }
 
-            var existing = await _context.Properties.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id);
-            if (existing == null) return NotFound();
+    private IActionResult MapCreateOutcome(
+        PropertyMutationOutcome outcome,
+        PropertyCreateInput input) =>
+        outcome.Status switch
+        {
+            PropertyOperationStatus.Success => RedirectToAction(nameof(Index)),
+            PropertyOperationStatus.Unauthenticated => Challenge(),
+            PropertyOperationStatus.Forbidden => Forbid(),
+            PropertyOperationStatus.ValidationFailed => ViewWithValidation(input, outcome),
+            PropertyOperationStatus.Conflict => ViewWithError(
+                input,
+                "The property could not be created. Review the values and try again."),
+            _ => throw new InvalidOperationException("Unknown property creation outcome.")
+        };
 
-            var user = await _userManager.GetUserAsync(User);
-            if (user == null) return Challenge();
+    private IActionResult MapUpdateOutcome(
+        PropertyMutationOutcome outcome,
+        PropertyEditInput input) =>
+        outcome.Status switch
+        {
+            PropertyOperationStatus.Success => RedirectToAction(nameof(Index)),
+            PropertyOperationStatus.Unauthenticated => Challenge(),
+            PropertyOperationStatus.Forbidden => Forbid(),
+            PropertyOperationStatus.NotFound => NotFound(),
+            PropertyOperationStatus.ValidationFailed => ViewWithValidation(input, outcome),
+            PropertyOperationStatus.Conflict => ViewWithError(
+                input,
+                "The property could not be updated because it changed. Reload it and try again."),
+            _ => throw new InvalidOperationException("Unknown property update outcome.")
+        };
 
-            if (!User.IsInRole("Admin") && existing.LandlordId != user.Id)
-                return Forbid();
+    private IActionResult MapQueryOutcome<T>(PropertyQueryOutcome<T> outcome)
+        where T : class =>
+        outcome.Status switch
+        {
+            PropertyOperationStatus.Success => View(outcome.Value),
+            PropertyOperationStatus.Unauthenticated => Challenge(),
+            PropertyOperationStatus.Forbidden => Forbid(),
+            PropertyOperationStatus.NotFound => NotFound(),
+            _ => throw new InvalidOperationException("Unknown property query outcome.")
+        };
 
-            property.LandlordId = existing.LandlordId;
-
-            if (ModelState.IsValid)
+    private IActionResult ViewWithValidation<T>(
+        T input,
+        PropertyMutationOutcome outcome)
+    {
+        foreach (var error in outcome.ValidationErrors ??
+                 new Dictionary<string, string[]>())
+        {
+            foreach (var message in error.Value)
             {
-                _context.Update(property);
-                await _context.SaveChangesAsync();
-                return RedirectToAction(nameof(Index));
+                ModelState.AddModelError(error.Key, message);
             }
-            return View(property);
         }
 
-        // GET: Properties/Delete/5
-        [Authorize(Roles = "Landlord,Admin")]
-        public async Task<IActionResult> Delete(int? id)
-        {
-            if (id == null) return NotFound();
+        return View(input);
+    }
 
-            var property = await _context.Properties.FirstOrDefaultAsync(p => p.Id == id);
-            if (property == null) return NotFound();
+    private IActionResult ViewWithError<T>(T input, string message)
+    {
+        ModelState.AddModelError(string.Empty, message);
+        return View(input);
+    }
 
-            var user = await _userManager.GetUserAsync(User);
-            if (user == null) return Challenge();
-
-            if (!User.IsInRole("Admin") && property.LandlordId != user.Id)
-                return Forbid();
-
-            return View(property);
-        }
-
-        // POST: Properties/DeleteConfirmed/5
-        [HttpPost, ActionName("DeleteConfirmed")]
-        [ValidateAntiForgeryToken]
-        [Authorize(Roles = "Landlord,Admin")]
-        public async Task<IActionResult> DeleteConfirmed(int id)
-        {
-            var property = await _context.Properties.FindAsync(id);
-            if (property != null)
-            {
-                var user = await _userManager.GetUserAsync(User);
-                if (user == null) return Challenge();
-
-                if (!User.IsInRole("Admin") && property.LandlordId != user.Id)
-                    return Forbid();
-
-                if (await _context.Tenancies.AnyAsync(tenancy => tenancy.PropertyId == id))
-                {
-                    TempData["Error"] = "A property with tenancy history cannot be deleted.";
-                    return RedirectToAction(nameof(Index));
-                }
-
-                _context.Properties.Remove(property);
-                await _context.SaveChangesAsync();
-            }
-            return RedirectToAction(nameof(Index));
-        }
+    private IActionResult RedirectWithError(string message)
+    {
+        TempData["Error"] = message;
+        return RedirectToAction(nameof(Index));
     }
 }

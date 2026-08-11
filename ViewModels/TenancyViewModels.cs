@@ -1,6 +1,6 @@
-using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using RentRight.Models;
+using System.ComponentModel.DataAnnotations;
 
 namespace RentRight.ViewModels;
 
@@ -21,7 +21,7 @@ public class TenancyAdminRowViewModel
     public TenancyStatus Status { get; init; }
 }
 
-public class TenancyCreateViewModel : IValidatableObject
+public class TenancyCreateViewModel
 {
     [Required(ErrorMessage = "Select a property.")]
     [Display(Name = "Property")]
@@ -33,7 +33,7 @@ public class TenancyCreateViewModel : IValidatableObject
 
     [DataType(DataType.Date)]
     [Display(Name = "Start date")]
-    public DateOnly StartDate { get; set; } = DateOnly.FromDateTime(DateTime.UtcNow);
+    public DateOnly StartDate { get; set; }
 
     [DataType(DataType.Date)]
     [Display(Name = "End date")]
@@ -41,14 +41,4 @@ public class TenancyCreateViewModel : IValidatableObject
 
     public IReadOnlyList<SelectListItem> AvailableProperties { get; set; } = [];
     public IReadOnlyList<SelectListItem> AvailableTenants { get; set; } = [];
-
-    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
-    {
-        if (EndDate is not null && EndDate < StartDate)
-        {
-            yield return new ValidationResult(
-                "End date cannot be before the start date.",
-                [nameof(EndDate)]);
-        }
-    }
 }

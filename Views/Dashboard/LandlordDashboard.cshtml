@@ -1,4 +1,4 @@
-@model IEnumerable<RentRight.Models.Property>
+@model RentRight.ViewModels.LandlordDashboardViewModel
 
 @{
     ViewData["Title"] = "Landlord Dashboard";
@@ -12,10 +12,10 @@
 
     <a asp-controller="Properties" asp-action="Create" class="btn btn-success mb-4">+ Add New Property</a>
 
-    @if (Model != null && Model.Any())
+    @if (Model.Properties.Count > 0)
     {
         <div class="row g-4">
-            @foreach (var property in Model)
+            @foreach (var property in Model.Properties)
             {
                 <div class="col-md-4">
                     <div class="card shadow-sm h-100">
