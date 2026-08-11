@@ -1,44 +1,35 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using RentRight.Data;
+using RentRight.Features.Properties;
+using RentRight.Features.Properties.Contracts;
 using RentRight.Models;
 
-namespace RentRight.Controllers
+namespace RentRight.Controllers;
+
+public class HomeController(IPropertyService propertyService) : Controller
 {
-    public class HomeController : Controller
+    public async Task<IActionResult> Index(
+        CancellationToken cancellationToken = default)
     {
-        private readonly ILogger<HomeController> _logger;
-        private readonly ApplicationDbContext _context;
+        var outcome = await propertyService.ListLatestAsync(
+            new LatestPropertiesQuery(),
+            cancellationToken);
 
-        // Inject ApplicationDbContext so we can access the database
-        public HomeController(ILogger<HomeController> logger, ApplicationDbContext context)
+        return outcome.Status switch
         {
-            _logger = logger;
-            _context = context;
-        }
+            PropertyOperationStatus.Success => View(outcome.Value),
+            _ => throw new InvalidOperationException("Unknown latest property list outcome.")
+        };
+    }
 
-        // Homepage - show latest properties
-        public async Task<IActionResult> Index()
+    public IActionResult Privacy() => View();
+
+    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+    public IActionResult Error()
+    {
+        return View(new ErrorViewModel
         {
-            var latestProperties = await _context.Properties
-                .Include(p => p.Landlord)
-                .OrderByDescending(p => p.Id)
-                .Take(6)
-                .ToListAsync();
-
-            return View(latestProperties);
-        }
-
-        public IActionResult Privacy()
-        {
-            return View();
-        }
-
-        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
-        public IActionResult Error()
-        {
-            return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
-        }
+            RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier
+        });
     }
 }

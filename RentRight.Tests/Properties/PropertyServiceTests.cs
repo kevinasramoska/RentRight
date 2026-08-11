@@ -27,6 +27,45 @@ public class PropertyServiceTests
     }
 
     [Fact]
+    public async Task ListLatestAsync_ExcessiveLimit_IsBoundedAndProjectsPublicFields()
+    {
+        var store = new FakePropertyStore(
+            Property("Older", landlordId: "landlord-1", id: 1),
+            Property("Latest", landlordId: "landlord-2", id: 2));
+        var service = CreateService(store, userId: null);
+
+        var outcome = await service.ListLatestAsync(
+            new LatestPropertiesQuery(500),
+            CancellationToken.None);
+
+        Assert.Equal(PropertyOperationStatus.Success, outcome.Status);
+        Assert.Equal(LatestPropertiesQuery.MaximumLimit, store.LastLatestListLimit);
+        Assert.Collection(
+            outcome.Value!,
+            property =>
+            {
+                Assert.Equal(2, property.Id);
+                Assert.Equal("Latest", property.Title);
+                Assert.Equal("Description", property.Description);
+            },
+            property => Assert.Equal(1, property.Id));
+    }
+
+    [Fact]
+    public async Task GetDetailsAsync_AnonymousUser_ReturnsPublicProjectionWithoutManagePermission()
+    {
+        var service = CreateService(
+            new FakePropertyStore(Property("Apartment", "landlord-1", 1)),
+            userId: null);
+
+        var outcome = await service.GetDetailsAsync(1, CancellationToken.None);
+
+        Assert.Equal(PropertyOperationStatus.Success, outcome.Status);
+        Assert.Equal("Apartment", outcome.Value!.Title);
+        Assert.False(outcome.Value.CanManage);
+    }
+
+    [Fact]
     public async Task CreateAsync_Landlord_AssignsAuthenticatedUserAndPermittedScalarsOnly()
     {
         var store = new FakePropertyStore();
@@ -86,6 +125,22 @@ public class PropertyServiceTests
         Assert.Equal(input.Address, updated.Address);
         Assert.Equal(input.RentAmount, updated.RentAmount);
         Assert.Equal(input.Description, updated.Description);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_ForgedInputId_UpdatesOnlyExplicitPropertyId()
+    {
+        var store = new FakePropertyStore(
+            Property("Target", landlordId: "landlord-1", id: 1),
+            Property("Other", landlordId: "landlord-1", id: 2));
+        var service = CreateService(store, "landlord-1", "Landlord");
+        var input = EditInput(2, "Updated target");
+
+        var outcome = await service.UpdateAsync(1, input, CancellationToken.None);
+
+        Assert.Equal(PropertyOperationStatus.Success, outcome.Status);
+        Assert.Equal("Updated target", store.Properties.Single(property => property.Id == 1).Title);
+        Assert.Equal("Other", store.Properties.Single(property => property.Id == 2).Title);
     }
 
     [Fact]
@@ -156,6 +211,29 @@ public class PropertyServiceTests
         Assert.Contains(nameof(PropertyCreateInput.RentAmount), outcome.ValidationErrors.Keys);
         Assert.Empty(store.Properties);
         Assert.Equal(0, store.CreateCount);
+    }
+
+    [Fact]
+    public async Task CreateAsync_ValuesAtValidationBoundaries_Succeeds()
+    {
+        var store = new FakePropertyStore();
+        var service = CreateService(store, "landlord-1", "Landlord");
+        var input = new PropertyCreateInput
+        {
+            Title = new string('\u00e1', 200),
+            Address = new string('\u03a9', 500),
+            RentAmount = 9_999_999_999_999_999.99m,
+            Description = new string('\u4f4f', 2_000)
+        };
+
+        var outcome = await service.CreateAsync(input, CancellationToken.None);
+
+        Assert.Equal(PropertyOperationStatus.Success, outcome.Status);
+        var created = Assert.Single(store.Properties);
+        Assert.Equal(200, created.Title.Length);
+        Assert.Equal(500, created.Address.Length);
+        Assert.Equal(2_000, created.Description!.Length);
+        Assert.Equal(input.RentAmount, created.RentAmount);
     }
 
     [Fact]
@@ -254,6 +332,7 @@ public class PropertyServiceTests
             _properties.Values.ToArray();
 
         public int LastListLimit { get; private set; }
+        public int LastLatestListLimit { get; private set; }
         public int CreateCount { get; private set; }
         public int UpdateCount { get; private set; }
         public PropertyDeleteStoreStatus DeleteStatus { get; set; } =
@@ -272,6 +351,24 @@ public class PropertyServiceTests
                     property.Address,
                     property.RentAmount,
                     property.LandlordId))
+                .ToArray();
+            return Task.FromResult(rows);
+        }
+
+        public Task<IReadOnlyList<LatestPropertyListItem>> ListLatestAsync(
+            int limit,
+            CancellationToken cancellationToken)
+        {
+            LastLatestListLimit = limit;
+            IReadOnlyList<LatestPropertyListItem> rows = _properties.Values
+                .OrderByDescending(property => property.Id)
+                .Take(limit)
+                .Select(property => new LatestPropertyListItem(
+                    property.Id,
+                    property.Title,
+                    property.Address,
+                    property.RentAmount,
+                    property.Description))
                 .ToArray();
             return Task.FromResult(rows);
         }

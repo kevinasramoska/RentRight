@@ -1,8 +1,14 @@
+using RentRight.Features.Properties.Contracts;
+
 namespace RentRight.Features.Properties;
 
 public interface IPropertyStore
 {
     Task<IReadOnlyList<PropertyListRecord>> ListAsync(
+        int limit,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<LatestPropertyListItem>> ListLatestAsync(
         int limit,
         CancellationToken cancellationToken);
 

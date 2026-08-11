@@ -243,6 +243,12 @@ public class PropertiesControllerTests
             CancellationToken cancellationToken) =>
             Task.FromResult(ListOutcome);
 
+        public Task<PropertyQueryOutcome<IReadOnlyList<LatestPropertyListItem>>> ListLatestAsync(
+            LatestPropertiesQuery query,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(
+                PropertyQueryOutcome<IReadOnlyList<LatestPropertyListItem>>.Success([]));
+
         public Task<PropertyQueryOutcome<PropertyDetails>> GetDetailsAsync(
             int propertyId,
             CancellationToken cancellationToken) =>
