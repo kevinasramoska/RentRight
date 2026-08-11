@@ -10,7 +10,7 @@ The application uses ASP.NET Core Identity for authentication and role managemen
 
 ## Tech Stack
 
-- `.NET 9`
+- `.NET 10 LTS`
 - `ASP.NET Core MVC`
 - `ASP.NET Core Identity`
 - `Entity Framework Core`
@@ -64,7 +64,7 @@ RentRight/
 
 Before running the app locally, make sure you have:
 
-- `.NET 9 SDK`
+- `.NET 10 SDK` (the repository-pinned version in `global.json`)
 - `SQL Server` available locally
 
 The default connection string expects SQL Server on `localhost,1433`.
@@ -92,7 +92,7 @@ dotnet user-secrets set "SeedAdmin:Password" "use-a-strong-local-password"
 1. Restore dependencies:
 
 ```bash
-dotnet restore
+dotnet restore RentRight.slnx
 ```
 
 2. Apply the database migrations:
@@ -142,9 +142,9 @@ Existing migrations are stored in [Migrations](/Users/kevinasramoska/Desktop/Pro
 ## Useful Commands
 
 ```bash
-dotnet restore
-dotnet build RentRight.slnx
-dotnet test RentRight.Tests/RentRight.Tests.csproj
+dotnet restore RentRight.slnx
+dotnet build RentRight.slnx --configuration Release
+dotnet test RentRight.slnx --configuration Release
 dotnet ef database update
 dotnet run
 ```
