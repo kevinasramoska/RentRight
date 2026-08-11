@@ -135,6 +135,52 @@ public class DashboardControllerTests
         }
     }
 
+    [Theory]
+    [InlineData(DashboardQueryStatus.Unauthenticated)]
+    [InlineData(DashboardQueryStatus.Forbidden)]
+    public async Task LandlordDashboard_AuthorizationOutcome_MapsToExpectedMvcResult(
+        DashboardQueryStatus status)
+    {
+        var outcome = status == DashboardQueryStatus.Unauthenticated
+            ? LandlordDashboardOutcome.Unauthenticated()
+            : LandlordDashboardOutcome.Forbidden();
+        var controller = CreateController(landlordOutcome: outcome);
+
+        var result = await controller.LandlordDashboard(CancellationToken.None);
+
+        if (status == DashboardQueryStatus.Unauthenticated)
+        {
+            Assert.IsType<ChallengeResult>(result);
+        }
+        else
+        {
+            Assert.IsType<ForbidResult>(result);
+        }
+    }
+
+    [Theory]
+    [InlineData(DashboardQueryStatus.Unauthenticated)]
+    [InlineData(DashboardQueryStatus.Forbidden)]
+    public async Task TenantDashboard_AuthorizationOutcome_MapsToExpectedMvcResult(
+        DashboardQueryStatus status)
+    {
+        var outcome = status == DashboardQueryStatus.Unauthenticated
+            ? TenantDashboardOutcome.Unauthenticated()
+            : TenantDashboardOutcome.Forbidden();
+        var controller = CreateController(tenantOutcome: outcome);
+
+        var result = await controller.TenantDashboard(CancellationToken.None);
+
+        if (status == DashboardQueryStatus.Unauthenticated)
+        {
+            Assert.IsType<ChallengeResult>(result);
+        }
+        else
+        {
+            Assert.IsType<ForbidResult>(result);
+        }
+    }
+
     private static DashboardController CreateController(
         DashboardRouteOutcome? routeOutcome = null,
         AdminDashboardOutcome? adminOutcome = null,

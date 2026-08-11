@@ -1,6 +1,7 @@
 using RentRight.Application.Abstractions;
 using RentRight.Features.Dashboards;
 using RentRight.Features.Dashboards.Contracts;
+using RentRight.Models;
 using Xunit;
 
 namespace RentRight.Tests.Dashboards;
@@ -52,6 +53,45 @@ public class DashboardServiceTests
         Assert.Equal(100, store.LandlordMaximumResults);
     }
 
+    [Theory]
+    [InlineData(false, null, "Landlord", DashboardQueryStatus.Unauthenticated)]
+    [InlineData(true, null, "Landlord", DashboardQueryStatus.Unauthenticated)]
+    [InlineData(true, "user-1", "Tenant", DashboardQueryStatus.Forbidden)]
+    public async Task LandlordQuery_UserWithoutLandlordAccess_ReturnsAuthorizationOutcomeWithoutQuerying(
+        bool isAuthenticated,
+        string? userId,
+        string role,
+        DashboardQueryStatus expectedStatus)
+    {
+        var store = new FakeDashboardDataStore();
+        var service = new LandlordDashboardQueryService(
+            store,
+            new FakeCurrentUser(isAuthenticated, userId, [role]));
+
+        var outcome = await service.QueryAsync(CancellationToken.None);
+
+        Assert.Equal(expectedStatus, outcome.Status);
+        Assert.Null(store.LandlordId);
+    }
+
+    [Fact]
+    public async Task LandlordQuery_AuthenticatedLandlord_ReturnsDashboardProjection()
+    {
+        var expectedProperty = new LandlordPropertySummary(7, "Home", "Address", 1200m);
+        var store = new FakeDashboardDataStore
+        {
+            LandlordProperties = [expectedProperty]
+        };
+        var service = new LandlordDashboardQueryService(
+            store,
+            new FakeCurrentUser(true, "landlord-7", ["Landlord"]));
+
+        var outcome = await service.QueryAsync(CancellationToken.None);
+
+        Assert.Equal(DashboardQueryStatus.Success, outcome.Status);
+        Assert.Equal(expectedProperty, Assert.Single(outcome.Dashboard!.Properties));
+    }
+
     [Fact]
     public async Task TenantQuery_AuthenticatedTenant_ScopesBoundsAndUsesClockDate()
     {
@@ -69,6 +109,61 @@ public class DashboardServiceTests
         Assert.Equal(new DateOnly(2026, 8, 11), store.Today);
         Assert.Equal(100, store.TenancyMaximumResults);
         Assert.Equal(5, store.MaintenanceMaximumResults);
+    }
+
+    [Theory]
+    [InlineData(false, null)]
+    [InlineData(true, null)]
+    public async Task TenantQuery_UserWithoutAuthenticatedIdentity_ReturnsUnauthenticatedWithoutQuerying(
+        bool isAuthenticated,
+        string? userId)
+    {
+        var store = new FakeDashboardDataStore();
+        var service = new TenantDashboardQueryService(
+            store,
+            new FakeCurrentUser(isAuthenticated, userId, ["Tenant"]),
+            new FakeClock(DateTime.UnixEpoch));
+
+        var outcome = await service.QueryAsync(CancellationToken.None);
+
+        Assert.Equal(DashboardQueryStatus.Unauthenticated, outcome.Status);
+        Assert.Null(store.TenancyTenantId);
+        Assert.Null(store.MaintenanceTenantId);
+    }
+
+    [Fact]
+    public async Task TenantQuery_AuthenticatedTenant_ReturnsDashboardProjections()
+    {
+        var tenancy = new TenantTenancySummary(
+            3,
+            "Home",
+            "Address",
+            new DateOnly(2026, 8, 1),
+            null,
+            TenancyStatus.Active,
+            true);
+        var maintenance = new TenantMaintenanceSummary(
+            9,
+            "Home",
+            new DateTime(2026, 8, 10, 9, 0, 0, DateTimeKind.Utc),
+            MaintenanceRequestStatus.Submitted);
+        var store = new FakeDashboardDataStore
+        {
+            TenantTenancies = [tenancy],
+            TenantMaintenanceRequests = [maintenance]
+        };
+        var service = new TenantDashboardQueryService(
+            store,
+            new FakeCurrentUser(true, "tenant-9", ["Tenant"]),
+            new FakeClock(new DateTime(2026, 8, 11, 12, 0, 0, DateTimeKind.Utc)));
+
+        var outcome = await service.QueryAsync(CancellationToken.None);
+
+        Assert.Equal(DashboardQueryStatus.Success, outcome.Status);
+        Assert.Equal(tenancy, Assert.Single(outcome.Dashboard!.Tenancies));
+        Assert.Equal(
+            maintenance,
+            Assert.Single(outcome.Dashboard.RecentMaintenanceRequests));
     }
 
     [Theory]
@@ -110,9 +205,30 @@ public class DashboardServiceTests
         Assert.Equal(4, outcome.Dashboard.TotalProperties);
     }
 
+    [Theory]
+    [InlineData(false, "Admin", DashboardQueryStatus.Unauthenticated)]
+    [InlineData(true, "Tenant", DashboardQueryStatus.Forbidden)]
+    public async Task AdminQuery_UserWithoutAdminAccess_ReturnsAuthorizationOutcomeWithoutQuerying(
+        bool isAuthenticated,
+        string role,
+        DashboardQueryStatus expectedStatus)
+    {
+        var store = new FakeDashboardDataStore();
+        var service = new AdminDashboardQueryService(
+            store,
+            new FakeCurrentUser(isAuthenticated, "user-1", [role]));
+
+        var outcome = await service.QueryAsync(CancellationToken.None);
+
+        Assert.Equal(expectedStatus, outcome.Status);
+        Assert.False(store.AdminQueried);
+    }
+
     private sealed class FakeDashboardDataStore : IDashboardDataStore
     {
         public AdminDashboardSummary AdminSummary { get; init; } = new(0, 0);
+        public bool AdminQueried { get; private set; }
+        public IReadOnlyList<LandlordPropertySummary> LandlordProperties { get; init; } = [];
         public string? LandlordId { get; private set; }
         public int LandlordMaximumResults { get; private set; }
         public string? TenancyTenantId { get; private set; }
@@ -120,9 +236,16 @@ public class DashboardServiceTests
         public DateOnly? Today { get; private set; }
         public string? MaintenanceTenantId { get; private set; }
         public int MaintenanceMaximumResults { get; private set; }
+        public IReadOnlyList<TenantTenancySummary> TenantTenancies { get; init; } = [];
+        public IReadOnlyList<TenantMaintenanceSummary> TenantMaintenanceRequests
+            { get; init; } = [];
 
         public Task<AdminDashboardSummary> GetAdminSummaryAsync(
-            CancellationToken cancellationToken) => Task.FromResult(AdminSummary);
+            CancellationToken cancellationToken)
+        {
+            AdminQueried = true;
+            return Task.FromResult(AdminSummary);
+        }
 
         public Task<IReadOnlyList<LandlordPropertySummary>> ListLandlordPropertiesAsync(
             string landlordId,
@@ -131,7 +254,7 @@ public class DashboardServiceTests
         {
             LandlordId = landlordId;
             LandlordMaximumResults = maximumResults;
-            return Task.FromResult<IReadOnlyList<LandlordPropertySummary>>([]);
+            return Task.FromResult(LandlordProperties);
         }
 
         public Task<IReadOnlyList<TenantTenancySummary>> ListTenantTenanciesAsync(
@@ -143,7 +266,7 @@ public class DashboardServiceTests
             TenancyTenantId = tenantId;
             Today = today;
             TenancyMaximumResults = maximumResults;
-            return Task.FromResult<IReadOnlyList<TenantTenancySummary>>([]);
+            return Task.FromResult(TenantTenancies);
         }
 
         public Task<IReadOnlyList<TenantMaintenanceSummary>> ListTenantMaintenanceAsync(
@@ -153,7 +276,7 @@ public class DashboardServiceTests
         {
             MaintenanceTenantId = tenantId;
             MaintenanceMaximumResults = maximumResults;
-            return Task.FromResult<IReadOnlyList<TenantMaintenanceSummary>>([]);
+            return Task.FromResult(TenantMaintenanceRequests);
         }
     }
 
