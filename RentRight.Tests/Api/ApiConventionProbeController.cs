@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -79,6 +80,14 @@ public sealed class ApiConventionProbeController : ApiV1ControllerBase
     [HttpGet("secure")]
     [Authorize]
     public IActionResult Secure() => Ok(new { Authenticated = true });
+
+    [HttpGet("antiforgery")]
+    [Authorize]
+    public IActionResult Antiforgery([FromServices] IAntiforgery antiforgery)
+    {
+        var tokens = antiforgery.GetAndStoreTokens(HttpContext);
+        return Ok(new { tokens.RequestToken });
+    }
 
     [HttpPost("secure")]
     [Authorize]

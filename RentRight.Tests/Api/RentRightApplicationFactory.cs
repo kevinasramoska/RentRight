@@ -7,7 +7,9 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace RentRight.Tests.Api;
 
-public sealed class RentRightApplicationFactory(string environmentName) :
+public sealed class RentRightApplicationFactory(
+    string environmentName,
+    Action<IServiceCollection>? configureServices = null) :
     WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -22,6 +24,7 @@ public sealed class RentRightApplicationFactory(string environmentName) :
             services.AddControllers()
                 .PartManager.ApplicationParts.Add(
                     new AssemblyPart(typeof(ApiConventionProbeController).Assembly));
+            configureServices?.Invoke(services);
         });
     }
 

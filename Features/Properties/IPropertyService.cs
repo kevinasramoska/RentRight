@@ -4,6 +4,14 @@ namespace RentRight.Features.Properties;
 
 public interface IPropertyService
 {
+    Task<PropertyQueryOutcome<PropertyPage<PublishedPropertyListItem>>> SearchPublishedAsync(
+        PublishedPropertyQuery query,
+        CancellationToken cancellationToken);
+
+    Task<PropertyQueryOutcome<PublishedPropertyDetails>> GetPublishedDetailsAsync(
+        int propertyId,
+        CancellationToken cancellationToken);
+
     Task<PropertyQueryOutcome<IReadOnlyList<PropertyListItem>>> ListAsync(
         PropertyListQuery query,
         CancellationToken cancellationToken);

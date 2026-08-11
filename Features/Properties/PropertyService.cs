@@ -12,6 +12,55 @@ public sealed class PropertyService(
     private const string AdministratorRole = "Admin";
     private const string LandlordRole = "Landlord";
 
+    public async Task<PropertyQueryOutcome<PropertyPage<PublishedPropertyListItem>>>
+        SearchPublishedAsync(
+            PublishedPropertyQuery query,
+            CancellationToken cancellationToken)
+    {
+        var page = Math.Clamp(query.Page, 1, PublishedPropertyQuery.MaximumPage);
+        var pageSize = Math.Clamp(
+            query.PageSize,
+            1,
+            PublishedPropertyQuery.MaximumPageSize);
+        var normalizedQuery = query with
+        {
+            Page = page,
+            PageSize = pageSize,
+            Search = string.IsNullOrWhiteSpace(query.Search)
+                ? null
+                : query.Search.Trim()
+        };
+        var result = await propertyStore.SearchPublishedAsync(
+            normalizedQuery,
+            cancellationToken);
+
+        return PropertyQueryOutcome<PropertyPage<PublishedPropertyListItem>>.Success(
+            new PropertyPage<PublishedPropertyListItem>(
+                result.Items,
+                page,
+                pageSize,
+                result.TotalCount));
+    }
+
+    public async Task<PropertyQueryOutcome<PublishedPropertyDetails>>
+        GetPublishedDetailsAsync(
+            int propertyId,
+            CancellationToken cancellationToken)
+    {
+        var property = await propertyStore.FindPublishedAsync(
+            propertyId,
+            cancellationToken);
+        return property is null
+            ? PropertyQueryOutcome<PublishedPropertyDetails>.NotFound()
+            : PropertyQueryOutcome<PublishedPropertyDetails>.Success(
+                new PublishedPropertyDetails(
+                    property.Id,
+                    property.Title,
+                    property.Address,
+                    property.RentAmount,
+                    property.Description));
+    }
+
     public async Task<PropertyQueryOutcome<IReadOnlyList<PropertyListItem>>> ListAsync(
         PropertyListQuery query,
         CancellationToken cancellationToken)

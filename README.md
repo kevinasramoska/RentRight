@@ -35,13 +35,14 @@ The application uses ASP.NET Core Identity for authentication and role managemen
 - Landlord maintenance queues and controlled status updates for owned properties
 - Admin access to all maintenance requests
 - Versioned `/api/v1` JSON, error, pagination, cookie, and antiforgery conventions
+- Public paged/filterable property REST list/detail plus authorized property commands
 - Runtime OpenAPI document at `/openapi/v1.json` in Development only
 
 ## Current Gaps
 
 The core MVC workflow is implemented. The larger roadmap still includes:
 
-- Resource API endpoints and React client
+- Tenancy/maintenance API endpoints and React client
 - SQL Server-backed integration tests and broader authorization coverage
 - Tenant invitation/acceptance and immutable maintenance status history
 - Optimistic concurrency and pagination
@@ -118,8 +119,9 @@ By default, local launch settings use:
 - `http://localhost:5022`
 
 When running in Development, the generated API contract is available at
-`/openapi/v1.json`. P03-01 establishes the transport conventions but intentionally
-does not add resource or smoke endpoints. See [docs/API.md](docs/API.md).
+`/openapi/v1.json`. The property REST resource is available at `/api/v1/properties`;
+see [docs/API.md](docs/API.md) for filters, schemas, authorization, antiforgery, and
+Problem Details behavior.
 
 ## Development Seeded Admin Account
 

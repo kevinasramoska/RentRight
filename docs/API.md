@@ -2,9 +2,9 @@
 
 ## Current scope
 
-Phase 3 starts with a versioned transport contract under `/api/v1`. P03-01 establishes
-the conventions described here; it does not expose a property, tenancy, maintenance,
-health, or test resource. The first resource API remains P03-02.
+Phase 3 exposes a versioned transport contract under `/api/v1`. P03-01 establishes
+the shared conventions described here, and P03-02 adds the property resource. Tenancy,
+maintenance, health, and test resources are not part of the production API.
 
 The runtime-generated OpenAPI document is available at `/openapi/v1.json` only when
 the application runs in `Development`. No interactive documentation UI is installed,
@@ -93,3 +93,60 @@ not add a token endpoint or weaken validation for API actions.
 OpenAPI describes the Identity application cookie as the `IdentityCookie` cookie
 security scheme and marks operations carrying authorization metadata. Authorization
 and ownership decisions remain server-side and resource-aware.
+
+## Property resource
+
+The property resource is available at `/api/v1/properties`:
+
+| Method and route | Access | Success |
+|---|---|---|
+| `GET /api/v1/properties` | Public | `200` paged property summaries |
+| `GET /api/v1/properties/{propertyId}` | Public | `200` property detail |
+| `POST /api/v1/properties` | `Landlord`, `Admin` | `201` property detail and `Location` |
+| `PUT /api/v1/properties/{propertyId}` | Owning `Landlord`, `Admin` | `204` |
+| `DELETE /api/v1/properties/{propertyId}` | Owning `Landlord`, `Admin` | `204` |
+
+The list accepts these query parameters:
+
+- `status`: optional, currently only `published` (the default) is valid.
+- `page` and `pageSize`: the shared bounds and defaults described above.
+- `search`: optional, at most 200 characters, matched against title and address.
+- `minimumRent` and `maximumRent`: optional inclusive decimal bounds; both must be
+  non-negative and the minimum cannot exceed the maximum.
+
+Results are ordered deterministically by title, address, and property ID before paging.
+The query performs a no-tracking count and projection and does not load landlord,
+tenancy, or maintenance entities.
+
+Create and update JSON accept exactly these writable values:
+
+```json
+{
+  "title": "City apartment",
+  "address": "1 Main Street",
+  "rentAmount": 1250.00,
+  "description": "Optional public description"
+}
+```
+
+Owner/`landlordId`, IDs, roles, timestamps, publication state, concurrency state,
+tenancies, and maintenance data are not mutation-contract fields. The owner is always
+the authenticated creator; updates preserve the persisted owner. Public list/detail
+responses contain only `id`, `title`, `address`, `rentAmount`, and `description`.
+
+An authenticated landlord receives a concealed `404 resource_not_found` when trying
+to update or delete another landlord's property. Admin precedence is explicit for a
+multi-role caller. Missing resources use the same 404 contract. Validation returns
+`400 validation_failed`, persistence/history conflicts return `409 resource_conflict`,
+and successful update/delete commands return no response body.
+
+DELETE preserves the current MVC lifecycle rule: an unused property is hard-deleted,
+while a property with tenancy history is retained and produces `409`. The current EF
+model has no separate unpublished/archive flag, so every persisted property is a
+published listing today and public reads use a dedicated published-only service/store
+path. Persistent archive/unpublish state and opaque rowversion concurrency are deferred
+to Phase 7; no concurrency value is accepted or returned by this API version yet.
+
+POST, PUT, and DELETE use the existing Identity cookie and require the
+`X-CSRF-TOKEN` antiforgery header. OpenAPI declares their cookie security requirement,
+request/response schemas, query filters, and documented status responses.

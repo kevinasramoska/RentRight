@@ -8,6 +8,30 @@ namespace RentRight.Tests.Properties;
 public class PropertyServiceTests
 {
     [Fact]
+    public async Task SearchPublishedAsync_UnboundedQuery_NormalizesPagingAndSearch()
+    {
+        var store = new FakePropertyStore(
+            Property("Apartment", landlordId: "landlord-1", id: 1));
+        var service = CreateService(store, userId: null);
+
+        var outcome = await service.SearchPublishedAsync(
+            new PublishedPropertyQuery(
+                Page: int.MaxValue,
+                PageSize: int.MaxValue,
+                Search: "  Apartment  "),
+            CancellationToken.None);
+
+        Assert.Equal(PropertyOperationStatus.Success, outcome.Status);
+        Assert.Equal(PublishedPropertyQuery.MaximumPage, outcome.Value!.Page);
+        Assert.Equal(PublishedPropertyQuery.MaximumPageSize, outcome.Value.PageSize);
+        Assert.Equal(PublishedPropertyQuery.MaximumPage, store.LastPublishedQuery!.Page);
+        Assert.Equal(
+            PublishedPropertyQuery.MaximumPageSize,
+            store.LastPublishedQuery.PageSize);
+        Assert.Equal("Apartment", store.LastPublishedQuery.Search);
+    }
+
+    [Fact]
     public async Task ListAsync_ExcessiveLimit_IsBoundedAndMarksOnlyOwnedPropertyManageable()
     {
         var store = new FakePropertyStore(
@@ -333,10 +357,66 @@ public class PropertyServiceTests
 
         public int LastListLimit { get; private set; }
         public int LastLatestListLimit { get; private set; }
+        public PublishedPropertyQuery? LastPublishedQuery { get; private set; }
         public int CreateCount { get; private set; }
         public int UpdateCount { get; private set; }
         public PropertyDeleteStoreStatus DeleteStatus { get; set; } =
             PropertyDeleteStoreStatus.Deleted;
+
+        public Task<PublishedPropertyPageRecord> SearchPublishedAsync(
+            PublishedPropertyQuery query,
+            CancellationToken cancellationToken)
+        {
+            LastPublishedQuery = query;
+            var properties = _properties.Values.AsEnumerable();
+            if (query.Search is not null)
+            {
+                properties = properties.Where(property =>
+                    property.Title.Contains(query.Search, StringComparison.OrdinalIgnoreCase) ||
+                    property.Address.Contains(query.Search, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (query.MinimumRent is decimal minimumRent)
+            {
+                properties = properties.Where(property => property.RentAmount >= minimumRent);
+            }
+
+            if (query.MaximumRent is decimal maximumRent)
+            {
+                properties = properties.Where(property => property.RentAmount <= maximumRent);
+            }
+
+            var filtered = properties.ToArray();
+            IReadOnlyList<PublishedPropertyListItem> items = filtered
+                .OrderBy(property => property.Title)
+                .ThenBy(property => property.Address)
+                .ThenBy(property => property.Id)
+                .Skip((query.Page - 1) * query.PageSize)
+                .Take(query.PageSize)
+                .Select(property => new PublishedPropertyListItem(
+                    property.Id,
+                    property.Title,
+                    property.Address,
+                    property.RentAmount,
+                    property.Description))
+                .ToArray();
+            return Task.FromResult(new PublishedPropertyPageRecord(items, filtered.Length));
+        }
+
+        public Task<PublishedPropertyListItem?> FindPublishedAsync(
+            int propertyId,
+            CancellationToken cancellationToken)
+        {
+            var property = _properties.GetValueOrDefault(propertyId);
+            return Task.FromResult(property is null
+                ? null
+                : new PublishedPropertyListItem(
+                    property.Id,
+                    property.Title,
+                    property.Address,
+                    property.RentAmount,
+                    property.Description));
+        }
 
         public Task<IReadOnlyList<PropertyListRecord>> ListAsync(
             int limit,

@@ -7,6 +7,62 @@ namespace RentRight.Features.Properties;
 
 public sealed class EfPropertyStore(ApplicationDbContext context) : IPropertyStore
 {
+    public async Task<PublishedPropertyPageRecord> SearchPublishedAsync(
+        PublishedPropertyQuery query,
+        CancellationToken cancellationToken)
+    {
+        // The current model has no draft/archive state, so every persisted row is published.
+        var properties = context.Properties.AsNoTracking();
+
+        if (query.Search is not null)
+        {
+            properties = properties.Where(property =>
+                property.Title.Contains(query.Search) ||
+                property.Address.Contains(query.Search));
+        }
+
+        if (query.MinimumRent is decimal minimumRent)
+        {
+            properties = properties.Where(property => property.RentAmount >= minimumRent);
+        }
+
+        if (query.MaximumRent is decimal maximumRent)
+        {
+            properties = properties.Where(property => property.RentAmount <= maximumRent);
+        }
+
+        var totalCount = await properties.CountAsync(cancellationToken);
+        var items = await properties
+            .OrderBy(property => property.Title)
+            .ThenBy(property => property.Address)
+            .ThenBy(property => property.Id)
+            .Skip((query.Page - 1) * query.PageSize)
+            .Take(query.PageSize)
+            .Select(property => new PublishedPropertyListItem(
+                property.Id,
+                property.Title,
+                property.Address,
+                property.RentAmount,
+                property.Description))
+            .ToListAsync(cancellationToken);
+
+        return new PublishedPropertyPageRecord(items, totalCount);
+    }
+
+    public Task<PublishedPropertyListItem?> FindPublishedAsync(
+        int propertyId,
+        CancellationToken cancellationToken) =>
+        context.Properties
+            .AsNoTracking()
+            .Where(property => property.Id == propertyId)
+            .Select(property => new PublishedPropertyListItem(
+                property.Id,
+                property.Title,
+                property.Address,
+                property.RentAmount,
+                property.Description))
+            .SingleOrDefaultAsync(cancellationToken);
+
     public async Task<IReadOnlyList<PropertyListRecord>> ListAsync(
         int limit,
         CancellationToken cancellationToken) =>

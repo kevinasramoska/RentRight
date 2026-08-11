@@ -291,7 +291,9 @@ Route shape should express resource relationships, while the service layer remai
 P03-01 implements the shared conventions below in `RentRight.Api` and
 `Controllers/Api/V1/ApiV1ControllerBase.cs`. The exact runtime contract, stable error
 codes, pagination bounds, and browser request requirements are documented in
-[`API.md`](API.md). Resource routes remain future work starting with P03-02.
+[`API.md`](API.md). P03-02 implements the property list/detail/create/update/delete
+routes through the existing property service; tenancy and maintenance routes remain
+future work.
 
 - JSON uses a documented naming convention and ISO-8601 UTC timestamps.
 - Use dedicated request and response DTOs with bounded validation.

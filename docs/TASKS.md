@@ -140,6 +140,13 @@ Implementation checkpoint (2026-08-11): the focused core-domain request is imple
 
 ### P03-02 — Deliver the property REST API
 
+- **Implementation status:** Complete for the current property lifecycle — added
+  public projected list/detail reads, bounded paging and filters, Landlord/Admin
+  create/update/delete commands, owner scoping with concealed cross-landlord IDs,
+  HTTP/OpenAPI/antiforgery coverage, and dedicated API DTOs. The current model has no
+  unpublished/archive or rowversion field; persistent lifecycle and concurrency state
+  remain explicitly deferred to Phase 7 without adding schema in this task.
+
 - **Why it matters:** Properties provide a bounded first API vertical slice that proves service reuse before the more sensitive maintenance workflow is exposed.
 - **Files/components likely affected:** `Controllers/Api/V1/PropertiesController.cs`, property contracts/services, OpenAPI descriptions, authorization mapping, integration tests.
 - **Implementation steps:**

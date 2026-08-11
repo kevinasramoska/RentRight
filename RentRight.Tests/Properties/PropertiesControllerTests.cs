@@ -238,6 +238,18 @@ public class PropertiesControllerTests
             PropertyMutationOutcome.Success(1);
         public int UpdateCallCount { get; private set; }
 
+        public Task<PropertyQueryOutcome<PropertyPage<PublishedPropertyListItem>>>
+            SearchPublishedAsync(
+                PublishedPropertyQuery query,
+                CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<PropertyQueryOutcome<PublishedPropertyDetails>>
+            GetPublishedDetailsAsync(
+                int propertyId,
+                CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
         public Task<PropertyQueryOutcome<IReadOnlyList<PropertyListItem>>> ListAsync(
             PropertyListQuery query,
             CancellationToken cancellationToken) =>
