@@ -1,10 +1,7 @@
-@model RentRight.Models.Property
-@using Microsoft.AspNetCore.Identity
-@inject UserManager<ApplicationUser> UserManager
+@model RentRight.Features.Properties.Contracts.PropertyDetails
 
 @{
     ViewData["Title"] = "Property Details";
-    var currentUserId = UserManager.GetUserId(User);
 }
 
 <h2>Property Details</h2>
@@ -26,7 +23,7 @@
     </dl>
 </div>
 
-@if (User.IsInRole("Admin") || (User.IsInRole("Landlord") && Model.LandlordId == currentUserId))
+@if (Model.CanManage)
 {
     <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-warning">Edit</a>
 }

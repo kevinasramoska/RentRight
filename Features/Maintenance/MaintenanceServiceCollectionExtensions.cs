@@ -2,5 +2,12 @@ namespace RentRight.Features.Maintenance;
 
 public static class MaintenanceServiceCollectionExtensions
 {
-    public static IServiceCollection AddMaintenanceFeature(this IServiceCollection services) => services;
+    public static IServiceCollection AddMaintenanceFeature(this IServiceCollection services)
+    {
+        services.AddScoped<IMaintenanceStore, EfMaintenanceStore>();
+        services.AddScoped<IMaintenanceQueryService, MaintenanceQueryService>();
+        services.AddScoped<IMaintenanceCommandService, MaintenanceCommandService>();
+
+        return services;
+    }
 }
