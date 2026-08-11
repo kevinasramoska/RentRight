@@ -8,7 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="RentRight.Tests/**/*.cs" />
+    <Compile Remove="RentRight.Tests/**" />
+    <Content Remove="RentRight.Tests/**" />
+    <EmbeddedResource Remove="RentRight.Tests/**" />
+    <None Remove="RentRight.Tests/**" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.10" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.UI" Version="10.0.10" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.10" />
