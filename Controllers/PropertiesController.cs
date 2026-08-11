@@ -30,7 +30,7 @@ namespace RentRight.Controllers
         // GET: Properties/Details/5
         [AllowAnonymous]
         public async Task<IActionResult> Details(int? id)
-        {   
+        {
             if (id == null) return NotFound();
 
             var property = await _context.Properties
@@ -54,10 +54,12 @@ namespace RentRight.Controllers
         [Authorize(Roles = "Landlord,Admin")]
         public async Task<IActionResult> Create(Property property)
         {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null) return Challenge();
+
             if (ModelState.IsValid)
             {
-                var user = await _userManager.GetUserAsync(User);
-                property.LandlordId = user!.Id;
+                property.LandlordId = user.Id;
 
                 _context.Add(property);
                 await _context.SaveChangesAsync();
@@ -77,8 +79,10 @@ namespace RentRight.Controllers
 
             // security: only allow editing own properties if landlord
             var user = await _userManager.GetUserAsync(User);
-            if (User.IsInRole("Landlord") && property.LandlordId != user!.Id)
-                return Unauthorized();
+            if (user == null) return Challenge();
+
+            if (!User.IsInRole("Admin") && property.LandlordId != user.Id)
+                return Forbid();
 
             return View(property);
         }
@@ -97,7 +101,7 @@ namespace RentRight.Controllers
             var user = await _userManager.GetUserAsync(User);
             if (user == null) return Challenge();
 
-            if (User.IsInRole("Landlord") && existing.LandlordId != user.Id)
+            if (!User.IsInRole("Admin") && existing.LandlordId != user.Id)
                 return Forbid();
 
             property.LandlordId = existing.LandlordId;
@@ -123,7 +127,7 @@ namespace RentRight.Controllers
             var user = await _userManager.GetUserAsync(User);
             if (user == null) return Challenge();
 
-            if (User.IsInRole("Landlord") && property.LandlordId != user.Id)
+            if (!User.IsInRole("Admin") && property.LandlordId != user.Id)
                 return Forbid();
 
             return View(property);
@@ -141,8 +145,14 @@ namespace RentRight.Controllers
                 var user = await _userManager.GetUserAsync(User);
                 if (user == null) return Challenge();
 
-                if (User.IsInRole("Landlord") && property.LandlordId != user.Id)
+                if (!User.IsInRole("Admin") && property.LandlordId != user.Id)
                     return Forbid();
+
+                if (await _context.Tenancies.AnyAsync(tenancy => tenancy.PropertyId == id))
+                {
+                    TempData["Error"] = "A property with tenancy history cannot be deleted.";
+                    return RedirectToAction(nameof(Index));
+                }
 
                 _context.Properties.Remove(property);
                 await _context.SaveChangesAsync();

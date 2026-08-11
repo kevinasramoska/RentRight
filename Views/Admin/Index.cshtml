@@ -1,7 +1,6 @@
-@model List<(RentRight.Models.ApplicationUser user, IList<string> roles)>
+@model RentRight.ViewModels.AdminUserRolesViewModel
 @{
     ViewData["Title"] = "Admin Panel";
-    var allRoles = ViewBag.AllRoles as List<string> ?? [];
 }
 
 <h2 class="mb-3">Admin Panel – User Role Management</h2>
@@ -9,6 +8,11 @@
 @if (TempData["Success"] != null)
 {
     <div class="alert alert-success">@TempData["Success"]</div>
+}
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger">@TempData["Error"]</div>
 }
 
 <table class="table table-bordered table-striped align-middle">
@@ -21,19 +25,19 @@
     </tr>
     </thead>
     <tbody>
-    @foreach (var (user, roles) in Model)
+    @foreach (var item in Model.Users)
     {
         <tr>
-            <td>@user.FullName</td>
-            <td>@user.Email</td>
-            <td>@string.Join(", ", roles)</td>
+            <td>@item.User.FullName</td>
+            <td>@item.User.Email</td>
+            <td>@string.Join(", ", item.Roles)</td>
             <td>
                 <form asp-action="UpdateRoles" method="post" class="d-flex flex-column gap-2">
-                    <input type="hidden" name="userId" value="@user.Id" />
+                    <input type="hidden" name="userId" value="@item.User.Id" />
                     <select name="selectedRoles" multiple class="form-select form-select-sm">
-                        @foreach (var role in allRoles)
+                        @foreach (var role in Model.AvailableRoles)
                         {
-                            <option value="@role" selected="@(roles.Contains(role))">@role</option>
+                            <option value="@role" selected="@(item.Roles.Contains(role))">@role</option>
                         }
                     </select>
                     <button type="submit" class="btn btn-sm btn-primary">Update</button>

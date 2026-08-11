@@ -1,0 +1,43 @@
+@model RentRight.ViewModels.MaintenanceRequestCreateViewModel
+
+@{
+    ViewData["Title"] = "Submit Maintenance Request";
+}
+
+<h2 class="mb-4">Submit Maintenance Request</h2>
+
+@if (Model.AvailableTenancies.Count == 0)
+{
+    <div class="alert alert-warning">
+        You do not have a currently active tenancy. A maintenance request can only be submitted for a property associated with your account.
+    </div>
+    <a asp-controller="Dashboard" asp-action="TenantDashboard" class="btn btn-secondary">Back to Dashboard</a>
+}
+else
+{
+    <form asp-action="Create" method="post">
+        <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+        <div class="mb-3">
+            <label asp-for="TenancyId" class="form-label"></label>
+            <select asp-for="TenancyId" asp-items="Model.AvailableTenancies" class="form-select">
+                <option value="">Select a property</option>
+            </select>
+            <span asp-validation-for="TenancyId" class="text-danger"></span>
+        </div>
+
+        <div class="mb-3">
+            <label asp-for="Description" class="form-label"></label>
+            <textarea asp-for="Description" class="form-control" rows="6"></textarea>
+            <span asp-validation-for="Description" class="text-danger"></span>
+            <div class="form-text">Describe the problem and where it is located (10–2000 characters).</div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Submit Request</button>
+        <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+    </form>
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

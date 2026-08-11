@@ -102,9 +102,11 @@ namespace RentRight.Migrations
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<string>", b =>
                 {
                     b.Property<string>("LoginProvider")
+                        .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("ProviderKey")
+                        .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("ProviderDisplayName")
@@ -142,9 +144,11 @@ namespace RentRight.Migrations
                         .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("LoginProvider")
+                        .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("Name")
+                        .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("Value")
@@ -176,7 +180,8 @@ namespace RentRight.Migrations
 
                     b.Property<string>("FullName")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("bit");
@@ -237,26 +242,28 @@ namespace RentRight.Migrations
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
 
-                    b.Property<int>("PropertyId")
-                        .HasColumnType("int");
+                    b.Property<DateTime>("LastUpdatedUtc")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
-                    b.Property<string>("TenantId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
+                    b.Property<int>("TenancyId")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("PropertyId");
+                    b.HasIndex("TenancyId", "DateSubmitted");
 
-                    b.HasIndex("TenantId");
-
-                    b.ToTable("MaintenanceRequests");
+                    b.ToTable("MaintenanceRequests", t =>
+                        {
+                            t.HasCheckConstraint("CK_MaintenanceRequests_Status", "[Status] IN (N'Submitted', N'InProgress', N'Resolved', N'Closed')");
+                        });
                 });
 
             modelBuilder.Entity("RentRight.Models.Property", b =>
@@ -269,27 +276,73 @@ namespace RentRight.Migrations
 
                     b.Property<string>("Address")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<string>("Description")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
 
                     b.Property<string>("LandlordId")
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
 
                     b.Property<decimal>("RentAmount")
+                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("Title")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.HasKey("Id");
 
                     b.HasIndex("LandlordId");
 
                     b.ToTable("Properties");
+                });
+
+            modelBuilder.Entity("RentRight.Models.Tenancy", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateOnly?>("EndDate")
+                        .HasColumnType("date");
+
+                    b.Property<int>("PropertyId")
+                        .HasColumnType("int");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PropertyId")
+                        .IsUnique()
+                        .HasFilter("[Status] = N'Active'");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("Tenancies", t =>
+                        {
+                            t.HasCheckConstraint("CK_Tenancies_EndDate", "[EndDate] IS NULL OR [EndDate] >= [StartDate]");
+
+                            t.HasCheckConstraint("CK_Tenancies_Status", "[Status] IN (N'Active', N'Ended')");
+                        });
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -345,14 +398,36 @@ namespace RentRight.Migrations
 
             modelBuilder.Entity("RentRight.Models.MaintenanceRequest", b =>
                 {
+                    b.HasOne("RentRight.Models.Tenancy", "Tenancy")
+                        .WithMany("MaintenanceRequests")
+                        .HasForeignKey("TenancyId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Tenancy");
+                });
+
+            modelBuilder.Entity("RentRight.Models.Property", b =>
+                {
+                    b.HasOne("RentRight.Models.ApplicationUser", "Landlord")
+                        .WithMany("PropertiesOwned")
+                        .HasForeignKey("LandlordId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Landlord");
+                });
+
+            modelBuilder.Entity("RentRight.Models.Tenancy", b =>
+                {
                     b.HasOne("RentRight.Models.Property", "Property")
-                        .WithMany()
+                        .WithMany("Tenancies")
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
                     b.HasOne("RentRight.Models.ApplicationUser", "Tenant")
-                        .WithMany()
+                        .WithMany("Tenancies")
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
@@ -362,15 +437,21 @@ namespace RentRight.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("RentRight.Models.ApplicationUser", b =>
+                {
+                    b.Navigation("PropertiesOwned");
+
+                    b.Navigation("Tenancies");
+                });
+
             modelBuilder.Entity("RentRight.Models.Property", b =>
                 {
-                    b.HasOne("RentRight.Models.ApplicationUser", "Landlord")
-                        .WithMany()
-                        .HasForeignKey("LandlordId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                    b.Navigation("Tenancies");
+                });
 
-                    b.Navigation("Landlord");
+            modelBuilder.Entity("RentRight.Models.Tenancy", b =>
+                {
+                    b.Navigation("MaintenanceRequests");
                 });
 #pragma warning restore 612, 618
         }

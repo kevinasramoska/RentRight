@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="RentRight.csproj" />
+  <Project Path="RentRight.Tests/RentRight.Tests.csproj" />
+</Solution>

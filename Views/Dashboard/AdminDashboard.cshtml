@@ -1,4 +1,4 @@
-@model (int totalUsers, int totalProperties)
+@model RentRight.ViewModels.AdminDashboardViewModel
 
 @{
     ViewData["Title"] = "Admin Dashboard";
@@ -12,7 +12,7 @@
             <div class="card shadow-sm border-0">
                 <div class="card-body">
                     <h5 class="text-muted">Total Users</h5>
-                    <h2 class="fw-bold">@Model.totalUsers</h2>
+                    <h2 class="fw-bold">@Model.TotalUsers</h2>
                 </div>
             </div>
         </div>
@@ -20,11 +20,15 @@
             <div class="card shadow-sm border-0">
                 <div class="card-body">
                     <h5 class="text-muted">Total Properties</h5>
-                    <h2 class="fw-bold">@Model.totalProperties</h2>
+                    <h2 class="fw-bold">@Model.TotalProperties</h2>
                 </div>
             </div>
         </div>
     </div>
 
-    <a asp-controller="Properties" asp-action="Index" class="btn btn-primary">Manage Properties</a>
+    <div class="d-flex flex-wrap gap-2">
+        <a asp-controller="Properties" asp-action="Index" class="btn btn-primary">Manage Properties</a>
+        <a asp-controller="Tenancies" asp-action="Index" class="btn btn-outline-primary">Manage Tenancies</a>
+        <a asp-controller="MaintenanceRequest" asp-action="Index" class="btn btn-outline-primary">Manage Maintenance Requests</a>
+    </div>
 </div>

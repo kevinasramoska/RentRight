@@ -1,0 +1,23 @@
+name: Continuous Integration
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+      - run: dotnet restore RentRight.Tests/RentRight.Tests.csproj
+      - run: dotnet build RentRight.csproj --no-restore --configuration Release
+      - run: dotnet test RentRight.Tests/RentRight.Tests.csproj --no-restore --configuration Release

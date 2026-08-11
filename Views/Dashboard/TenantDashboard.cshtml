@@ -1,8 +1,82 @@
+@using RentRight.Models
+@model RentRight.ViewModels.TenantDashboardViewModel
+
 @{
     ViewData["Title"] = "Tenant Dashboard";
 }
 
-<div class="container py-5 text-center">
-    <h2 class="fw-bold mb-4">Welcome, Tenant!</h2>
-    <p class="lead text-muted">You can view your active rentals and submit maintenance requests here (coming soon).</p>
+<div class="container py-5">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <h2 class="fw-bold mb-0">Tenant Dashboard</h2>
+        <div>
+            <a asp-controller="MaintenanceRequest" asp-action="Index" class="btn btn-outline-primary">My Requests</a>
+            @if (Model.Tenancies.Any(tenancy => tenancy.IsCurrentlyActive))
+            {
+                <a asp-controller="MaintenanceRequest" asp-action="Create" class="btn btn-primary">Submit Request</a>
+            }
+        </div>
+    </div>
+
+    <h3 class="h5 mb-3">My Tenancies</h3>
+    @if (Model.Tenancies.Count == 0)
+    {
+        <div class="alert alert-info">No property tenancy is associated with your account yet.</div>
+    }
+    else
+    {
+        <div class="row g-4 mb-5">
+            @foreach (var tenancy in Model.Tenancies)
+            {
+                <div class="col-md-6">
+                    <div class="card h-100 @(tenancy.IsCurrentlyActive ? "border-success" : string.Empty)">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start gap-2">
+                                <h4 class="h5 card-title">@tenancy.PropertyTitle</h4>
+                                <span class="badge @(tenancy.IsCurrentlyActive ? "bg-success" : "bg-secondary")">
+                                    @(tenancy.IsCurrentlyActive ? "Active" : tenancy.Status.ToString())
+                                </span>
+                            </div>
+                            <p class="text-muted">@tenancy.PropertyAddress</p>
+                            <p class="mb-0">
+                                @tenancy.StartDate.ToString("dd MMM yyyy")
+                                –
+                                @(tenancy.EndDate?.ToString("dd MMM yyyy") ?? "Open-ended")
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="h5 mb-0">Recent Maintenance Requests</h3>
+        <a asp-controller="MaintenanceRequest" asp-action="Index">View all</a>
+    </div>
+
+    @if (Model.RecentMaintenanceRequests.Count == 0)
+    {
+        <p class="text-muted">You have not submitted any maintenance requests.</p>
+    }
+    else
+    {
+        <div class="list-group">
+            @foreach (var request in Model.RecentMaintenanceRequests)
+            {
+                var status = request.Status == MaintenanceRequestStatus.InProgress
+                    ? "In Progress"
+                    : request.Status.ToString();
+                <a asp-controller="MaintenanceRequest"
+                   asp-action="Details"
+                   asp-route-id="@request.Id"
+                   class="list-group-item list-group-item-action d-flex justify-content-between align-items-start gap-3">
+                    <span>
+                        <strong>@request.PropertyTitle</strong><br />
+                        <span class="text-muted">@request.DateSubmitted.ToString("dd MMM yyyy")</span>
+                    </span>
+                    <span class="badge bg-secondary">@status</span>
+                </a>
+            }
+        </div>
+    }
 </div>

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using RentRight.Models;
+using RentRight.ViewModels;
 
 namespace RentRight.Controllers
 {
@@ -20,30 +21,63 @@ namespace RentRight.Controllers
         // GET: /Admin
         public async Task<IActionResult> Index()
         {
-            var users = _userManager.Users.ToList();
-            var allRoles = _roleManager.Roles.Select(r => r.Name!).ToList();
+            var users = _userManager.Users.OrderBy(user => user.Email).ToList();
+            var allRoles = _roleManager.Roles
+                .Select(role => role.Name!)
+                .OrderBy(role => role)
+                .ToList();
 
-            var userRoles = new List<(ApplicationUser user, IList<string> roles)>();
+            var userRoles = new List<UserRoleRowViewModel>();
             foreach (var user in users)
             {
                 var roles = await _userManager.GetRolesAsync(user);
-                userRoles.Add((user, roles));
+                userRoles.Add(new UserRoleRowViewModel
+                {
+                    User = user,
+                    Roles = roles.ToList()
+                });
             }
 
-            ViewBag.AllRoles = allRoles;
-            return View(userRoles);
+            return View(new AdminUserRolesViewModel
+            {
+                Users = userRoles,
+                AvailableRoles = allRoles
+            });
         }
 
         // POST: /Admin/UpdateRoles
         [HttpPost]
-        public async Task<IActionResult> UpdateRoles(string userId, List<string> selectedRoles)
+        public async Task<IActionResult> UpdateRoles(string userId, List<string>? selectedRoles)
         {
             var user = await _userManager.FindByIdAsync(userId);
             if (user == null) return NotFound();
 
+            var requestedRoles = (selectedRoles ?? [])
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var validRoles = _roleManager.Roles
+                .Select(role => role.Name!)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            if (requestedRoles.Any(role => !validRoles.Contains(role)))
+            {
+                TempData["Error"] = "One or more selected roles are invalid.";
+                return RedirectToAction(nameof(Index));
+            }
+
             var currentRoles = await _userManager.GetRolesAsync(user);
-            var rolesToAdd = selectedRoles.Except(currentRoles);
-            var rolesToRemove = currentRoles.Except(selectedRoles);
+            if (currentRoles.Contains("Admin") && !requestedRoles.Contains("Admin", StringComparer.OrdinalIgnoreCase))
+            {
+                var administrators = await _userManager.GetUsersInRoleAsync("Admin");
+                if (administrators.Count == 1)
+                {
+                    TempData["Error"] = "At least one administrator account must remain assigned to the Admin role.";
+                    return RedirectToAction(nameof(Index));
+                }
+            }
+
+            var rolesToAdd = requestedRoles.Except(currentRoles);
+            var rolesToRemove = currentRoles.Except(requestedRoles);
 
             if (rolesToAdd.Any())
                 await _userManager.AddToRolesAsync(user, rolesToAdd);

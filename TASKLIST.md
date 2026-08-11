@@ -9,7 +9,7 @@ This list is ordered by dependency and risk. Complete the first section before a
 - [x] Protect property edits and deletion with server-side ownership checks.
 - [x] Remove the hard-coded seeded administrator password from source control.
 - [ ] Configure a local SQL Server connection and development seed administrator with .NET user secrets.
-- [ ] Add a CI workflow that restores, builds, and runs tests on every pull request.
+- [x] Add a CI workflow that restores, builds, and runs tests on every pull request.
 
 ## 2. Complete the domain model
 
@@ -23,12 +23,12 @@ This list is ordered by dependency and risk. Complete the first section before a
 - [ ] Implement tenant maintenance-request create/list/detail flows, scoped to an active tenancy.
 - [ ] Implement landlord maintenance-request triage and status updates for their own properties.
 - [ ] Finish the tenant dashboard with tenancy and maintenance-request summaries.
-- [ ] Replace `ViewBag` and tuple-based dashboard/admin views with dedicated view models.
+- [x] Replace `ViewBag` and tuple-based dashboard/admin views with dedicated view models.
 - [ ] Add pagination, filtering, and an explicit published/available state for public property listings.
 
 ## 4. Improve security and operations
 
-- [ ] Define a role-assignment policy: prevent administrators from removing their own last Admin role and validate submitted role names.
+- [x] Define a role-assignment policy: validate submitted role names and preserve at least one Admin account.
 - [ ] Add audit records for role and maintenance-status changes.
 - [ ] Add rate limiting and production authentication/account-confirmation settings.
 - [ ] Store production connection strings and seed credentials in deployment secrets, never appsettings files.
@@ -36,7 +36,7 @@ This list is ordered by dependency and risk. Complete the first section before a
 
 ## 5. Establish quality controls
 
-- [ ] Create a test project and cover authorization, property ownership, role management, and maintenance status transitions.
+- [ ] Expand the test project to cover authorization, property ownership, role management, and maintenance status transitions.
 - [ ] Add integration tests using an isolated database/container.
 - [ ] Add analyzers/formatting checks and enforce zero warnings in CI.
 - [ ] Add a contribution guide covering migrations, secrets, local setup, and pull-request checks.

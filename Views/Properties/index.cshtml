@@ -1,14 +1,25 @@
 @model IEnumerable<RentRight.Models.Property>
+@using Microsoft.AspNetCore.Identity
+@inject UserManager<ApplicationUser> UserManager
 
 @{
     ViewData["Title"] = "Properties";
+    var currentUserId = UserManager.GetUserId(User);
 }
 
 <h2>Properties</h2>
 
-<p>
-    <a class="btn btn-primary" asp-action="Create">Create New Property</a>
-</p>
+@if (User.IsInRole("Landlord") || User.IsInRole("Admin"))
+{
+    <p>
+        <a class="btn btn-primary" asp-action="Create">Create New Property</a>
+    </p>
+}
+
+@if (TempData["Error"] is string errorMessage)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
 
 <table class="table table-striped">
     <thead>
@@ -16,7 +27,6 @@
         <th>Title</th>
         <th>Address</th>
         <th>Rent Amount</th>
-        <th>Landlord Id</th>
         <th></th>
     </tr>
     </thead>
@@ -27,11 +37,13 @@
             <td>@item.Title</td>
             <td>@item.Address</td>
             <td>@item.RentAmount.ToString("C")</td>
-            <td>@item.LandlordId</td>
             <td>
                 <a class="btn btn-sm btn-info" asp-action="Details" asp-route-id="@item.Id">Details</a>
-                <a class="btn btn-sm btn-warning" asp-action="Edit" asp-route-id="@item.Id">Edit</a>
-                <a class="btn btn-sm btn-danger" asp-action="Delete" asp-route-id="@item.Id">Delete</a>
+                @if (User.IsInRole("Admin") || (User.IsInRole("Landlord") && item.LandlordId == currentUserId))
+                {
+                    <a class="btn btn-sm btn-warning" asp-action="Edit" asp-route-id="@item.Id">Edit</a>
+                    <a class="btn btn-sm btn-danger" asp-action="Delete" asp-route-id="@item.Id">Delete</a>
+                }
             </td>
         </tr>
     }

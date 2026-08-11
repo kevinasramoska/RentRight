@@ -5,13 +5,16 @@ namespace RentRight.Models;
 public class MaintenanceRequest
 {
     public int Id { get; set; }
-    [Required] public string Description { get; set; } = string.Empty;
+
+    [Required]
+    [StringLength(2000)]
+    public string Description { get; set; } = string.Empty;
+
     public DateTime DateSubmitted { get; set; } = DateTime.UtcNow;
-    public string Status { get; set; } = "Pending";
+    public DateTime LastUpdatedUtc { get; set; } = DateTime.UtcNow;
+    public MaintenanceRequestStatus Status { get; set; } = MaintenanceRequestStatus.Submitted;
 
-    public int PropertyId { get; set; }
-    public Property? Property { get; set; }
-
-    public string TenantId { get; set; } = string.Empty;
-    public ApplicationUser? Tenant { get; set; }
+    [Range(1, int.MaxValue)]
+    public int TenancyId { get; set; }
+    public Tenancy? Tenancy { get; set; }
 }

@@ -4,7 +4,7 @@ RentRight is an ASP.NET Core MVC property management application for three user 
 
 - `Admin` manages users and roles.
 - `Landlord` creates and manages property listings.
-- `Tenant` can sign in and access a tenant dashboard placeholder.
+- `Tenant` can view associated tenancies and submit/view maintenance requests.
 
 The application uses ASP.NET Core Identity for authentication and role management, Entity Framework Core for data access, and SQL Server for persistence.
 
@@ -28,15 +28,21 @@ The application uses ASP.NET Core Identity for authentication and role managemen
 - Admin user role management screen
 - Landlord dashboard showing the landlord's own properties
 - Property create, edit, and delete flows for `Landlord` and `Admin`
+- Admin tenancy creation and ending
+- Tenant dashboard with associated properties/tenancies
+- Tenant-scoped maintenance request creation, list, and detail views
+- Landlord maintenance queues and controlled status updates for owned properties
+- Admin access to all maintenance requests
 
 ## Current Gaps
 
-These areas appear to be incomplete in the current codebase:
+The core MVC workflow is implemented. The larger roadmap still includes:
 
-- `MaintenanceRequestController` is present but not implemented
-- Tenant maintenance workflows are not implemented yet
-- Tenant dashboard is currently a placeholder
-- There are no automated test projects in the repository
+- Application/service-layer extraction
+- REST API and React client
+- SQL Server-backed integration tests and broader authorization coverage
+- Tenant invitation/acceptance and immutable maintenance status history
+- Optimistic concurrency and pagination
 
 ## Project Structure
 
@@ -46,7 +52,9 @@ RentRight/
 ├── Data/                 EF Core DbContext
 ├── Migrations/           Entity Framework migrations
 ├── Models/               Domain and identity models
+├── ViewModels/           MVC input and presentation models
 ├── Views/                Razor views
+├── RentRight.Tests/      xUnit tests
 ├── wwwroot/              Static assets
 ├── Program.cs            App startup, DI, middleware, seeding
 └── RentRight.csproj      Project file
@@ -115,6 +123,9 @@ When running in Development, the app creates an administrator only when both `Se
 - Anonymous users can browse the home page, property list, and property details
 - `Landlord` and `Admin` users can create properties
 - `Landlord` users can edit their own properties
+- `Tenant` users can view their tenancies and create/view requests only through their own active tenancy
+- `Landlord` users can view and update requests only for properties they own
+- `Admin` users can create/end tenancies and manage every maintenance request
 - `Admin` users can access the admin dashboard and update user roles
 
 ## Database Notes
@@ -122,6 +133,7 @@ When running in Development, the app creates an administrator only when both `Se
 The EF Core context is defined in [Data/ApplicationDbContext.cs](/Users/kevinasramoska/Desktop/Property Manager/RentRight/Data/ApplicationDbContext.cs) and currently includes:
 
 - `Properties`
+- `Tenancies`
 - `MaintenanceRequests`
 - Identity tables through `IdentityDbContext<ApplicationUser>`
 
@@ -131,7 +143,8 @@ Existing migrations are stored in [Migrations](/Users/kevinasramoska/Desktop/Pro
 
 ```bash
 dotnet restore
-dotnet build
+dotnet build RentRight.slnx
+dotnet test RentRight.Tests/RentRight.Tests.csproj
 dotnet ef database update
 dotnet run
 ```

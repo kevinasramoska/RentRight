@@ -5,7 +5,10 @@
 }
 
 <div class="container py-5">
-    <h2 class="fw-bold mb-4">My Properties</h2>
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <h2 class="fw-bold mb-0">My Properties</h2>
+        <a asp-controller="MaintenanceRequest" asp-action="Index" class="btn btn-outline-primary">Property Maintenance Requests</a>
+    </div>
 
     <a asp-controller="Properties" asp-action="Create" class="btn btn-success mb-4">+ Add New Property</a>
 

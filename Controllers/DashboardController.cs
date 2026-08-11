@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using RentRight.Data;
 using RentRight.Models;
 using Microsoft.AspNetCore.Identity;
+using RentRight.ViewModels;
 
 namespace RentRight.Controllers
 {
@@ -44,7 +45,11 @@ namespace RentRight.Controllers
         {
             var totalUsers = await _context.Users.CountAsync();
             var totalProperties = await _context.Properties.CountAsync();
-            return View("AdminDashboard", (totalUsers, totalProperties));
+            return View("AdminDashboard", new AdminDashboardViewModel
+            {
+                TotalUsers = totalUsers,
+                TotalProperties = totalProperties
+            });
         }
 
         // --- LANDLORD DASHBOARD ---
@@ -63,9 +68,53 @@ namespace RentRight.Controllers
 
         // --- TENANT DASHBOARD ---
         [Authorize(Roles = "Tenant")]
-        public IActionResult TenantDashboard()
+        public async Task<IActionResult> TenantDashboard(CancellationToken cancellationToken)
         {
-            return View();
+            var userId = _userManager.GetUserId(User);
+            if (userId == null) return Challenge();
+
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var tenancies = await _context.Tenancies
+                .AsNoTracking()
+                .Where(tenancy => tenancy.TenantId == userId)
+                .OrderByDescending(tenancy => tenancy.Status == TenancyStatus.Active)
+                .ThenByDescending(tenancy => tenancy.StartDate)
+                .Select(tenancy => new TenantTenancySummaryViewModel
+                {
+                    Id = tenancy.Id,
+                    PropertyTitle = tenancy.Property!.Title,
+                    PropertyAddress = tenancy.Property.Address,
+                    StartDate = tenancy.StartDate,
+                    EndDate = tenancy.EndDate,
+                    Status = tenancy.Status,
+                    IsCurrentlyActive = tenancy.Status == TenancyStatus.Active &&
+                        tenancy.StartDate <= today &&
+                        (tenancy.EndDate == null || tenancy.EndDate >= today)
+                })
+                .ToListAsync(cancellationToken);
+
+            var recentRequests = await _context.MaintenanceRequests
+                .AsNoTracking()
+                .Where(request => request.Tenancy!.TenantId == userId)
+                .OrderByDescending(request => request.DateSubmitted)
+                .Take(5)
+                .Select(request => new MaintenanceRequestRowViewModel
+                {
+                    Id = request.Id,
+                    PropertyTitle = request.Tenancy!.Property!.Title,
+                    TenantName = request.Tenancy.Tenant!.FullName,
+                    Description = request.Description,
+                    DateSubmitted = request.DateSubmitted,
+                    Status = request.Status,
+                    CanUpdateStatus = false
+                })
+                .ToListAsync(cancellationToken);
+
+            return View(new TenantDashboardViewModel
+            {
+                Tenancies = tenancies,
+                RecentMaintenanceRequests = recentRequests
+            });
         }
     }
 }
