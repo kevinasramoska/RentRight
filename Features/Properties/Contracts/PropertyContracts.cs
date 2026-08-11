@@ -15,6 +15,38 @@ public sealed record PropertyListItem(
     decimal RentAmount,
     bool CanManage);
 
+public sealed record PublishedPropertyQuery(
+    int Page,
+    int PageSize,
+    string? Search = null,
+    decimal? MinimumRent = null,
+    decimal? MaximumRent = null)
+{
+    public const int MaximumPage = 10_000;
+    public const int MaximumPageSize = 100;
+}
+
+public sealed record PublishedPropertyListItem(
+    int Id,
+    string Title,
+    string Address,
+    decimal RentAmount,
+    string? Description);
+
+public sealed record PublishedPropertyDetails(
+    int Id,
+    string Title,
+    string Address,
+    decimal RentAmount,
+    string? Description);
+
+public sealed record PropertyPage<T>(
+    IReadOnlyList<T> Items,
+    int Page,
+    int PageSize,
+    int TotalCount)
+    where T : class;
+
 public sealed record LatestPropertiesQuery(int Limit = 6)
 {
     public const int DefaultLimit = 6;

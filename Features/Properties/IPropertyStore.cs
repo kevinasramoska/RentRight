@@ -4,6 +4,14 @@ namespace RentRight.Features.Properties;
 
 public interface IPropertyStore
 {
+    Task<PublishedPropertyPageRecord> SearchPublishedAsync(
+        PublishedPropertyQuery query,
+        CancellationToken cancellationToken);
+
+    Task<PublishedPropertyListItem?> FindPublishedAsync(
+        int propertyId,
+        CancellationToken cancellationToken);
+
     Task<IReadOnlyList<PropertyListRecord>> ListAsync(
         int limit,
         CancellationToken cancellationToken);
@@ -51,6 +59,10 @@ public sealed record PropertyValues(
     string Address,
     decimal RentAmount,
     string? Description);
+
+public sealed record PublishedPropertyPageRecord(
+    IReadOnlyList<PublishedPropertyListItem> Items,
+    int TotalCount);
 
 public enum PropertyDeleteStoreStatus
 {
