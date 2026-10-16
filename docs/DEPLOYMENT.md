@@ -2,8 +2,9 @@
 
 The demo needs a backend host that runs .NET 10/Linux containers and a managed
 SQL Server database. No hosting account, database, or public demo URL is currently
-configured. Container execution has not been verified locally because the Docker
-daemon is unavailable; the .NET Release publish and test suite can run without it.
+configured. Application-container execution has not been verified locally.
+The separate [SQL integration suite](SQL_INTEGRATION_TESTS.md) exercises disposable
+SQL Server containers; it does not verify the application Dockerfile or deployment.
 
 ## Container and configuration
 

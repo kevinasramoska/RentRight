@@ -186,6 +186,8 @@ Implementation checkpoint (2026-08-11): the focused core-domain request is imple
 
 ### P04-02 — Add SQL Server-backed ASP.NET Core integration tests
 
+- **Implementation status:** Completed — 26 real SQL Server integration cases passed twice on 2026-10-16, in addition to the empty-database smoke run and all 286 fast tests. The separate project uses Testcontainers, per-case migrated databases and real Identity login cookies without production hooks or schema changes. See `docs/SQL_INTEGRATION_TESTS.md` for local/CI commands and verification evidence.
+
 - **Why it matters:** Authorization, Identity cookies, antiforgery, migrations, SQL Server constraints, and HTTP error contracts cannot be trusted from unit tests alone.
 - **Files/components likely affected:** A dedicated integration-test project or namespace, `Program.cs` (`public partial class Program` test seam), custom `WebApplicationFactory`, Testcontainers setup, database reset/fixtures, CI Docker support.
 - **Implementation steps:**

@@ -184,6 +184,12 @@ dotnet ef database update
 dotnet run
 ```
 
+SQL Server-backed HTTP tests are a separate explicit command; see [SQL integration tests](docs/SQL_INTEGRATION_TESTS.md) for Docker prerequisites, isolation and CI execution.
+
+```bash
+dotnet test RentRight.Tests/SqlIntegration/RentRight.SqlIntegration.Tests.csproj --configuration Release
+```
+
 ## Deployment and MVC/API routing
 
 See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the .NET 10 container, SQL Server,
