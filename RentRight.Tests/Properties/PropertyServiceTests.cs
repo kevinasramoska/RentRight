@@ -75,6 +75,34 @@ public class PropertyServiceTests
             property => Assert.Equal(1, property.Id));
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task ListAsync_NonPositiveLimit_UsesMinimumLimit(int requestedLimit)
+    {
+        var store = new FakePropertyStore(Property("Apartment", "landlord-1", 1));
+        var service = CreateService(store, userId: null);
+
+        await service.ListAsync(new PropertyListQuery(requestedLimit), CancellationToken.None);
+
+        Assert.Equal(1, store.LastListLimit);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task ListLatestAsync_NonPositiveLimit_UsesMinimumLimit(int requestedLimit)
+    {
+        var store = new FakePropertyStore(Property("Apartment", "landlord-1", 1));
+        var service = CreateService(store, userId: null);
+
+        await service.ListLatestAsync(
+            new LatestPropertiesQuery(requestedLimit),
+            CancellationToken.None);
+
+        Assert.Equal(1, store.LastLatestListLimit);
+    }
+
     [Fact]
     public async Task GetDetailsAsync_AnonymousUser_ReturnsPublicProjectionWithoutManagePermission()
     {
@@ -203,6 +231,24 @@ public class PropertyServiceTests
     }
 
     [Fact]
+    public async Task UpdateAsync_Owner_ForwardsCancellationTokenToReadAndMutation()
+    {
+        var store = new FakePropertyStore(
+            Property("Before", landlordId: "landlord-1", id: 1));
+        var service = CreateService(store, "landlord-1", "Landlord");
+        using var cancellationSource = new CancellationTokenSource();
+
+        var outcome = await service.UpdateAsync(
+            1,
+            EditInput(1, "After"),
+            cancellationSource.Token);
+
+        Assert.Equal(PropertyOperationStatus.Success, outcome.Status);
+        Assert.Equal(cancellationSource.Token, store.LastFindCancellationToken);
+        Assert.Equal(cancellationSource.Token, store.LastUpdateCancellationToken);
+    }
+
+    [Fact]
     public async Task UpdateAsync_MissingProperty_ReturnsNotFound()
     {
         var service = CreateService(new FakePropertyStore(), "landlord-1", "Landlord");
@@ -292,6 +338,20 @@ public class PropertyServiceTests
     }
 
     [Fact]
+    public async Task DeleteAsync_NonOwner_ReturnsForbiddenWithoutDeleting()
+    {
+        var store = new FakePropertyStore(
+            Property("Protected", landlordId: "landlord-2", id: 1));
+        var service = CreateService(store, "landlord-1", "Landlord");
+
+        var outcome = await service.DeleteAsync(1, CancellationToken.None);
+
+        Assert.Equal(PropertyOperationStatus.Forbidden, outcome.Status);
+        Assert.Equal(0, store.DeleteCount);
+        Assert.Equal("Protected", Assert.Single(store.Properties).Title);
+    }
+
+    [Fact]
     public void MutationContracts_DoNotExposeOwnershipOrNavigationFields()
     {
         var createProperties = typeof(PropertyCreateInput).GetProperties()
@@ -360,6 +420,9 @@ public class PropertyServiceTests
         public PublishedPropertyQuery? LastPublishedQuery { get; private set; }
         public int CreateCount { get; private set; }
         public int UpdateCount { get; private set; }
+        public int DeleteCount { get; private set; }
+        public CancellationToken LastFindCancellationToken { get; private set; }
+        public CancellationToken LastUpdateCancellationToken { get; private set; }
         public PropertyDeleteStoreStatus DeleteStatus { get; set; } =
             PropertyDeleteStoreStatus.Deleted;
 
@@ -455,8 +518,11 @@ public class PropertyServiceTests
 
         public Task<PropertyRecord?> FindAsync(
             int propertyId,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(_properties.GetValueOrDefault(propertyId));
+            CancellationToken cancellationToken)
+        {
+            LastFindCancellationToken = cancellationToken;
+            return Task.FromResult(_properties.GetValueOrDefault(propertyId));
+        }
 
         public Task<int> CreateAsync(
             PropertyValues values,
@@ -481,6 +547,7 @@ public class PropertyServiceTests
             CancellationToken cancellationToken)
         {
             UpdateCount++;
+            LastUpdateCancellationToken = cancellationToken;
             if (!_properties.TryGetValue(propertyId, out var property))
             {
                 return Task.FromResult(false);
@@ -500,6 +567,7 @@ public class PropertyServiceTests
             int propertyId,
             CancellationToken cancellationToken)
         {
+            DeleteCount++;
             if (DeleteStatus == PropertyDeleteStoreStatus.Deleted)
             {
                 _properties.Remove(propertyId);

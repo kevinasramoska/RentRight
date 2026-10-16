@@ -54,6 +54,26 @@ public class TenancyServiceTests
     }
 
     [Theory]
+    [InlineData(false, false, TenancyQueryStatus.Unauthenticated)]
+    [InlineData(true, false, TenancyQueryStatus.Forbidden)]
+    public async Task GetCreateForm_UserWithoutAdminAccess_ReturnsAuthorizationOutcomeWithoutQuerying(
+        bool isAuthenticated,
+        bool isAdministrator,
+        TenancyQueryStatus expectedStatus)
+    {
+        var store = new FakeTenancyStore();
+        var service = CreateService(
+            store,
+            new FakeCurrentUser(isAuthenticated, isAdministrator));
+
+        var outcome = await service.GetCreateFormAsync(CancellationToken.None);
+
+        Assert.Equal(expectedStatus, outcome.Status);
+        Assert.Equal(0, store.PropertyMaximumResults);
+        Assert.Equal(0, store.TenantMaximumResults);
+    }
+
+    [Theory]
     [InlineData(false, false, CreateTenancyStatus.Unauthenticated)]
     [InlineData(true, false, CreateTenancyStatus.Forbidden)]
     public async Task Create_UserWithoutAdminAccess_ReturnsAuthorizationOutcomeWithoutQuerying(
@@ -203,6 +223,42 @@ public class TenancyServiceTests
             store.CreatedTenancy);
     }
 
+    [Fact]
+    public async Task Create_FutureStartWithoutEndDate_Succeeds()
+    {
+        var store = new FakeTenancyStore();
+        var service = CreateService(store);
+        var command = new CreateTenancyCommand(
+            10,
+            "tenant-1",
+            DateOnly.FromDateTime(NowUtc).AddDays(30),
+            null);
+
+        var outcome = await service.CreateAsync(command, CancellationToken.None);
+
+        Assert.Equal(CreateTenancyStatus.Success, outcome.Status);
+        Assert.Equal(command.StartDate, store.CreatedTenancy!.StartDate);
+        Assert.Null(store.CreatedTenancy.EndDate);
+    }
+
+    [Fact]
+    public async Task Create_ValidCommand_ForwardsCancellationTokenToEveryStoreOperation()
+    {
+        var store = new FakeTenancyStore();
+        var service = CreateService(store);
+        using var cancellationSource = new CancellationTokenSource();
+
+        var outcome = await service.CreateAsync(
+            ValidCommand(),
+            cancellationSource.Token);
+
+        Assert.Equal(CreateTenancyStatus.Success, outcome.Status);
+        Assert.Equal(4, store.CancellationTokens.Count);
+        Assert.All(
+            store.CancellationTokens,
+            token => Assert.Equal(cancellationSource.Token, token));
+    }
+
     [Theory]
     [InlineData("2026-08-01", "2026-08-11")]
     [InlineData("2026-08-20", "2026-08-20")]
@@ -315,11 +371,13 @@ public class TenancyServiceTests
             EndTenancyPersistenceResult.Success;
         public DateOnly? SavedEndDate { get; private set; }
         public CreateTenancyRecord? CreatedTenancy { get; private set; }
+        public List<CancellationToken> CancellationTokens { get; } = [];
 
         public Task<IReadOnlyList<TenancyAdminRow>> ListForAdministrationAsync(
             int maximumResults,
             CancellationToken cancellationToken)
         {
+            CancellationTokens.Add(cancellationToken);
             ListMaximumResults = maximumResults;
             return Task.FromResult<IReadOnlyList<TenancyAdminRow>>([]);
         }
@@ -328,6 +386,7 @@ public class TenancyServiceTests
             int maximumResults,
             CancellationToken cancellationToken)
         {
+            CancellationTokens.Add(cancellationToken);
             PropertyMaximumResults = maximumResults;
             return Task.FromResult<IReadOnlyList<TenancySelectionOption>>([]);
         }
@@ -336,6 +395,7 @@ public class TenancyServiceTests
             int maximumResults,
             CancellationToken cancellationToken)
         {
+            CancellationTokens.Add(cancellationToken);
             TenantMaximumResults = maximumResults;
             return Task.FromResult<IReadOnlyList<TenancySelectionOption>>([]);
         }
@@ -344,22 +404,32 @@ public class TenancyServiceTests
             int propertyId,
             CancellationToken cancellationToken)
         {
+            CancellationTokens.Add(cancellationToken);
             PropertyExistsCalled = true;
             return Task.FromResult(PropertyExists);
         }
 
         public Task<bool> TenantAccountExistsAsync(
             string tenantId,
-            CancellationToken cancellationToken) => Task.FromResult(TenantExists);
+            CancellationToken cancellationToken)
+        {
+            CancellationTokens.Add(cancellationToken);
+            return Task.FromResult(TenantExists);
+        }
 
         public Task<bool> HasActiveTenancyAsync(
             int propertyId,
-            CancellationToken cancellationToken) => Task.FromResult(HasActiveTenancy);
+            CancellationToken cancellationToken)
+        {
+            CancellationTokens.Add(cancellationToken);
+            return Task.FromResult(HasActiveTenancy);
+        }
 
         public Task<CreateTenancyPersistenceResult> CreateAsync(
             CreateTenancyRecord tenancy,
             CancellationToken cancellationToken)
         {
+            CancellationTokens.Add(cancellationToken);
             CreateCalled = true;
             CreatedTenancy = tenancy;
             return Task.FromResult(CreateResult);
@@ -369,6 +439,7 @@ public class TenancyServiceTests
             int tenancyId,
             CancellationToken cancellationToken)
         {
+            CancellationTokens.Add(cancellationToken);
             GetForEndCalled = true;
             return Task.FromResult(EndState);
         }
@@ -378,6 +449,7 @@ public class TenancyServiceTests
             DateOnly endDate,
             CancellationToken cancellationToken)
         {
+            CancellationTokens.Add(cancellationToken);
             SavedEndDate = endDate;
             return Task.FromResult(EndResult);
         }

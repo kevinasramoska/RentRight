@@ -167,7 +167,8 @@ Implementation checkpoint (2026-08-11): the focused core-domain request is imple
 
 ### P04-01 — Build a meaningful xUnit unit-test suite
 
-- **Why it matters:** The current two model tests prove the runner works but do not protect ownership, tenancy, role management, or maintenance transitions.
+- **Implementation status:** Completed — P04-01 adds 45 deterministic domain and application-service tests, bringing the combined suite to 286 passing tests after Phase 3. The .NET 10 Microsoft coverage collector reports 61.06% line and 54.07% branch coverage for the production assembly. Generated migrations and static assets are excluded, no threshold is enforced from this diagnostic baseline, and SQL Server-backed HTTP, Identity, antiforgery, and migration coverage remains P04-02.
+- **Why it matters:** Ownership, tenancy, role management, and maintenance transitions need deterministic regression protection below the HTTP and database boundaries.
 - **Files/components likely affected:** `RentRight.Tests`, test builders/fixtures, application/domain tests, coverage configuration, project references.
 - **Implementation steps:**
   1. Organize tests by feature and replace repeated setup with readable builders.

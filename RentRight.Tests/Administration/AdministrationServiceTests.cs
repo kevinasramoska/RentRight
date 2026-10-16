@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using RentRight.Application.Abstractions;
 using RentRight.Features.Administration;
 using RentRight.Features.Administration.Contracts;
@@ -7,6 +8,44 @@ namespace RentRight.Tests.Administration;
 
 public class AdministrationServiceTests
 {
+    [Theory]
+    [InlineData(false, false, ListAdministrationUsersStatus.Unauthenticated)]
+    [InlineData(true, false, ListAdministrationUsersStatus.Forbidden)]
+    public async Task ListUsersAsync_UserWithoutAdminAccess_ReturnsAuthorizationOutcomeWithoutQuerying(
+        bool isAuthenticated,
+        bool isAdministrator,
+        ListAdministrationUsersStatus expectedStatus)
+    {
+        var store = CreateStore(("user-1", "user@example.com", ["Tenant"]));
+        var service = CreateService(store, isAuthenticated, isAdministrator);
+
+        var outcome = await service.ListUsersAsync(
+            new AdministrationUsersQuery(),
+            CancellationToken.None);
+
+        Assert.Equal(expectedStatus, outcome.Status);
+        Assert.Equal(0, store.GetUsersPageCount);
+    }
+
+    [Theory]
+    [InlineData(false, false, UpdateUserRolesStatus.Unauthenticated)]
+    [InlineData(true, false, UpdateUserRolesStatus.Forbidden)]
+    public async Task UpdateUserRolesAsync_UserWithoutAdminAccess_ReturnsAuthorizationOutcomeWithoutTransaction(
+        bool isAuthenticated,
+        bool isAdministrator,
+        UpdateUserRolesStatus expectedStatus)
+    {
+        var store = CreateStore(("user-1", "user@example.com", ["Tenant"]));
+        var service = CreateService(store, isAuthenticated, isAdministrator);
+
+        var outcome = await service.UpdateUserRolesAsync(
+            new UpdateUserRolesCommand("user-1", ["Tenant"]),
+            CancellationToken.None);
+
+        Assert.Equal(expectedStatus, outcome.Status);
+        Assert.Equal(0, store.SerializableTransactionCount);
+    }
+
     [Fact]
     public async Task UpdateUserRolesAsync_InvalidRole_ReturnsValidationOutcomeWithoutMutation()
     {
@@ -118,6 +157,58 @@ public class AdministrationServiceTests
     }
 
     [Fact]
+    public async Task UpdateUserRolesAsync_MissingUser_RollsBackAndReturnsUserNotFound()
+    {
+        var store = CreateStore(("user-1", "user@example.com", ["Tenant"]));
+        var service = CreateService(store);
+
+        var outcome = await service.UpdateUserRolesAsync(
+            new UpdateUserRolesCommand("missing-user", ["Tenant"]),
+            CancellationToken.None);
+
+        Assert.Equal(UpdateUserRolesStatus.UserNotFound, outcome.Status);
+        Assert.Equal(1, store.RollbackCount);
+        Assert.Equal(0, store.CommitCount);
+        Assert.Empty(store.AddCalls);
+        Assert.Empty(store.RemoveCalls);
+    }
+
+    [Fact]
+    public async Task UpdateUserRolesAsync_UnchangedRoles_CommitsWithoutIdentityMutation()
+    {
+        var store = CreateStore(("user-1", "user@example.com", ["Landlord", "Tenant"]));
+        var service = CreateService(store);
+
+        var outcome = await service.UpdateUserRolesAsync(
+            new UpdateUserRolesCommand("user-1", ["tenant", "LANDLORD", "Tenant"]),
+            CancellationToken.None);
+
+        Assert.Equal(UpdateUserRolesStatus.Success, outcome.Status);
+        Assert.Equal("user@example.com", outcome.UserEmail);
+        Assert.Empty(store.AddCalls);
+        Assert.Empty(store.RemoveCalls);
+        Assert.Equal(1, store.CommitCount);
+        Assert.Equal(0, store.RollbackCount);
+    }
+
+    [Fact]
+    public async Task UpdateUserRolesAsync_StoreThrowsDbUpdateException_RollsBackAndReturnsConcurrentUpdate()
+    {
+        var store = CreateStore(("user-1", "user@example.com", ["Tenant"]));
+        store.AddException = new DbUpdateException("Concurrent role update.");
+        var service = CreateService(store);
+
+        var outcome = await service.UpdateUserRolesAsync(
+            new UpdateUserRolesCommand("user-1", ["Tenant", "Landlord"]),
+            CancellationToken.None);
+
+        Assert.Equal(UpdateUserRolesStatus.ConcurrentUpdate, outcome.Status);
+        Assert.Equal(["Tenant"], store.RolesFor("user-1"));
+        Assert.Equal(1, store.RollbackCount);
+        Assert.Equal(0, store.CommitCount);
+    }
+
+    [Fact]
     public async Task ListUsersAsync_ExcessivePageSize_IsBounded()
     {
         var store = CreateStore(("user-1", "user@example.com", ["Tenant", "Landlord"]));
@@ -133,8 +224,11 @@ public class AdministrationServiceTests
         Assert.Equal(["Landlord", "Tenant"], Assert.Single(outcome.Page!.Users).Roles);
     }
 
-    private static AdministrationService CreateService(FakeAdministrationRoleStore store) =>
-        new(store, new FakeCurrentUser(isAuthenticated: true, isAdministrator: true));
+    private static AdministrationService CreateService(
+        FakeAdministrationRoleStore store,
+        bool isAuthenticated = true,
+        bool isAdministrator = true) =>
+        new(store, new FakeCurrentUser(isAuthenticated, isAdministrator));
 
     private static FakeAdministrationRoleStore CreateStore(
         params (string UserId, string Email, string[] Roles)[] users) =>
@@ -167,6 +261,7 @@ public class AdministrationServiceTests
 
         public AdministrationIdentityOperation? AddFailure { get; set; }
         public AdministrationIdentityOperation? RemoveFailure { get; set; }
+        public DbUpdateException? AddException { get; set; }
         public List<IReadOnlyList<string>> AddCalls { get; } = [];
         public List<IReadOnlyList<string>> RemoveCalls { get; } = [];
         public int SerializableTransactionCount { get; private set; }
@@ -174,6 +269,7 @@ public class AdministrationServiceTests
         public int RollbackCount { get; private set; }
         public int LastRequestedPage { get; private set; }
         public int LastRequestedPageSize { get; private set; }
+        public int GetUsersPageCount { get; private set; }
 
         public IReadOnlyList<string> RolesFor(string userId) =>
             _users[userId].Roles.OrderBy(role => role).ToArray();
@@ -183,6 +279,7 @@ public class AdministrationServiceTests
             int pageSize,
             CancellationToken cancellationToken)
         {
+            GetUsersPageCount++;
             LastRequestedPage = page;
             LastRequestedPageSize = pageSize;
             var rows = _users
@@ -234,6 +331,11 @@ public class AdministrationServiceTests
             CancellationToken cancellationToken)
         {
             AddCalls.Add(roles.ToArray());
+            if (AddException is not null)
+            {
+                throw AddException;
+            }
+
             if (AddFailure is not null)
             {
                 return Task.FromResult(AddFailure);

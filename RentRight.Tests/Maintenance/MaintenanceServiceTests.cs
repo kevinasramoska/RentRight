@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using RentRight.Application.Abstractions;
 using RentRight.Features.Maintenance;
 using RentRight.Features.Maintenance.Contracts;
@@ -9,6 +10,25 @@ namespace RentRight.Tests.Maintenance;
 public class MaintenanceServiceTests
 {
     private static readonly DateTime Now = new(2026, 8, 11, 12, 30, 0, DateTimeKind.Utc);
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task CreateAsync_UserWithoutAuthenticatedIdentifier_ReturnsUnauthenticatedWithoutStoreRead(
+        string? userId)
+    {
+        var store = CreateStoreWithActiveTenancy();
+        var service = CreateCommandService(store, userId, "Tenant");
+
+        var outcome = await service.CreateAsync(
+            new CreateMaintenanceRequestCommand(1, "A valid maintenance description"),
+            CancellationToken.None);
+
+        Assert.Equal(MaintenanceOutcomeStatus.Unauthenticated, outcome.Status);
+        Assert.Equal(0, store.GetTenancyCallCount);
+        Assert.Null(store.CreatedRequest);
+    }
 
     [Theory]
     [InlineData(null)]
@@ -55,6 +75,27 @@ public class MaintenanceServiceTests
             Assert.Contains(outcome.Errors!, error => error.Field == "Description");
             Assert.Null(store.CreatedRequest);
         }
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task CreateAsync_InvalidTenancyId_ReturnsValidationWithoutStoreRead(
+        int? tenancyId)
+    {
+        var store = CreateStoreWithActiveTenancy();
+        var service = CreateCommandService(store, "tenant-1", "Tenant");
+
+        var outcome = await service.CreateAsync(
+            new CreateMaintenanceRequestCommand(
+                tenancyId,
+                "A valid maintenance description"),
+            CancellationToken.None);
+
+        Assert.Equal(MaintenanceOutcomeStatus.Validation, outcome.Status);
+        Assert.Contains(outcome.Errors!, error => error.Field == "TenancyId");
+        Assert.Equal(0, store.GetTenancyCallCount);
     }
 
     [Fact]
@@ -154,6 +195,20 @@ public class MaintenanceServiceTests
     }
 
     [Fact]
+    public async Task CreateAsync_StoreThrowsDbUpdateException_ReturnsConflict()
+    {
+        var store = CreateStoreWithActiveTenancy();
+        store.CreateException = new DbUpdateException("Tenancy changed.");
+        var service = CreateCommandService(store, "tenant-1", "Tenant");
+
+        var outcome = await service.CreateAsync(
+            new CreateMaintenanceRequestCommand(1, "A valid maintenance description"),
+            CancellationToken.None);
+
+        Assert.Equal(MaintenanceOutcomeStatus.Conflict, outcome.Status);
+    }
+
+    [Fact]
     public async Task CreateAsync_NonTenantRole_ReturnsForbidden()
     {
         var store = CreateStoreWithActiveTenancy();
@@ -193,6 +248,43 @@ public class MaintenanceServiceTests
         Assert.Equal(MaintenanceOutcomeStatus.Success, outcome.Status);
         Assert.True(outcome.Detail!.CanUpdateStatus);
         Assert.Equal("Property 1", outcome.Detail.PropertyTitle);
+    }
+
+    [Theory]
+    [InlineData("Tenant", "tenant-1", false)]
+    [InlineData("Landlord", "landlord-1", true)]
+    public async Task GetDetailAsync_OwningUser_ReturnsSuccessWithExpectedUpdatePermission(
+        string role,
+        string userId,
+        bool canUpdateStatus)
+    {
+        var service = CreateQueryService(CreateStoreWithRequest(), userId, role);
+
+        var outcome = await service.GetDetailAsync(10, CancellationToken.None);
+
+        Assert.Equal(MaintenanceOutcomeStatus.Success, outcome.Status);
+        Assert.Equal(canUpdateStatus, outcome.Detail!.CanUpdateStatus);
+        Assert.Equal("The boiler pressure has fallen.", outcome.Detail.Description);
+    }
+
+    [Theory]
+    [InlineData(null, "Tenant", MaintenanceOutcomeStatus.Unauthenticated)]
+    [InlineData("user-1", "", MaintenanceOutcomeStatus.Forbidden)]
+    public async Task ListAsync_UserWithoutAuthorizedIdentity_ReturnsOutcomeWithoutStoreQuery(
+        string? userId,
+        string role,
+        MaintenanceOutcomeStatus expectedStatus)
+    {
+        var store = CreateStoreWithRequest();
+        var roles = string.IsNullOrEmpty(role) ? [] : new[] { role };
+        var service = CreateQueryService(store, userId, roles);
+
+        var outcome = await service.ListAsync(
+            new MaintenanceRequestsQuery(),
+            CancellationToken.None);
+
+        Assert.Equal(expectedStatus, outcome.Status);
+        Assert.Null(store.LastListAccess);
     }
 
     [Fact]
@@ -245,6 +337,23 @@ public class MaintenanceServiceTests
         Assert.Equal(MaintenanceOutcomeStatus.Success, outcome.Status);
         Assert.Equal(MaintenanceRequestsQuery.MaximumPage, store.LastPage);
         Assert.Equal(MaintenanceRequestsQuery.MaximumPageSize, store.LastPageSize);
+    }
+
+    [Fact]
+    public async Task ListAsync_InputsBelowMinimum_AreClampedToOne()
+    {
+        var store = CreateStoreWithRequest();
+        var service = CreateQueryService(store, "admin-1", "Admin");
+
+        var outcome = await service.ListAsync(
+            new MaintenanceRequestsQuery(Page: int.MinValue, PageSize: 0),
+            CancellationToken.None);
+
+        Assert.Equal(MaintenanceOutcomeStatus.Success, outcome.Status);
+        Assert.Equal(1, store.LastPage);
+        Assert.Equal(1, store.LastPageSize);
+        Assert.Equal(1, outcome.List!.Page);
+        Assert.Equal(1, outcome.List.PageSize);
     }
 
     [Fact]
@@ -348,6 +457,38 @@ public class MaintenanceServiceTests
         Assert.Null(store.UpdateCall);
     }
 
+    [Fact]
+    public async Task UpdateStatusAsync_MissingRequest_ReturnsNotFoundWithoutMutation()
+    {
+        var store = new FakeMaintenanceStore();
+        var service = CreateCommandService(store, "landlord-1", "Landlord");
+
+        var outcome = await service.UpdateStatusAsync(
+            new UpdateMaintenanceRequestStatusCommand(
+                404,
+                404,
+                MaintenanceRequestStatus.InProgress),
+            CancellationToken.None);
+
+        Assert.Equal(MaintenanceOutcomeStatus.NotFound, outcome.Status);
+        Assert.Null(store.UpdateCall);
+    }
+
+    [Fact]
+    public async Task GetStatusUpdateAsync_OwningLandlord_ReturnsExactAllowedTransitions()
+    {
+        var store = CreateStoreWithRequest(MaintenanceRequestStatus.Resolved);
+        var service = CreateQueryService(store, "landlord-1", "Landlord");
+
+        var outcome = await service.GetStatusUpdateAsync(10, CancellationToken.None);
+
+        Assert.Equal(MaintenanceOutcomeStatus.Success, outcome.Status);
+        Assert.Equal(MaintenanceRequestStatus.Resolved, outcome.Update!.CurrentStatus);
+        Assert.Equal(
+            [MaintenanceRequestStatus.InProgress, MaintenanceRequestStatus.Closed],
+            outcome.Update.AllowedStatuses);
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData((MaintenanceRequestStatus)999)]
@@ -400,6 +541,23 @@ public class MaintenanceServiceTests
     }
 
     [Fact]
+    public async Task UpdateStatusAsync_StoreThrowsDbUpdateException_ReturnsConflict()
+    {
+        var store = CreateStoreWithRequest();
+        store.UpdateException = new DbUpdateException("Request changed.");
+        var service = CreateCommandService(store, "landlord-1", "Landlord");
+
+        var outcome = await service.UpdateStatusAsync(
+            new UpdateMaintenanceRequestStatusCommand(
+                10,
+                10,
+                MaintenanceRequestStatus.InProgress),
+            CancellationToken.None);
+
+        Assert.Equal(MaintenanceOutcomeStatus.Conflict, outcome.Status);
+    }
+
+    [Fact]
     public async Task UpdateStatusAsync_TenantRole_ReturnsForbidden()
     {
         var store = CreateStoreWithRequest();
@@ -418,13 +576,13 @@ public class MaintenanceServiceTests
 
     private static MaintenanceCommandService CreateCommandService(
         FakeMaintenanceStore store,
-        string userId,
+        string? userId,
         params string[] roles) =>
         new(store, new FakeCurrentUser(userId, roles), new FakeClock(Now));
 
     private static MaintenanceQueryService CreateQueryService(
         FakeMaintenanceStore store,
-        string userId,
+        string? userId,
         params string[] roles) =>
         new(store, new FakeCurrentUser(userId, roles), new FakeClock(Now));
 
@@ -496,12 +654,15 @@ public class MaintenanceServiceTests
         public List<MaintenanceTenancyStoreData> Tenancies { get; } = [];
         public int NextRequestId { get; set; } = 100;
         public bool UpdateSucceeds { get; set; } = true;
+        public DbUpdateException? CreateException { get; set; }
+        public DbUpdateException? UpdateException { get; set; }
         public NewMaintenanceRequest? CreatedRequest { get; private set; }
         public UpdateCallData? UpdateCall { get; private set; }
         public MaintenanceListAccess? LastListAccess { get; private set; }
         public int LastPage { get; private set; }
         public int LastPageSize { get; private set; }
         public DateOnly? LastActiveTenancyDate { get; private set; }
+        public int GetTenancyCallCount { get; private set; }
 
         public Task<IReadOnlyList<MaintenanceListStoreRow>> ListAsync(
             MaintenanceListAccess access,
@@ -559,13 +720,21 @@ public class MaintenanceServiceTests
 
         public Task<MaintenanceTenancyStoreData?> GetTenancyAsync(
             int tenancyId,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(Tenancies.SingleOrDefault(tenancy => tenancy.Id == tenancyId));
+            CancellationToken cancellationToken)
+        {
+            GetTenancyCallCount++;
+            return Task.FromResult(Tenancies.SingleOrDefault(tenancy => tenancy.Id == tenancyId));
+        }
 
         public Task<int> CreateAsync(
             NewMaintenanceRequest request,
             CancellationToken cancellationToken)
         {
+            if (CreateException is not null)
+            {
+                throw CreateException;
+            }
+
             CreatedRequest = request;
             return Task.FromResult(NextRequestId);
         }
@@ -577,6 +746,11 @@ public class MaintenanceServiceTests
             DateTime lastUpdatedUtc,
             CancellationToken cancellationToken)
         {
+            if (UpdateException is not null)
+            {
+                throw UpdateException;
+            }
+
             UpdateCall = new UpdateCallData(
                 requestId,
                 expectedStatus,

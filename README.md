@@ -64,6 +64,32 @@ RentRight/
 └── RentRight.csproj      Project file
 ```
 
+## Tests and Coverage
+
+The deterministic xUnit suite exercises domain rules, application-service outcomes,
+authorization decisions, boundary validation, and cancellation-token forwarding. It
+does not require SQL Server, Docker, or network access:
+
+```bash
+dotnet test RentRight.Tests/RentRight.Tests.csproj --configuration Release
+```
+
+Collect production-assembly coverage with the .NET 10 Microsoft coverage collector:
+
+```bash
+dotnet test RentRight.Tests/RentRight.Tests.csproj \
+  --configuration Release \
+  --settings coverage.runsettings \
+  --collect:"Code Coverage;Format=Cobertura" \
+  --results-directory TestResults/Coverage
+```
+
+The Cobertura artifact is written below `TestResults/Coverage/`. The checked-in
+settings exclude generated migrations, build output, and static assets. Coverage is
+used as diagnostic evidence rather than a repository-wide percentage gate; real
+HTTP, Identity, migration, and SQL Server behavior belongs to the P04-02 integration
+suite.
+
 ## Prerequisites
 
 Before running the app locally, make sure you have:
