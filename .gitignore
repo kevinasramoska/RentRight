@@ -23,3 +23,9 @@ TestResults/
 coverage/
 *.coverage
 *.coveragexml
+
+# React dependencies and generated assets
+ClientApp/node_modules/
+ClientApp/dist/
+wwwroot/app/
+artifacts/

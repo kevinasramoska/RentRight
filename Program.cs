@@ -116,6 +116,9 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+// Restrict the React fallback to extensionless routes below /app.
+app.MapFallbackToFile("/app/{*path:nonfile}", "app/index.html");
+
 app.MapControllers();
 app.MapControllerRoute(
     name: "default",

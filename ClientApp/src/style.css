@@ -1,0 +1,6 @@
+:root { font-family: system-ui, sans-serif; color: #162937; background: #fafafa; line-height: 1.6; }
+body { margin: 0 auto; max-width: 70rem; padding: 1rem; }
+nav { display: flex; flex-wrap: wrap; gap: 1rem; padding: 1rem 0; border-bottom: 1px solid #72818b; }
+a { color: #145479; }
+button { font: inherit; padding: .5rem 1rem; cursor: pointer; }
+:focus-visible { outline: 3px solid #145479; outline-offset: 4px; }

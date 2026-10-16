@@ -9,6 +9,9 @@
 
   <ItemGroup>
     <Compile Remove="RentRight.Tests/**" />
+    <Content Remove="ClientApp/**" />
+    <Content Remove="wwwroot/app/**" />
+    <None Remove="ClientApp/node_modules/**" />
     <Content Remove="RentRight.Tests/**" />
     <EmbeddedResource Remove="RentRight.Tests/**" />
     <None Remove="RentRight.Tests/**" />
@@ -25,4 +28,21 @@
     </PackageReference>
   </ItemGroup>
 
+  <Target Name="BuildReactForPublish" BeforeTargets="_HandleFileConflictsForPublish">
+    <Exec WorkingDirectory="ClientApp" Command="npm ci" />
+    <Exec WorkingDirectory="ClientApp" Command="npm run build" />
+    <ItemGroup>
+      <!-- Replace any frontend entries discovered from a previous local build. -->
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+        Condition="$([System.String]::Copy('%(ResolvedFileToPublish.RelativePath)').StartsWith('wwwroot/app/'))" />
+    </ItemGroup>
+    <ItemGroup>
+      <ReactPublishAsset Include="wwwroot/app/**" />
+      <ResolvedFileToPublish Include="@(ReactPublishAsset)">
+        <RelativePath>%(ReactPublishAsset.Identity)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+        <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
 </Project>

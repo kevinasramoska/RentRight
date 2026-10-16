@@ -18,6 +18,15 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ClientApp/package-lock.json
+      - run: npm ci
+        working-directory: ClientApp
+      - run: npm run lint && npm run type-check && npm test && npm run build
+        working-directory: ClientApp
       - run: dotnet restore RentRight.slnx
       - run: dotnet build RentRight.slnx --no-restore --configuration Release
       - run: dotnet test RentRight.slnx --no-restore --configuration Release
