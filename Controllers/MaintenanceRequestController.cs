@@ -206,6 +206,7 @@ public class MaintenanceRequestController(
         MaintenanceRequestDetail detail) =>
         new()
         {
+            History = detail.History,
             Id = detail.Id,
             PropertyTitle = detail.PropertyTitle,
             PropertyAddress = detail.PropertyAddress,

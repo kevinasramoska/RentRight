@@ -82,9 +82,14 @@ public sealed record TenantMaintenanceSummary(
     DateTime DateSubmitted,
     MaintenanceRequestStatus Status);
 
+public sealed record TenantMaintenanceCounts(int Open, int Recent);
+
 public sealed record TenantDashboardSummary(
     IReadOnlyList<TenantTenancySummary> Tenancies,
-    IReadOnlyList<TenantMaintenanceSummary> RecentMaintenanceRequests);
+    IReadOnlyList<TenantMaintenanceSummary> RecentMaintenanceRequests)
+{
+    public TenantMaintenanceCounts Counts { get; init; } = new(0, 0);
+}
 
 public sealed record TenantDashboardOutcome(
     DashboardQueryStatus Status,

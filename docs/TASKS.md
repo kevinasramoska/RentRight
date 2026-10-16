@@ -229,9 +229,9 @@ Implementation checkpoint (2026-08-11): the focused core-domain request is imple
 
 ### P05-02 — Complete the tenant dashboard and maintenance submission journey
 
-- **Implementation status:** Partially delivered early in Phase 1 — Razor dashboard and tenant-scoped create/list/detail flows are working. Application services, REST endpoints, status history, and integration coverage remain in this task.
+- **Implementation status:** Delivered in P05-02 — active-tenancy dashboard projections/counts, tenant REST create/list/detail, shared Razor submission rules, immutable status events with truthful legacy baselines, and fast/HTTP/SQL regression coverage. See README for eligibility, repeated-submit, multiple-tenancy, conflict, and unavailable behavior.
 
-- **Why it matters:** The tenant dashboard is currently a placeholder and the application has no usable tenant value proposition.
+- **Why it matters:** Provides the central tenant dashboard and maintenance submission/read journey.
 - **Files/components likely affected:** tenant dashboard query service/view model, maintenance service/contracts, maintenance API endpoints, interim Razor views if needed, `DashboardController`, tests.
 - **Implementation steps:**
   1. Query the authenticated tenant's active tenancy, property summary, and recent/open maintenance counts with projections.
@@ -249,7 +249,7 @@ Implementation checkpoint (2026-08-11): the focused core-domain request is imple
 
 ### P05-03 — Implement landlord maintenance triage and status history
 
-- **Implementation status:** Partially delivered early in Phase 1 — Landlord/Admin Razor list/detail/status updates and owner scoping are working. Pagination/filtering, immutable history, optimistic concurrency, services/API, and integration coverage remain in this task.
+- **Implementation status:** Partially delivered early in Phase 1 — Landlord/Admin Razor list/detail/status updates and owner scoping are working. P05-02 supplies immutable history and records existing Razor transitions. Queue pagination/filtering, new transition commands/API, optimistic concurrency UI, and admin triage remain in P05-03.
 
 - **Why it matters:** A request workflow is incomplete until the owning landlord can prioritize, progress, resolve, and explain work while tenants retain visibility.
 - **Files/components likely affected:** maintenance workflow service, landlord dashboard/query model, API/MVC endpoints, status-event model/configuration, Razor views if retained, tests.

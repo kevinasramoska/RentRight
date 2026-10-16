@@ -54,7 +54,11 @@ public sealed record MaintenanceRequestDetail(
     DateTime DateSubmitted,
     DateTime LastUpdatedUtc,
     MaintenanceRequestStatus Status,
-    bool CanUpdateStatus);
+    bool CanUpdateStatus)
+{
+    public IReadOnlyList<MaintenanceHistoryItem> History { get; init; } = [];
+}
+
 
 public sealed record MaintenanceTenancyOption(
     int TenancyId,

@@ -266,6 +266,38 @@ namespace RentRight.Migrations
                         });
                 });
 
+            modelBuilder.Entity("RentRight.Models.MaintenanceStatusEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<bool>("IsLegacyBaseline")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("MaintenanceRequestId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("OccurredUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MaintenanceRequestId", "OccurredUtc", "Id");
+
+                    b.ToTable("MaintenanceStatusEvents", t =>
+                        {
+                            t.HasCheckConstraint("CK_MaintenanceStatusEvents_Status", "[Status] IN (N'Submitted', N'InProgress', N'Resolved', N'Closed')");
+                        });
+                });
+
             modelBuilder.Entity("RentRight.Models.Property", b =>
                 {
                     b.Property<int>("Id")
@@ -453,6 +485,15 @@ namespace RentRight.Migrations
                     b.Navigation("Tenancy");
                 });
 
+            modelBuilder.Entity("RentRight.Models.MaintenanceStatusEvent", b =>
+                {
+                    b.HasOne("RentRight.Models.MaintenanceRequest", null)
+                        .WithMany("StatusHistory")
+                        .HasForeignKey("MaintenanceRequestId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("RentRight.Models.Property", b =>
                 {
                     b.HasOne("RentRight.Models.ApplicationUser", "Landlord")
@@ -487,6 +528,11 @@ namespace RentRight.Migrations
                     b.Navigation("PropertiesOwned");
 
                     b.Navigation("Tenancies");
+                });
+
+            modelBuilder.Entity("RentRight.Models.MaintenanceRequest", b =>
+                {
+                    b.Navigation("StatusHistory");
                 });
 
             modelBuilder.Entity("RentRight.Models.Property", b =>

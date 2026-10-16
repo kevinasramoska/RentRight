@@ -262,6 +262,9 @@ public class DashboardServiceTests
 
     private sealed class FakeDashboardDataStore : IDashboardDataStore
     {
+        public Task<TenantMaintenanceCounts> GetTenantMaintenanceCountsAsync(string tenantId, DateOnly today,
+            DateTime recentSince, CancellationToken cancellationToken) => Task.FromResult(new TenantMaintenanceCounts(0, 0));
+
         public AdminDashboardSummary AdminSummary { get; init; } = new(0, 0);
         public bool AdminQueried { get; private set; }
         public CancellationToken AdminCancellationToken { get; private set; }
@@ -312,6 +315,7 @@ public class DashboardServiceTests
 
         public Task<IReadOnlyList<TenantMaintenanceSummary>> ListTenantMaintenanceAsync(
             string tenantId,
+            DateOnly today,
             int maximumResults,
             CancellationToken cancellationToken)
         {

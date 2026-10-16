@@ -603,6 +603,7 @@ public class MaintenanceServiceTests
         MaintenanceRequestStatus status = MaintenanceRequestStatus.Submitted)
     {
         var store = new FakeMaintenanceStore();
+        store.Tenancies.Add(CreateTenancy(1, "tenant-1", TenancyStatus.Active, new(2026, 1, 1), null));
         store.Requests.Add(new MaintenanceRequestStoreData(
             10,
             "Property 1",
@@ -613,7 +614,7 @@ public class MaintenanceServiceTests
             Now.AddDays(-1),
             status,
             "tenant-1",
-            "landlord-1"));
+            "landlord-1", 1));
         return store;
     }
 
@@ -650,6 +651,9 @@ public class MaintenanceServiceTests
 
     private sealed class FakeMaintenanceStore : IMaintenanceStore
     {
+        public Task<IReadOnlyList<MaintenanceHistoryItem>> GetHistoryAsync(int requestId, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<MaintenanceHistoryItem>>([]);
+
         public List<MaintenanceRequestStoreData> Requests { get; } = [];
         public List<MaintenanceTenancyStoreData> Tenancies { get; } = [];
         public int NextRequestId { get; set; } = 100;

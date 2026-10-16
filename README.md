@@ -30,8 +30,9 @@ The application uses ASP.NET Core Identity for authentication and role managemen
 - Landlord dashboard showing the landlord's own properties
 - Property create, edit, and delete flows for `Landlord` and `Admin`
 - Admin/owning-landlord tenancy invitations, explicit tenant acceptance, and audited ending
-- Tenant dashboard with associated properties/tenancies
-- Tenant-scoped maintenance request creation, list, and detail views
+- Tenant dashboard with currently active tenancies, recent requests, open counts, and 30-day submission counts
+- Tenant-scoped maintenance request creation, list, and detail views plus REST endpoints
+- Immutable maintenance status history with explicitly marked legacy baselines
 - Landlord maintenance queues and controlled status updates for owned properties
 - Admin access to all maintenance requests
 - Versioned `/api/v1` JSON, error, pagination, cookie, and antiforgery conventions
@@ -42,10 +43,48 @@ The application uses ASP.NET Core Identity for authentication and role managemen
 
 The core MVC workflow is implemented. The larger roadmap still includes:
 
-- Maintenance API endpoints and React client
-- SQL Server-backed integration tests and broader authorization coverage
-- Immutable maintenance status history
-- Optimistic concurrency and pagination
+- Landlord maintenance API queue/filtering and React client
+- Landlord transition/concurrency UI and admin triage (P05-03)
+
+## Tenant maintenance API
+
+Authenticated tenants use `GET /api/v1/maintenance-requests` (bounded `page`/`pageSize`),
+`GET /api/v1/maintenance-requests/{id}`, and `POST /api/v1/maintenance-requests`.
+POST accepts only `{ "description": "Describe the problem here" }`, with 10–2000
+characters after trimming. Same-origin Identity cookies and `X-CSRF-TOKEN` protect
+writes. The server derives tenancy, tenant, property relationship, UTC timestamps,
+and initial `Submitted` status. Status values in responses/history are strings.
+A successful POST returns `201` with an ID and a detail `Location`.
+
+Eligibility requires an accepted, currently active tenancy. Pre-invitation legacy
+active tenancies remain eligible under Phase 5.1 compatibility; consent is not
+invented for those rows. No active tenancy (including pending, cancelled/declined,
+expired, future, or ended tenancy) returns `409` with `no_active_tenancy`. Phase 5.1
+has no distinct Declined status: cancelled invitations use `Ended`. Multiple active
+tenancies return `409 resource_conflict`; use the existing Razor property selector
+in that case. Valid repeated descriptions create separate requests: there is no
+stable business key for duplicate suppression or automatic POST retry.
+
+Tenant lists are empty without an eligible tenancy; inaccessible and missing IDs
+both return `404 resource_not_found`, including requests from ended tenancies.
+Invalid input/paging returns `400`; unauthenticated/wrong-role callers receive
+`401`/`403`. Database outages return `503 service_unavailable`; persistence/racing
+state conflicts return `409 resource_conflict`. Errors use the shared Problem
+Details contract without submitted descriptions or dependency details.
+
+The dashboard shows up to five recent requests. Open means `Submitted` or
+`InProgress`; recent counts submissions in the preceding 30 days, both scoped to
+currently eligible tenancies. History is ordered by UTC event time then event ID.
+Tenants read it in API details or Razor; owning landlords/admins use Razor details.
+Existing Razor status updates remain available and append an event atomically;
+no new landlord mutation API is introduced here.
+
+Apply `MaintenanceStatusHistory` through the normal migration workflow. It adds a
+status-event table and one marked baseline for each existing request at its last
+known update time (never before submission), without fabricating prior transitions.
+New requests and their initial events commit together. Application saves reject
+updates/deletes of history. Rollback refuses to discard newly recorded events;
+export/archive history before planning a downgrade. No existing migration is edited.
 
 ## Project Structure
 

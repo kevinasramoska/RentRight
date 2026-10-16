@@ -4,6 +4,8 @@ namespace RentRight.ViewModels;
 
 public class TenantDashboardViewModel
 {
+    public int OpenRequestCount { get; init; }
+    public int RecentRequestCount { get; init; }
     public IReadOnlyList<TenantTenancySummaryViewModel> Tenancies { get; init; } = [];
     public IReadOnlyList<TenantDashboardMaintenanceRequestViewModel> RecentMaintenanceRequests
         { get; init; } = [];
