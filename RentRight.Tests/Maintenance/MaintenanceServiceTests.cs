@@ -396,7 +396,7 @@ public class MaintenanceServiceTests
         var service = CreateCommandService(store, "landlord-1", "Landlord");
 
         var outcome = await service.UpdateStatusAsync(
-            new UpdateMaintenanceRequestStatusCommand(10, 10, next),
+            new UpdateMaintenanceRequestStatusCommand(10, 10, next, ExpectedRevision: 0),
             CancellationToken.None);
 
         var expected = current.CanTransitionTo(next)
@@ -422,7 +422,7 @@ public class MaintenanceServiceTests
             new UpdateMaintenanceRequestStatusCommand(
                 10,
                 10,
-                MaintenanceRequestStatus.InProgress),
+                MaintenanceRequestStatus.InProgress, ExpectedRevision: 0),
             CancellationToken.None);
 
         Assert.Equal(MaintenanceOutcomeStatus.ConcealedNotFound, outcome.Status);
@@ -450,7 +450,7 @@ public class MaintenanceServiceTests
             new UpdateMaintenanceRequestStatusCommand(
                 10,
                 11,
-                MaintenanceRequestStatus.InProgress),
+                MaintenanceRequestStatus.InProgress, ExpectedRevision: 0),
             CancellationToken.None);
 
         Assert.Equal(MaintenanceOutcomeStatus.ConcealedNotFound, outcome.Status);
@@ -467,7 +467,7 @@ public class MaintenanceServiceTests
             new UpdateMaintenanceRequestStatusCommand(
                 404,
                 404,
-                MaintenanceRequestStatus.InProgress),
+                MaintenanceRequestStatus.InProgress, ExpectedRevision: 0),
             CancellationToken.None);
 
         Assert.Equal(MaintenanceOutcomeStatus.NotFound, outcome.Status);
@@ -499,7 +499,7 @@ public class MaintenanceServiceTests
         var service = CreateCommandService(store, "landlord-1", "Landlord");
 
         var outcome = await service.UpdateStatusAsync(
-            new UpdateMaintenanceRequestStatusCommand(10, 10, newStatus),
+            new UpdateMaintenanceRequestStatusCommand(10, 10, newStatus, ExpectedRevision: 0),
             CancellationToken.None);
 
         Assert.Equal(MaintenanceOutcomeStatus.Validation, outcome.Status);
@@ -516,7 +516,7 @@ public class MaintenanceServiceTests
             new UpdateMaintenanceRequestStatusCommand(
                 10,
                 10,
-                MaintenanceRequestStatus.InProgress),
+                MaintenanceRequestStatus.InProgress, ExpectedRevision: 0),
             CancellationToken.None);
 
         Assert.Equal(MaintenanceOutcomeStatus.Success, outcome.Status);
@@ -534,7 +534,7 @@ public class MaintenanceServiceTests
             new UpdateMaintenanceRequestStatusCommand(
                 10,
                 10,
-                MaintenanceRequestStatus.InProgress),
+                MaintenanceRequestStatus.InProgress, ExpectedRevision: 0),
             CancellationToken.None);
 
         Assert.Equal(MaintenanceOutcomeStatus.Conflict, outcome.Status);
@@ -551,7 +551,7 @@ public class MaintenanceServiceTests
             new UpdateMaintenanceRequestStatusCommand(
                 10,
                 10,
-                MaintenanceRequestStatus.InProgress),
+                MaintenanceRequestStatus.InProgress, ExpectedRevision: 0),
             CancellationToken.None);
 
         Assert.Equal(MaintenanceOutcomeStatus.Conflict, outcome.Status);
@@ -567,11 +567,71 @@ public class MaintenanceServiceTests
             new UpdateMaintenanceRequestStatusCommand(
                 10,
                 10,
-                MaintenanceRequestStatus.InProgress),
+                MaintenanceRequestStatus.InProgress, ExpectedRevision: 0),
             CancellationToken.None);
 
         Assert.Equal(MaintenanceOutcomeStatus.Forbidden, outcome.Status);
         Assert.Null(store.UpdateCall);
+    }
+
+    [Theory]
+    [InlineData(null, MaintenancePriority.High, null)]
+    [InlineData(-1L, MaintenancePriority.High, null)]
+    [InlineData(0L, (MaintenancePriority)999, null)]
+    public async Task UpdateStatusAsync_InvalidRevisionOrPriority_DoesNotWrite(long? revision, MaintenancePriority priority, string? note)
+    {
+        var store = CreateStoreWithRequest();
+        var result = await CreateCommandService(store, "landlord-1", "Landlord").UpdateStatusAsync(
+            new(10, 10, MaintenanceRequestStatus.InProgress, revision, priority, note), default);
+        Assert.Equal(MaintenanceOutcomeStatus.Validation, result.Status);
+        Assert.Null(store.UpdateCall);
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_StalePriorityUpdateOrOversizedNote_DoesNotWrite()
+    {
+        var store = CreateStoreWithRequest();
+        var service = CreateCommandService(store, "landlord-1", "Landlord");
+        Assert.Equal(MaintenanceOutcomeStatus.Conflict, (await service.UpdateStatusAsync(new(10, 10, null, 1, MaintenancePriority.High), default)).Status);
+        Assert.Equal(MaintenanceOutcomeStatus.Validation, (await service.UpdateStatusAsync(new(10, 10, MaintenanceRequestStatus.InProgress, 0, null, new string('x', 1001)), default)).Status);
+        Assert.Null(store.UpdateCall);
+    }
+
+    [Theory]
+    [InlineData("landlord-1", false)]
+    [InlineData("admin-1", true)]
+    public async Task UpdateStatusAsync_AcceptedUpdate_DerivesActorAndTrimsNote(string actor, bool admin)
+    {
+        var store = CreateStoreWithRequest();
+        var result = await CreateCommandService(store, actor, admin ? "Admin" : "Landlord", "Tenant").UpdateStatusAsync(
+            new(10, 10, MaintenanceRequestStatus.InProgress, 0, MaintenancePriority.Urgent, "  Investigating  "), default);
+        Assert.Equal(MaintenanceOutcomeStatus.Success, result.Status);
+        Assert.Equal(actor, store.Mutation!.ActorUserId);
+        Assert.Equal(admin, store.Mutation.IsAdmin);
+        Assert.Equal("Investigating", store.Mutation.Note);
+        Assert.Equal(MaintenancePriority.Urgent, store.Mutation.Priority);
+        Assert.Equal(Now, store.UpdateCall!.LastUpdatedUtc);
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_PriorityOnly_ChangesPriorityWithoutStatusTransition()
+    {
+        var store = CreateStoreWithRequest(MaintenanceRequestStatus.Closed);
+        var result = await CreateCommandService(store, "landlord-1", "Landlord").UpdateStatusAsync(new(10, 10, null, 0, MaintenancePriority.Low), default);
+        Assert.Equal(MaintenanceOutcomeStatus.Success, result.Status);
+        Assert.Equal(store.UpdateCall!.ExpectedStatus, store.UpdateCall.NewStatus);
+        Assert.Null(store.Mutation!.Note);
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_WrappedTimeout_ReturnsUnavailableWithoutDetails()
+    {
+        var store = CreateStoreWithRequest();
+        store.UpdateException = new DbUpdateException("Dependency details", new TimeoutException("Private details"));
+        var result = await CreateCommandService(store, "landlord-1", "Landlord").UpdateStatusAsync(
+            new(10, 10, MaintenanceRequestStatus.InProgress, 0), default);
+        Assert.Equal(MaintenanceOutcomeStatus.Unavailable, result.Status);
+        Assert.Null(result.Errors);
     }
 
     private static MaintenanceCommandService CreateCommandService(
@@ -661,6 +721,7 @@ public class MaintenanceServiceTests
         public DbUpdateException? CreateException { get; set; }
         public DbUpdateException? UpdateException { get; set; }
         public NewMaintenanceRequest? CreatedRequest { get; private set; }
+        public MaintenanceMutation? Mutation { get; private set; }
         public UpdateCallData? UpdateCall { get; private set; }
         public MaintenanceListAccess? LastListAccess { get; private set; }
         public int LastPage { get; private set; }
@@ -748,13 +809,15 @@ public class MaintenanceServiceTests
             MaintenanceRequestStatus expectedStatus,
             MaintenanceRequestStatus newStatus,
             DateTime lastUpdatedUtc,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            MaintenanceMutation mutation)
         {
             if (UpdateException is not null)
             {
                 throw UpdateException;
             }
 
+            Mutation = mutation;
             UpdateCall = new UpdateCallData(
                 requestId,
                 expectedStatus,

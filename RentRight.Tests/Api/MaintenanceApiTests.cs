@@ -119,6 +119,32 @@ public class MaintenanceApiTests
         Assert.Single(input.GetProperty("properties").EnumerateObject());
     }
 
+    [Theory]
+    [InlineData(TenantMaintenanceStatus.Unauthenticated, 401)]
+    [InlineData(TenantMaintenanceStatus.Forbidden, 403)]
+    [InlineData(TenantMaintenanceStatus.NotFound, 404)]
+    [InlineData(TenantMaintenanceStatus.Invalid, 400)]
+    [InlineData(TenantMaintenanceStatus.Unavailable, 503)]
+    public async Task LandlordDetail_ServiceFailure_ReturnsStandardProblem(TenantMaintenanceStatus status, int expected)
+    {
+        await using var factory = new RentRightApplicationFactory("Development", services =>
+        {
+            services.RemoveAll<ILandlordMaintenanceService>();
+            services.AddSingleton<ILandlordMaintenanceService>(new LandlordQueries(status));
+        });
+        using var client = Client(factory, "Admin", "Tenant", "Landlord");
+        using var response = await client.GetAsync("/api/v1/landlord-maintenance-requests/7");
+        await ProblemAsync(response, expected);
+    }
+
+    private sealed class LandlordQueries(TenantMaintenanceStatus status) : ILandlordMaintenanceService
+    {
+        public Task<TenantMaintenanceResult<MaintenanceQueuePage>> ListAsync(MaintenanceQueueQuery query, CancellationToken cancellationToken) =>
+            Task.FromResult(new TenantMaintenanceResult<MaintenanceQueuePage>(status));
+        public Task<TenantMaintenanceResult<MaintenanceTriageDetail>> GetAsync(int id, CancellationToken cancellationToken) =>
+            Task.FromResult(new TenantMaintenanceResult<MaintenanceTriageDetail>(status));
+    }
+
     private static async Task ProblemAsync(HttpResponseMessage response, int expected)
     {
         Assert.Equal(expected, (int)response.StatusCode);

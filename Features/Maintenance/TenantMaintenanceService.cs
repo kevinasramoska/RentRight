@@ -71,7 +71,7 @@ public sealed class TenantMaintenanceService(ApplicationDbContext db, ICurrentUs
             var history = await db.MaintenanceStatusEvents.AsNoTracking()
                 .Where(e => e.MaintenanceRequestId == id && Visible().Any(r => r.Id == e.MaintenanceRequestId))
                 .OrderBy(e => e.OccurredUtc).ThenBy(e => e.Id)
-                .Select(e => new MaintenanceHistoryItem(e.Status.ToString(), DateTime.SpecifyKind(e.OccurredUtc, DateTimeKind.Utc), e.IsLegacyBaseline))
+                .Select(e => new MaintenanceHistoryItem(e.Status.ToString(), DateTime.SpecifyKind(e.OccurredUtc, DateTimeKind.Utc), e.IsLegacyBaseline, e.PreviousStatus == null ? null : e.PreviousStatus.ToString(), e.Note))
                 .ToListAsync(cancellationToken);
             return new(TenantMaintenanceStatus.Success, new(item, history));
         });

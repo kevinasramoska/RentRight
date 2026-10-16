@@ -9,7 +9,7 @@ public sealed class EfMaintenanceStore(ApplicationDbContext dbContext) : IMainte
     public async Task<IReadOnlyList<MaintenanceHistoryItem>> GetHistoryAsync(int requestId, CancellationToken cancellationToken) =>
         await dbContext.MaintenanceStatusEvents.AsNoTracking().Where(e => e.MaintenanceRequestId == requestId)
             .OrderBy(e => e.OccurredUtc).ThenBy(e => e.Id)
-            .Select(e => new MaintenanceHistoryItem(e.Status.ToString(), e.OccurredUtc, e.IsLegacyBaseline))
+            .Select(e => new MaintenanceHistoryItem(e.Status.ToString(), e.OccurredUtc, e.IsLegacyBaseline, e.PreviousStatus == null ? null : e.PreviousStatus.ToString(), e.Note, e.ActorUserId))
             .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<MaintenanceListStoreRow>> ListAsync(
@@ -65,7 +65,7 @@ public sealed class EfMaintenanceStore(ApplicationDbContext dbContext) : IMainte
                 request.Status,
                 request.Tenancy.TenantId,
                 request.Tenancy.Property.LandlordId,
-                request.TenancyId))
+                request.TenancyId, request.Priority, request.Revision))
             .SingleOrDefaultAsync(cancellationToken);
 
     public async Task<IReadOnlyList<MaintenanceTenancyStoreData>> ListActiveTenanciesAsync(
@@ -133,7 +133,7 @@ public sealed class EfMaintenanceStore(ApplicationDbContext dbContext) : IMainte
             Status = request.Status,
             DateSubmitted = request.DateSubmitted,
             LastUpdatedUtc = request.LastUpdatedUtc,
-            StatusHistory = [new MaintenanceStatusEvent(MaintenanceRequestStatus.Submitted, request.DateSubmitted)]
+            StatusHistory = [new MaintenanceStatusEvent(MaintenanceRequestStatus.Submitted, request.DateSubmitted, actorUserId: request.TenantId)]
         };
 
         dbContext.MaintenanceRequests.Add(entity);
@@ -147,22 +147,42 @@ public sealed class EfMaintenanceStore(ApplicationDbContext dbContext) : IMainte
         MaintenanceRequestStatus expectedStatus,
         MaintenanceRequestStatus newStatus,
         DateTime lastUpdatedUtc,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        MaintenanceMutation mutation)
     {
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         var affectedRows = await dbContext.MaintenanceRequests
-            .Where(request => request.Id == requestId && request.Status == expectedStatus)
+            .Where(request => request.Id == requestId && request.Status == expectedStatus
+                && request.Revision == mutation.ExpectedRevision
+                && (mutation.IsAdmin || request.Tenancy!.Property!.LandlordId == mutation.ActorUserId))
             .ExecuteUpdateAsync(
                 updates => updates
+                    .SetProperty(request => request.Priority, mutation.Priority)
+                    .SetProperty(request => request.Revision, request => request.Revision + 1)
                     .SetProperty(request => request.Status, newStatus)
                     .SetProperty(request => request.LastUpdatedUtc, lastUpdatedUtc),
                 cancellationToken);
 
         if (affectedRows != 1) return false;
-        // Retain the existing Razor command, recording its already-supported transitions.
-        dbContext.MaintenanceStatusEvents.Add(new MaintenanceStatusEvent(newStatus, lastUpdatedUtc, maintenanceRequestId: requestId));
-        await dbContext.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+        MaintenanceStatusEvent? statusEvent = null;
+        try
+        {
+            if (newStatus != expectedStatus)
+            {
+                statusEvent = new MaintenanceStatusEvent(newStatus, lastUpdatedUtc,
+                    maintenanceRequestId: requestId, previousStatus: expectedStatus,
+                    actorUserId: mutation.ActorUserId, note: mutation.Note);
+                dbContext.MaintenanceStatusEvents.Add(statusEvent);
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            // A rolled-back event must not be retried by a later SaveChanges in this scope.
+            if (statusEvent is not null) dbContext.Entry(statusEvent).State = EntityState.Detached;
+            throw;
+        }
         return true;
     }
 }

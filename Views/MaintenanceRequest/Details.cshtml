@@ -28,6 +28,9 @@
     <dt class="col-sm-3">Status</dt>
     <dd class="col-sm-9">@status</dd>
 
+    <dt class="col-sm-3">Priority</dt>
+    <dd class="col-sm-9">@Model.Priority</dd>
+
     <dt class="col-sm-3">Submitted</dt>
     <dd class="col-sm-9">@Model.DateSubmitted.ToString("dd MMM yyyy HH:mm") UTC</dd>
 
@@ -43,6 +46,9 @@
     @foreach (var entry in Model.History)
     {
         <li>@entry.Status — @entry.OccurredUtc.ToString("dd MMM yyyy HH:mm") UTC
+            @if (Model.CanUpdateStatus && entry.ActorUserId is not null) { <span>by @entry.ActorUserId</span> }
+            @if (entry.PreviousStatus is not null) { <span>from @entry.PreviousStatus</span> }
+            @if (entry.Note is not null) { <p style="white-space: pre-wrap;">@entry.Note</p> }
             @if (entry.IsLegacyBaseline) { <span>(Imported baseline; earlier transitions were not recorded)</span> }
         </li>
     }

@@ -248,6 +248,18 @@ namespace RentRight.Migrations
                     b.Property<DateTime>("LastUpdatedUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("Priority")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("Normal");
+
+                    b.Property<long>("Revision")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L);
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -262,6 +274,8 @@ namespace RentRight.Migrations
 
                     b.ToTable("MaintenanceRequests", t =>
                         {
+                            t.HasCheckConstraint("CK_MaintenanceRequests_Priority", "[Priority] IN (N'Low', N'Normal', N'High', N'Urgent')");
+
                             t.HasCheckConstraint("CK_MaintenanceRequests_Status", "[Status] IN (N'Submitted', N'InProgress', N'Resolved', N'Closed')");
                         });
                 });
@@ -274,14 +288,26 @@ namespace RentRight.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("ActorUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
                     b.Property<bool>("IsLegacyBaseline")
                         .HasColumnType("bit");
 
                     b.Property<int>("MaintenanceRequestId")
                         .HasColumnType("int");
 
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
                     b.Property<DateTime>("OccurredUtc")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("PreviousStatus")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<string>("Status")
                         .IsRequired()

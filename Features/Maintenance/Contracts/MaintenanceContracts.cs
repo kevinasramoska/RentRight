@@ -10,7 +10,8 @@ public enum MaintenanceOutcomeStatus
     NotFound,
     ConcealedNotFound,
     Validation,
-    Conflict
+    Conflict,
+    Unavailable
 }
 
 public sealed record MaintenanceValidationError(string Field, string Message);
@@ -56,6 +57,8 @@ public sealed record MaintenanceRequestDetail(
     MaintenanceRequestStatus Status,
     bool CanUpdateStatus)
 {
+    public MaintenancePriority Priority { get; init; }
+    public long Revision { get; init; }
     public IReadOnlyList<MaintenanceHistoryItem> History { get; init; } = [];
 }
 
@@ -77,12 +80,14 @@ public sealed record MaintenanceStatusUpdate(
     string PropertyTitle,
     string TenantName,
     MaintenanceRequestStatus CurrentStatus,
-    IReadOnlyList<MaintenanceRequestStatus> AllowedStatuses);
+    IReadOnlyList<MaintenanceRequestStatus> AllowedStatuses,
+    MaintenancePriority Priority = MaintenancePriority.Normal, long Revision = 0);
 
 public sealed record UpdateMaintenanceRequestStatusCommand(
     int RequestId,
     int SubmittedRequestId,
-    MaintenanceRequestStatus? NewStatus);
+    MaintenanceRequestStatus? NewStatus,
+    long? ExpectedRevision = null, MaintenancePriority? Priority = null, string? Note = null);
 
 public sealed record MaintenanceListOutcome(
     MaintenanceOutcomeStatus Status,

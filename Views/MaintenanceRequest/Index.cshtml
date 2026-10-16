@@ -13,6 +13,11 @@
     }
 </div>
 
+@if (User.IsInRole("Landlord") || User.IsInRole("Admin"))
+{
+    <p><a asp-controller="MaintenanceQueue" asp-action="Index">Open filtered work queue</a></p>
+}
+
 @if (TempData["Success"] is string successMessage)
 {
     <div class="alert alert-success">@successMessage</div>

@@ -13,7 +13,10 @@ public sealed class MaintenanceQueryService(
     private const string LandlordRole = "Landlord";
     private const string TenantRole = "Tenant";
 
-    public async Task<MaintenanceListOutcome> ListAsync(
+    public Task<MaintenanceListOutcome> ListAsync(MaintenanceRequestsQuery query, CancellationToken cancellationToken) =>
+        ExecuteAsync(() => ListCoreAsync(query, cancellationToken), () => new MaintenanceListOutcome(MaintenanceOutcomeStatus.Unavailable));
+
+    private async Task<MaintenanceListOutcome> ListCoreAsync(
         MaintenanceRequestsQuery query,
         CancellationToken cancellationToken)
     {
@@ -72,7 +75,10 @@ public sealed class MaintenanceQueryService(
             pageSize));
     }
 
-    public async Task<MaintenanceDetailOutcome> GetDetailAsync(
+    public Task<MaintenanceDetailOutcome> GetDetailAsync(int requestId, CancellationToken cancellationToken) =>
+        ExecuteAsync(() => GetDetailCoreAsync(requestId, cancellationToken), () => new MaintenanceDetailOutcome(MaintenanceOutcomeStatus.Unavailable));
+
+    private async Task<MaintenanceDetailOutcome> GetDetailCoreAsync(
         int requestId,
         CancellationToken cancellationToken)
     {
@@ -119,11 +125,17 @@ public sealed class MaintenanceQueryService(
             request.Status,
             CanUpdateStatus: isAdministrator || landlordOwnsRequest)
         {
-            History = await store.GetHistoryAsync(requestId, cancellationToken)
+            Priority = request.Priority,
+            Revision = request.Revision,
+            History = (await store.GetHistoryAsync(requestId, cancellationToken))
+                .Select(e => isAdministrator || landlordOwnsRequest ? e : e with { ActorUserId = null }).ToArray()
         });
     }
 
-    public async Task<MaintenanceCreateFormOutcome> GetCreateFormAsync(
+    public Task<MaintenanceCreateFormOutcome> GetCreateFormAsync(CancellationToken cancellationToken) =>
+        ExecuteAsync(() => GetCreateFormCoreAsync(cancellationToken), () => new MaintenanceCreateFormOutcome(MaintenanceOutcomeStatus.Unavailable));
+
+    private async Task<MaintenanceCreateFormOutcome> GetCreateFormCoreAsync(
         CancellationToken cancellationToken)
     {
         var userId = GetAuthenticatedUserId();
@@ -152,7 +164,10 @@ public sealed class MaintenanceQueryService(
         return MaintenanceCreateFormOutcome.Success(new MaintenanceCreateForm(options));
     }
 
-    public async Task<MaintenanceStatusUpdateOutcome> GetStatusUpdateAsync(
+    public Task<MaintenanceStatusUpdateOutcome> GetStatusUpdateAsync(int requestId, CancellationToken cancellationToken) =>
+        ExecuteAsync(() => GetStatusUpdateCoreAsync(requestId, cancellationToken), () => new MaintenanceStatusUpdateOutcome(MaintenanceOutcomeStatus.Unavailable));
+
+    private async Task<MaintenanceStatusUpdateOutcome> GetStatusUpdateCoreAsync(
         int requestId,
         CancellationToken cancellationToken)
     {
@@ -185,7 +200,15 @@ public sealed class MaintenanceQueryService(
             request.PropertyTitle,
             request.TenantName,
             request.Status,
-            request.Status.GetAllowedTransitions()));
+            request.Status.GetAllowedTransitions(), request.Priority, request.Revision));
+    }
+
+    private static async Task<T> ExecuteAsync<T>(Func<Task<T>> action, Func<T> unavailable)
+    {
+        try { return await action(); }
+        catch (Exception exception) when (exception is System.Data.Common.DbException or Microsoft.EntityFrameworkCore.DbUpdateException or TimeoutException
+            || exception is InvalidOperationException { InnerException: System.Data.Common.DbException or TimeoutException })
+        { return unavailable(); }
     }
 
     private string? GetAuthenticatedUserId() =>
