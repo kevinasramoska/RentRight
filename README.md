@@ -158,7 +158,16 @@ dotnet ef database update
 dotnet run
 ```
 
-## Notes
+## Deployment and MVC/API routing
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the .NET 10 container, SQL Server,
+Identity key storage, HTTPS proxy requirements, and demo promotion checks.
+
+API controllers have the `Api` area route value to isolate link generation from
+MVC controllers with the same name. Public API URLs remain `/api/v1/...`; Razor
+property forms post to `/Properties/Create` and retain antiforgery protection.
+
+## Repository notes
 
 - Generated `bin/`, `obj/`, IDE files, and local secrets are intentionally excluded from Git
 - The app uses default Identity UI routes such as `/Identity/Account/Login`

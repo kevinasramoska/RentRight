@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
@@ -21,6 +22,47 @@ public class PropertiesApiTests
 {
     private const string PropertiesRoute = "/api/v1/properties";
     private const string ProbeRoute = "/api/v1/api-convention-probe";
+
+    [Theory]
+    [InlineData("Landlord")]
+    [InlineData("Admin")]
+    public async Task CreateForm_Manager_SubmitsToMvcAndCreatesProperty(string role)
+    {
+        var store = new InMemoryPropertyStore();
+        await using var factory = CreateFactory(store);
+        using var client = CreateClient(factory);
+        AddIdentityCookie(client, factory, "manager-1", role);
+
+        using var page = await client.GetAsync("/Properties/Create");
+        page.EnsureSuccessStatusCode();
+        var html = await page.Content.ReadAsStringAsync();
+        var form = Regex.Matches(html, "<form\\b[^>]*>.*?</form>", RegexOptions.Singleline)
+            .Cast<Match>()
+            .Single(match => match.Value.Contains("name=\"Title\"", StringComparison.Ordinal))
+            .Value;
+        var action = WebUtility.HtmlDecode(Regex.Match(form, "action=\"([^\"]+)\"").Groups[1].Value);
+        var token = WebUtility.HtmlDecode(Regex.Match(
+            form,
+            "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"").Groups[1].Value);
+
+        Assert.Equal("/Properties/Create", action);
+        Assert.NotEmpty(token);
+        using var response = await client.PostAsync(action, new FormUrlEncodedContent(
+            new Dictionary<string, string>
+            {
+                ["Title"] = "MVC Apartment",
+                ["Address"] = "1 Main Street",
+                ["RentAmount"] = "1250",
+                ["Description"] = "Created through the actual Razor form",
+                ["__RequestVerificationToken"] = token
+            }));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/Properties", response.Headers.Location?.OriginalString);
+        var property = Assert.Single(store.Properties);
+        Assert.Equal("MVC Apartment", property.Title);
+        Assert.Equal("manager-1", property.LandlordId);
+    }
 
     [Fact]
     public async Task GetProperties_Anonymous_FiltersPagesAndOrdersPublishedProjection()

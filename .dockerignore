@@ -1,0 +1,12 @@
+.git
+.github
+**/bin
+**/obj
+RentRight.Tests
+TestResults
+**/*.user
+**/*.pfx
+**/secrets.json
+**/appsettings.*.Local.json
+**/appsettings.Local.json
+appsettings.Development.json

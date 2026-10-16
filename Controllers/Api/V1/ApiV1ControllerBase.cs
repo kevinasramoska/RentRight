@@ -6,6 +6,7 @@ using RentRight.Features.Properties.Contracts;
 namespace RentRight.Controllers.Api.V1;
 
 [ApiController]
+[Area("Api")]
 [Route(ApiConventions.RoutePrefix + "/[controller]")]
 [ProducesResponseType<ProblemDetails>(
     StatusCodes.Status400BadRequest,
