@@ -4,7 +4,7 @@ public enum TenantMaintenanceStatus { Success, Unauthenticated, Forbidden, NotFo
 public sealed record MaintenanceHistoryItem(string Status, DateTime OccurredUtc, bool IsLegacyBaseline,
     string? PreviousStatus = null, string? Note = null, string? ActorUserId = null);
 public sealed record TenantMaintenanceItem(int Id, string PropertyTitle, string PropertyAddress,
-    string Description, DateTime SubmittedUtc, DateTime LastUpdatedUtc, string Status);
+    string Description, DateTime SubmittedUtc, DateTime LastUpdatedUtc, string Status, string Priority = "Normal");
 public sealed record TenantMaintenanceDetail(TenantMaintenanceItem Request, IReadOnlyList<MaintenanceHistoryItem> History);
 public sealed record TenantMaintenancePage(IReadOnlyList<TenantMaintenanceItem> Items, int TotalCount);
 public sealed record TenantMaintenanceResult<T>(TenantMaintenanceStatus Status, T? Value = default);

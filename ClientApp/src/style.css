@@ -4,3 +4,22 @@ nav { display: flex; flex-wrap: wrap; gap: 1rem; padding: 1rem 0; border-bottom:
 a { color: #145479; }
 button { font: inherit; padding: .5rem 1rem; cursor: pointer; }
 :focus-visible { outline: 3px solid #145479; outline-offset: 4px; }
+* { box-sizing: border-box; }
+main { padding-block: 1rem 3rem; }
+.brand { font-size: 1.25rem; font-weight: 700; }
+h1 { line-height: 1.25; }
+a, button { touch-action: manipulation; }
+nav a { display: inline-flex; align-items: center; min-height: 44px; }
+[aria-current="page"] { font-weight: 700; text-decoration-thickness: 3px; }
+.card, .requests li, .timeline li { padding: 1rem; border: 1px solid #b4c0c8; border-radius: .5rem; background: white; margin-block: 1rem; }
+.requests { list-style: none; padding: 0; }
+.timeline { padding-left: 1.5rem; }
+label { display: block; font-weight: 700; }
+textarea { display: block; width: 100%; max-width: 45rem; font: inherit; padding: .75rem; border: 1px solid #72818b; border-radius: .25rem; }
+button { min-height: 44px; color: #fff; background: #145479; border: 1px solid #145479; border-radius: .25rem; }
+button:disabled { opacity: .65; cursor: wait; }
+p, h1, h2, h3, a, .text { overflow-wrap: anywhere; }
+.text { white-space: pre-wrap; }
+[role="alert"] { border-left: 4px solid #9a291a; padding: 1rem; margin-block: 1rem; background: #fff3ef; }
+@media (max-width: 40rem) { body { padding: .75rem; } nav { gap: .5rem 1rem; } h1 { font-size: 1.8rem; } }
+.requests a, form a { display: inline-block; min-height: 44px; padding-block: .5rem; }

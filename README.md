@@ -311,10 +311,41 @@ optional note. Actor IDs are retained as historical facts without a user-delete
 cascade. Downgrade refuses to discard recorded triage/audit data. Descriptions and
 notes render as encoded text. Phase 7 query/index measurement remains deferred.
 
-## React foundation (P06-01)
+## React tenant portal (P06-01 / P06-02)
 
-The React shell lives at `/app/`; Razor, Identity and `/api/v1` retain their existing
-routes and server authorization. P06-02's tenant portal is not implemented yet.
+The authenticated tenant portal lives at `/app/`; Razor, Identity and `/api/v1`
+retain their existing routes and server authorization. Overview shows accepted,
+currently active tenancies, open and 30-day request counts, and recent requests.
+`/app/requests` lists ten requests per page; `/app/requests/{id}` shows the request,
+priority and chronological status history in UTC, including legacy baselines and
+bounded notes. `/app/requests/new` validates a trimmed 10–2000 character description
+and opens the created detail after a successful submission. Priority is read-only.
+
+`GET /api/v1/tenant-dashboard` adapts the existing tenant dashboard query service;
+it returns property titles/addresses, tenancy dates, counts and recent request
+links, without tenancy, property, user or landlord identifiers. The tenant
+maintenance read projection now also includes `priority`. No schema changes.
+
+Navigation uses the browser URL/history and fresh requests, with no shared data
+cache. Session rechecks on navigation, window focus and returning to a visible tab
+clear the portal first; hiding the tab also clears tenant UI and unsaved form data.
+Anonymous, wrong-role and failed session responses cannot retain tenant content.
+Read failures offer retry; failed submissions preserve text until navigation and
+warn that a network failure may follow a successful save, so check the list before
+retrying. Multiple active tenancies require resolution rather than guessing a
+property. API ProblemDetails fields select fixed client messages; raw server
+messages, traces and exceptions are never displayed or logged.
+
+The layout uses semantic navigation/main landmarks, a skip link, focused page
+headings, visible field labels, linked validation summary, field errors, live
+status announcements, visible focus and wrapping mobile layouts. Component tests
+cover the complete submission/navigation journey, errors, cancellation, session
+changes and escaped text. The HTTP smoke covers the real static host, cookie,
+session, dashboard, antiforgery and maintenance contracts with application-service
+test doubles; the separate SQL suite covers real persistence and tenant scoping.
+This combines component integration and WebApplicationFactory coverage; it is not
+a real-browser end-to-end or screen-reader test. Narrow/wide layout review is by
+component/CSS inspection; real-device and assistive-technology checks remain manual.
 Node **24 LTS** and npm are required for frontend development and `dotnet publish`.
 Dependencies use exact versions and a committed lockfile. No database changes are
 required by this phase. The existing Dockerfile has no Node runtime and is not yet
