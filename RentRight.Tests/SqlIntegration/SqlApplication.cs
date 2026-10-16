@@ -1,4 +1,6 @@
 using System.Net;
+using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
@@ -20,6 +22,7 @@ public enum Actor { Anonymous, Tenant, OwningLandlord, OtherLandlord, MultiRoleA
 // production Identity, authorization, filters, services and stores stay registered.
 public sealed class SqlApplication : WebApplicationFactory<Program>
 {
+    public ConcurrentQueue<string> Logs { get; } = new();
     private readonly string _connectionString;
     private readonly string _password = $"T!{Guid.NewGuid():N}a9";
 
@@ -42,6 +45,7 @@ public sealed class SqlApplication : WebApplicationFactory<Program>
         builder.UseSetting("SeedAdmin:Password", string.Empty);
         builder.ConfigureServices(services =>
         {
+            services.AddLogging(logging => logging.AddProvider(new CaptureLogs(Logs)));
             services.RemoveAll<DbContextOptions<ApplicationDbContext>>();
             services.AddDbContext<ApplicationDbContext>(options => options.UseSqlServer(_connectionString));
         });
@@ -124,6 +128,19 @@ public sealed class SqlApplication : WebApplicationFactory<Program>
     }
 
     private static string Email(Actor actor) => $"{actor}@example.test";
+
+    private sealed class CaptureLogs(ConcurrentQueue<string> messages) : ILoggerProvider
+    {
+        public ILogger CreateLogger(string categoryName) => new CaptureLogger(messages);
+        public void Dispose() { }
+        private sealed class CaptureLogger(ConcurrentQueue<string> messages) : ILogger
+        {
+            public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+            public bool IsEnabled(LogLevel level) => true;
+            public void Log<TState>(LogLevel level, EventId id, TState state, Exception? error, Func<TState, Exception?, string> formatter) =>
+                messages.Enqueue(formatter(state, error));
+        }
+    }
 
     public override async ValueTask DisposeAsync()
     {

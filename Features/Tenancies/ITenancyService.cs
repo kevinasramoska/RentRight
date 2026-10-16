@@ -4,6 +4,10 @@ namespace RentRight.Features.Tenancies;
 
 public interface ITenancyService
 {
+    Task<AcceptTenancyOutcome> AcceptAsync(AcceptTenancyCommand command, CancellationToken cancellationToken);
+    Task<GetTenancyOutcome> GetAsync(int id, CancellationToken cancellationToken);
+    Task<ListTenanciesPageOutcome> ListAsync(int page, int pageSize, CancellationToken cancellationToken);
+
     Task<ListTenanciesOutcome> ListForAdministrationAsync(
         CancellationToken cancellationToken);
 

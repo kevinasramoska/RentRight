@@ -1,0 +1,9 @@
+@model RentRight.Features.Tenancies.Contracts.InvitationReceipt
+@{ ViewData["Title"] = "Invitation issued"; }
+<h2>Invitation issued</h2>
+<p>Send this token privately to the intended tenant. It is displayed once, expires at @Model.ExpiresUtc.ToString("u"), and requires that account to sign in and explicitly accept.</p>
+<p>This receipt does not confirm whether the account exists or is eligible. No email is sent.</p>
+<label for="invitation-token">One-time invitation token</label>
+<textarea id="invitation-token" class="form-control" readonly>@Model.Token</textarea>
+<p>The tenant can enter it on <a asp-action="Accept">Accept invitation</a>.</p>
+<a asp-action="Index">Return to tenancies</a>

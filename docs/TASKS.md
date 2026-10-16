@@ -208,7 +208,8 @@ Implementation checkpoint (2026-08-11): the focused core-domain request is imple
 
 ### P05-01 — Implement the tenancy establishment lifecycle
 
-- **Implementation status:** Partially delivered early in Phase 1 — Admin can directly create/end tenancies. Invitations, acceptance, services/API, audit events, and concurrency handling remain in this task.
+- **Implementation status:** Complete (2026-10-16). Admin/owning-Landlord invitations, explicit matched-Tenant acceptance, scoped API list/detail, audited ending/cancellation, exact-identifier privacy, hashed expiring single-use tokens, transactional property reservations and rowversion are implemented. Immediate Admin assignment is intentionally replaced by consent. Legacy records retain unknown audit/consent values. Manual token delivery is the operational limit; property archive state does not exist in the current model.
+- **Verification:** Final fast suite: 321 passed. Two independent complete disposable SQL Server runs: **72 passed each**, 0 failed/skipped, including lifecycle HTTP/Razor/cookie/antiforgery, migration/backfill/rollback, constraints, privacy and all six race combinations. Release builds, EF pending-model check, generated Up/Down SQL review and all three project transitive vulnerability audits passed. See [lifecycle decisions, file inventory and verification](TENANCY_LIFECYCLE.md).
 
 - **Why it matters:** Tenant features need an auditable, authorized occupancy record. Assigning a tenant directly to a maintenance request is not sufficient.
 - **Files/components likely affected:** tenancy service/contracts, API/MVC endpoints and views as selected, `ApplicationDbContext`, authorization checks, status history/audit records, tests.

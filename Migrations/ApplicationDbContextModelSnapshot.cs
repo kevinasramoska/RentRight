@@ -17,7 +17,7 @@ namespace RentRight.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.10")
+                .HasAnnotation("ProductVersion", "10.0.10")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -311,11 +311,50 @@ namespace RentRight.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("AcceptedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime?>("AcceptedUtc")
+                        .HasColumnType("datetime2");
+
                     b.Property<DateOnly?>("EndDate")
                         .HasColumnType("date");
 
+                    b.Property<string>("EndReason")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("EndedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime?>("EndedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("InvitationExpiresUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("InvitationTokenHash")
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<string>("InvitedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime?>("InvitedUtc")
+                        .HasColumnType("datetime2");
+
                     b.Property<int>("PropertyId")
                         .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
 
                     b.Property<DateOnly>("StartDate")
                         .HasColumnType("date");
@@ -326,22 +365,29 @@ namespace RentRight.Migrations
                         .HasColumnType("nvarchar(20)");
 
                     b.Property<string>("TenantId")
-                        .IsRequired()
                         .HasColumnType("nvarchar(450)");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("InvitationTokenHash")
+                        .IsUnique()
+                        .HasFilter("[InvitationTokenHash] IS NOT NULL");
+
                     b.HasIndex("PropertyId")
                         .IsUnique()
-                        .HasFilter("[Status] = N'Active'");
+                        .HasFilter("[Status] IN (N'Active', N'Pending')");
 
                     b.HasIndex("TenantId");
 
                     b.ToTable("Tenancies", t =>
                         {
+                            t.HasCheckConstraint("CK_Tenancies_ActiveTenant", "[Status] <> N'Active' OR [TenantId] IS NOT NULL");
+
                             t.HasCheckConstraint("CK_Tenancies_EndDate", "[EndDate] IS NULL OR [EndDate] >= [StartDate]");
 
-                            t.HasCheckConstraint("CK_Tenancies_Status", "[Status] IN (N'Active', N'Ended')");
+                            t.HasCheckConstraint("CK_Tenancies_Invitation", "[Status] <> N'Pending' OR ([InvitationTokenHash] IS NOT NULL AND [InvitedUtc] IS NOT NULL AND [InvitationExpiresUtc] IS NOT NULL AND [InvitationExpiresUtc] > [InvitedUtc] AND [InvitedByUserId] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_Tenancies_Status", "[Status] IN (N'Active', N'Ended', N'Pending')");
                         });
                 });
 
@@ -429,8 +475,7 @@ namespace RentRight.Migrations
                     b.HasOne("RentRight.Models.ApplicationUser", "Tenant")
                         .WithMany("Tenancies")
                         .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.Navigation("Property");
 

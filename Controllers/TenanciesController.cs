@@ -7,9 +7,11 @@ using RentRight.ViewModels;
 
 namespace RentRight.Controllers;
 
-[Authorize(Roles = "Admin")]
+[Authorize(Roles = "Admin,Landlord,Tenant")]
+[ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public class TenanciesController(ITenancyService tenancyService) : Controller
 {
+    [Authorize(Roles = "Admin,Landlord")]
     public async Task<IActionResult> Index(CancellationToken cancellationToken)
     {
         var outcome = await tenancyService.ListForAdministrationAsync(cancellationToken);
@@ -28,6 +30,7 @@ public class TenanciesController(ITenancyService tenancyService) : Controller
         };
     }
 
+    [Authorize(Roles = "Admin,Landlord")]
     public async Task<IActionResult> Create(CancellationToken cancellationToken)
     {
         var outcome = await tenancyService.GetCreateFormAsync(cancellationToken);
@@ -42,6 +45,7 @@ public class TenanciesController(ITenancyService tenancyService) : Controller
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin,Landlord")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(
         TenancyCreateViewModel model,
@@ -58,8 +62,7 @@ public class TenanciesController(ITenancyService tenancyService) : Controller
         switch (outcome.Status)
         {
             case CreateTenancyStatus.Success:
-                TempData["Success"] = "Tenancy created.";
-                return RedirectToAction(nameof(Index));
+                return View("Invitation", outcome.Invitation);
             case CreateTenancyStatus.Unauthenticated:
                 return Challenge();
             case CreateTenancyStatus.Forbidden:
@@ -75,15 +78,10 @@ public class TenanciesController(ITenancyService tenancyService) : Controller
                     nameof(model.PropertyId),
                     "Select a valid property.");
                 break;
-            case CreateTenancyStatus.TenantNotFound:
-                ModelState.AddModelError(
-                    nameof(model.TenantId),
-                    "Select a valid tenant account.");
-                break;
             case CreateTenancyStatus.Conflict:
                 ModelState.AddModelError(
                     nameof(model.PropertyId),
-                    "This property already has an active tenancy.");
+                    "This property already has an active tenancy or pending invitation.");
                 break;
             default:
                 throw new InvalidOperationException("Unknown create-tenancy outcome.");
@@ -93,6 +91,7 @@ public class TenanciesController(ITenancyService tenancyService) : Controller
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin,Landlord")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> End(int id, CancellationToken cancellationToken)
     {
@@ -119,6 +118,25 @@ public class TenanciesController(ITenancyService tenancyService) : Controller
             default:
                 throw new InvalidOperationException("Unknown end-tenancy outcome.");
         }
+    }
+
+    [Authorize(Roles = "Tenant")]
+    public IActionResult Accept() => View(new TenancyAcceptViewModel());
+
+    [HttpPost]
+    [Authorize(Roles = "Tenant")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Accept(TenancyAcceptViewModel model, CancellationToken cancellationToken)
+    {
+        var outcome = await tenancyService.AcceptAsync(new(model.Token), cancellationToken);
+        if (outcome.Status == AcceptTenancyStatus.Success)
+            return RedirectToAction("Index", "Dashboard");
+        if (outcome.Status == AcceptTenancyStatus.Unauthenticated) return Challenge();
+        if (outcome.Status == AcceptTenancyStatus.Forbidden) return Forbid();
+        // Never echo a submitted token into a response or validation value.
+        ModelState.Clear();
+        ModelState.AddModelError(string.Empty, "Invitation unavailable. Check the token, account and expiry with the sender.");
+        return View(new TenancyAcceptViewModel());
     }
 
     private async Task<IActionResult> ReturnCreateViewAsync(
@@ -165,9 +183,6 @@ public class TenanciesController(ITenancyService tenancyService) : Controller
         TenancyCreateForm form)
     {
         model.AvailableProperties = form.AvailableProperties
-            .Select(option => new SelectListItem(option.Label, option.Value))
-            .ToArray();
-        model.AvailableTenants = form.AvailableTenants
             .Select(option => new SelectListItem(option.Label, option.Value))
             .ToArray();
     }

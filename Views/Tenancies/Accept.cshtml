@@ -1,0 +1,10 @@
+@model RentRight.ViewModels.TenancyAcceptViewModel
+@{ ViewData["Title"] = "Accept tenancy invitation"; }
+<h2>Accept tenancy invitation</h2>
+<p>Sign in with the invited tenant account and paste the token supplied privately by your landlord or administrator. Submitting this form accepts the tenancy.</p>
+<form asp-action="Accept" method="post">
+    <div asp-validation-summary="All" class="text-danger"></div>
+    <label asp-for="Token"></label>
+    <input asp-for="Token" class="form-control" autocomplete="off" />
+    <button type="submit" class="btn btn-primary">Accept tenancy</button>
+</form>

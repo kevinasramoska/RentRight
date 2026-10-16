@@ -49,13 +49,11 @@ public class TenanciesControllerTests
         var model = Assert.IsType<TenancyCreateViewModel>(view.Model);
         Assert.Equal(new DateOnly(2026, 8, 11), model.StartDate);
         Assert.Single(model.AvailableProperties);
-        Assert.Single(model.AvailableTenants);
     }
 
     [Theory]
     [InlineData(CreateTenancyStatus.ValidationFailed, "EndDate")]
     [InlineData(CreateTenancyStatus.PropertyNotFound, "PropertyId")]
-    [InlineData(CreateTenancyStatus.TenantNotFound, "TenantId")]
     [InlineData(CreateTenancyStatus.Conflict, "PropertyId")]
     public async Task CreatePost_RecoverableOutcome_ReturnsFormWithFieldError(
         CreateTenancyStatus status,
@@ -67,7 +65,6 @@ public class TenanciesControllerTests
                 CreateTenancyOutcome.ValidationFailed(
                     [new TenancyValidationError("EndDate", "Invalid date.")]),
             CreateTenancyStatus.PropertyNotFound => CreateTenancyOutcome.PropertyNotFound(),
-            CreateTenancyStatus.TenantNotFound => CreateTenancyOutcome.TenantNotFound(),
             CreateTenancyStatus.Conflict => CreateTenancyOutcome.Conflict(),
             _ => throw new InvalidOperationException()
         };
@@ -79,7 +76,6 @@ public class TenanciesControllerTests
         var model = Assert.IsType<TenancyCreateViewModel>(view.Model);
         Assert.NotEmpty(controller.ModelState[expectedField]!.Errors);
         Assert.Single(model.AvailableProperties);
-        Assert.Single(model.AvailableTenants);
     }
 
     [Theory]
@@ -106,18 +102,18 @@ public class TenanciesControllerTests
     }
 
     [Fact]
-    public async Task CreatePost_Success_RedirectsWithConfirmation()
+    public async Task CreatePost_Success_ShowsOneTimeReceipt()
     {
         var controller = CreateController(new FakeTenancyService
         {
-            CreateOutcome = CreateTenancyOutcome.Success()
+            CreateOutcome = CreateTenancyOutcome.Success(new InvitationReceipt(new string('A', 64), DateTime.UtcNow.AddDays(7)))
         });
 
         var result = await controller.Create(ValidModel(), CancellationToken.None);
 
-        var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(TenanciesController.Index), redirect.ActionName);
-        Assert.Equal("Tenancy created.", controller.TempData["Success"]);
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("Invitation", view.ViewName);
+        Assert.Empty(controller.TempData);
     }
 
     [Theory]
@@ -187,17 +183,23 @@ public class TenanciesControllerTests
     {
         private static readonly TenancyCreateForm Form = new(
             new DateOnly(2026, 8, 11),
-            [new TenancySelectionOption("10", "Home — Address")],
-            [new TenancySelectionOption("tenant-1", "Tenant — tenant@example.com")]);
+            [new TenancySelectionOption("10", "Home — Address")]);
 
         public ListTenanciesOutcome ListOutcome { get; init; } =
             ListTenanciesOutcome.Success([]);
         public GetTenancyCreateFormOutcome FormOutcome { get; init; } =
             GetTenancyCreateFormOutcome.Success(Form);
         public CreateTenancyOutcome CreateOutcome { get; init; } =
-            CreateTenancyOutcome.Success();
+            CreateTenancyOutcome.Success(new InvitationReceipt(new string('A', 64), DateTime.UtcNow.AddDays(7)));
         public EndTenancyOutcome EndOutcome { get; init; } =
             EndTenancyOutcome.Success(changed: true);
+
+        public Task<AcceptTenancyOutcome> AcceptAsync(AcceptTenancyCommand command, CancellationToken cancellationToken) =>
+            Task.FromResult(new AcceptTenancyOutcome(AcceptTenancyStatus.Success));
+        public Task<GetTenancyOutcome> GetAsync(int id, CancellationToken cancellationToken) =>
+            Task.FromResult(new GetTenancyOutcome(TenancyQueryStatus.Success));
+        public Task<ListTenanciesPageOutcome> ListAsync(int page, int size, CancellationToken cancellationToken) =>
+            Task.FromResult(new ListTenanciesPageOutcome(TenancyQueryStatus.Success, new TenancyPage([], 0)));
 
         public Task<ListTenanciesOutcome> ListForAdministrationAsync(
             CancellationToken cancellationToken) => Task.FromResult(ListOutcome);

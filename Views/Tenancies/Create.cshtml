@@ -1,19 +1,14 @@
 @model RentRight.ViewModels.TenancyCreateViewModel
 
 @{
-    ViewData["Title"] = "Create Tenancy";
+    ViewData["Title"] = "Invite Tenant";
 }
 
-<h2 class="mb-4">Create Tenancy</h2>
+<h2 class="mb-4">Invite Tenant</h2>
 
 @if (Model.AvailableProperties.Count == 0)
 {
-    <div class="alert alert-warning">No property is currently available for a new active tenancy.</div>
-}
-
-@if (Model.AvailableTenants.Count == 0)
-{
-    <div class="alert alert-warning">No user currently has the Tenant role. Assign the role in the Admin Panel first.</div>
+    <div class="alert alert-warning">No property is currently available for a new invitation.</div>
 }
 
 <form asp-action="Create" method="post">
@@ -29,9 +24,7 @@
 
     <div class="mb-3">
         <label asp-for="TenantId" class="form-label"></label>
-        <select asp-for="TenantId" asp-items="Model.AvailableTenants" class="form-select">
-            <option value="">Select a tenant</option>
-        </select>
+        <input asp-for="TenantId" class="form-control" autocomplete="off" />
         <span asp-validation-for="TenantId" class="text-danger"></span>
     </div>
 
@@ -48,7 +41,7 @@
         </div>
     </div>
 
-    <button type="submit" class="btn btn-primary" disabled="@(Model.AvailableProperties.Count == 0 || Model.AvailableTenants.Count == 0)">Create Tenancy</button>
+    <button type="submit" class="btn btn-primary" disabled="@(Model.AvailableProperties.Count == 0)">Invite Tenant</button>
     <a asp-action="Index" class="btn btn-secondary">Cancel</a>
 </form>
 

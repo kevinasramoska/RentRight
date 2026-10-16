@@ -43,7 +43,8 @@ public sealed class EfDashboardDataStore(ApplicationDbContext dbContext) : IDash
         CancellationToken cancellationToken) =>
         await dbContext.Tenancies
             .AsNoTracking()
-            .Where(tenancy => tenancy.TenantId == tenantId)
+            .Where(tenancy => tenancy.TenantId == tenantId &&
+                (tenancy.InvitedUtc == null || tenancy.AcceptedUtc != null))
             .OrderByDescending(tenancy => tenancy.Status == TenancyStatus.Active)
             .ThenByDescending(tenancy => tenancy.StartDate)
             .ThenByDescending(tenancy => tenancy.Id)

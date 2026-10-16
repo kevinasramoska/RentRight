@@ -29,7 +29,7 @@ The application uses ASP.NET Core Identity for authentication and role managemen
 - Admin user role management screen
 - Landlord dashboard showing the landlord's own properties
 - Property create, edit, and delete flows for `Landlord` and `Admin`
-- Admin tenancy creation and ending
+- Admin/owning-landlord tenancy invitations, explicit tenant acceptance, and audited ending
 - Tenant dashboard with associated properties/tenancies
 - Tenant-scoped maintenance request creation, list, and detail views
 - Landlord maintenance queues and controlled status updates for owned properties
@@ -42,9 +42,9 @@ The application uses ASP.NET Core Identity for authentication and role managemen
 
 The core MVC workflow is implemented. The larger roadmap still includes:
 
-- Tenancy/maintenance API endpoints and React client
+- Maintenance API endpoints and React client
 - SQL Server-backed integration tests and broader authorization coverage
-- Tenant invitation/acceptance and immutable maintenance status history
+- Immutable maintenance status history
 - Optimistic concurrency and pagination
 
 ## Project Structure
@@ -160,7 +160,7 @@ When running in Development, the app creates an administrator only when both `Se
 - `Landlord` users can edit their own properties
 - `Tenant` users can view their tenancies and create/view requests only through their own active tenancy
 - `Landlord` users can view and update requests only for properties they own
-- `Admin` users can create/end tenancies and manage every maintenance request
+- `Admin` and owning `Landlord` users can invite/end tenancies; only the invited `Tenant` can accept. Admin can manage every maintenance request
 - `Admin` users can access the admin dashboard and update user roles
 
 ## Database Notes
@@ -204,3 +204,28 @@ property forms post to `/Properties/Create` and retain antiforgery protection.
 - Generated `bin/`, `obj/`, IDE files, and local secrets are intentionally excluded from Git
 - The app uses default Identity UI routes such as `/Identity/Account/Login`
 - Some UI and controller files suggest work in progress, so the `README` intentionally documents only behaviour visible in the current code
+
+## Tenancy invitations (P05-01)
+
+Use `/Tenancies` as Admin or an owning Landlord to invite by the tenant's **exact
+login identifier** (currently their registration email). The account must already
+have the Tenant role. A successful invitation shows a random token once for
+private manual delivery; no email is sent. The intended tenant signs in and pastes
+it at `/Tenancies/Accept` within seven days. Occupancy becomes Active only after
+explicit acceptance. Future Active tenancies reserve the property but do not grant
+date-based occupancy access before their start date.
+
+An invitation receipt deliberately does not confirm account existence or role.
+Unknown/ineligible identifiers still reserve the property until expiry/cancellation;
+check the identifier privately with the intended tenant, cancel a mistaken invite,
+and issue another. Tokens cannot be recovered; cancel/reissue if lost. Store or
+transmit them only through a private channel. Never place them in a query string.
+Lists/detail never return a token, hash, or invitation target identity.
+
+The incremental `TenancyInvitationLifecycle` migration preserves existing Active
+and Ended rows, with null lifecycle audit fields where no historical evidence
+exists. New rows record invitation, acceptance and ending actors/UTC times.
+Rollback refuses to discard lifecycle audit data. All extant properties are
+eligible subject to reservation rules; this model has no archive/publication state.
+See [lifecycle decisions and manual checks](docs/TENANCY_LIFECYCLE.md) and
+[API contracts](docs/API.md). Maintenance submission/history remains outside P05-01.

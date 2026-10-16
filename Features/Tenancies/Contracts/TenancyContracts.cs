@@ -16,8 +16,7 @@ public sealed record TenancySelectionOption(string Value, string Label);
 
 public sealed record TenancyCreateForm(
     DateOnly DefaultStartDate,
-    IReadOnlyList<TenancySelectionOption> AvailableProperties,
-    IReadOnlyList<TenancySelectionOption> AvailableTenants);
+    IReadOnlyList<TenancySelectionOption> AvailableProperties);
 
 public sealed record CreateTenancyCommand(
     int? PropertyId,
@@ -69,15 +68,16 @@ public enum CreateTenancyStatus
     Forbidden,
     ValidationFailed,
     PropertyNotFound,
-    TenantNotFound,
     Conflict
 }
 
 public sealed record CreateTenancyOutcome(
     CreateTenancyStatus Status,
-    IReadOnlyList<TenancyValidationError>? Errors = null)
+    IReadOnlyList<TenancyValidationError>? Errors = null,
+    InvitationReceipt? Invitation = null)
 {
-    public static CreateTenancyOutcome Success() => new(CreateTenancyStatus.Success);
+    public static CreateTenancyOutcome Success(InvitationReceipt invitation) =>
+        new(CreateTenancyStatus.Success, Invitation: invitation);
 
     public static CreateTenancyOutcome Unauthenticated() =>
         new(CreateTenancyStatus.Unauthenticated);
@@ -91,9 +91,6 @@ public sealed record CreateTenancyOutcome(
 
     public static CreateTenancyOutcome PropertyNotFound() =>
         new(CreateTenancyStatus.PropertyNotFound);
-
-    public static CreateTenancyOutcome TenantNotFound() =>
-        new(CreateTenancyStatus.TenantNotFound);
 
     public static CreateTenancyOutcome Conflict() =>
         new(CreateTenancyStatus.Conflict);
@@ -125,3 +122,13 @@ public sealed record EndTenancyOutcome(EndTenancyStatus Status, bool Changed = f
     public static EndTenancyOutcome Conflict() =>
         new(EndTenancyStatus.Conflict);
 }
+
+// Raw token appears only in the issuance response and the acceptance request.
+public sealed record InvitationReceipt(string Token, DateTime ExpiresUtc);
+public sealed record AcceptTenancyCommand(string Token);
+public enum AcceptTenancyStatus { Success, Unauthenticated, Forbidden, NotFound, Conflict }
+public sealed record AcceptTenancyOutcome(AcceptTenancyStatus Status);
+public sealed record GetTenancyOutcome(TenancyQueryStatus Status, TenancyAdminRow? Tenancy = null);
+public sealed record TenancyPage(IReadOnlyList<TenancyAdminRow> Items, int TotalCount);
+
+public sealed record ListTenanciesPageOutcome(TenancyQueryStatus Status, TenancyPage? Page = null);

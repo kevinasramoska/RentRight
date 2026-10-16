@@ -56,6 +56,15 @@ namespace RentRight.Data
                     .HasConversion<string>()
                     .HasMaxLength(20);
 
+                entity.Property(tenancy => tenancy.InvitationTokenHash).HasMaxLength(64).IsUnicode(false);
+                entity.Property(tenancy => tenancy.InvitedByUserId).HasMaxLength(450);
+                entity.Property(tenancy => tenancy.AcceptedByUserId).HasMaxLength(450);
+                entity.Property(tenancy => tenancy.EndedByUserId).HasMaxLength(450);
+                entity.Property(tenancy => tenancy.EndReason).HasMaxLength(20);
+                entity.Property(tenancy => tenancy.RowVersion).IsRowVersion();
+                entity.HasIndex(tenancy => tenancy.InvitationTokenHash).IsUnique()
+                    .HasFilter("[InvitationTokenHash] IS NOT NULL");
+
                 entity.HasOne(tenancy => tenancy.Property)
                     .WithMany(property => property.Tenancies)
                     .HasForeignKey(tenancy => tenancy.PropertyId)
@@ -69,16 +78,20 @@ namespace RentRight.Data
                 entity.HasIndex(tenancy => tenancy.TenantId);
                 entity.HasIndex(tenancy => tenancy.PropertyId)
                     .IsUnique()
-                    .HasFilter("[Status] = N'Active'");
+                    .HasFilter("[Status] IN (N'Active', N'Pending')");
 
                 entity.ToTable(table =>
                 {
                     table.HasCheckConstraint(
                         "CK_Tenancies_EndDate",
                         "[EndDate] IS NULL OR [EndDate] >= [StartDate]");
+                    table.HasCheckConstraint("CK_Tenancies_ActiveTenant",
+                        "[Status] <> N'Active' OR [TenantId] IS NOT NULL");
+                    table.HasCheckConstraint("CK_Tenancies_Invitation",
+                        "[Status] <> N'Pending' OR ([InvitationTokenHash] IS NOT NULL AND [InvitedUtc] IS NOT NULL AND [InvitationExpiresUtc] IS NOT NULL AND [InvitationExpiresUtc] > [InvitedUtc] AND [InvitedByUserId] IS NOT NULL)");
                     table.HasCheckConstraint(
                         "CK_Tenancies_Status",
-                        "[Status] IN (N'Active', N'Ended')");
+                        "[Status] IN (N'Active', N'Ended', N'Pending')");
                 });
             });
 

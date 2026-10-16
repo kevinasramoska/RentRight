@@ -473,7 +473,7 @@ public class PropertiesApiTests
         Assert.True(put.GetProperty("responses").TryGetProperty("204", out _));
         Assert.True(delete.GetProperty("responses").TryGetProperty("409", out _));
         Assert.DoesNotContain("landlordId", body, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("tenancies", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("tenancies", document.RootElement.GetProperty("components").GetProperty("schemas").GetProperty("PropertyResponse").ToString(), StringComparison.OrdinalIgnoreCase);
     }
 
     private static RentRightApplicationFactory CreateFactory(
