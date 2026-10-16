@@ -312,7 +312,7 @@ public class MaintenanceRequestControllerTests
     [InlineData(MaintenanceOutcomeStatus.Forbidden, typeof(ForbidResult))]
     [InlineData(MaintenanceOutcomeStatus.NotFound, typeof(NotFoundResult))]
     [InlineData(MaintenanceOutcomeStatus.ConcealedNotFound, typeof(NotFoundResult))]
-    [InlineData(MaintenanceOutcomeStatus.Conflict, typeof(ConflictResult))]
+    [InlineData(MaintenanceOutcomeStatus.Conflict, typeof(ConflictObjectResult))]
     public async Task UpdateStatusPost_TerminalOutcome_MapsToExpectedMvcResult(
         MaintenanceOutcomeStatus status,
         Type expectedResultType)

@@ -268,3 +268,45 @@ Rollback refuses to discard lifecycle audit data. All extant properties are
 eligible subject to reservation rules; this model has no archive/publication state.
 See [lifecycle decisions and manual checks](docs/TENANCY_LIFECYCLE.md) and
 [API contracts](docs/API.md). Maintenance submission/history remains outside P05-01.
+
+## Landlord maintenance triage (P05-03)
+
+Landlords and admins can open `/MaintenanceQueue` (linked from the retained
+maintenance list) to filter by status, property number and inclusive UTC submission
+dates. Pages contain 1–100 requests, ordered by submission time and request number,
+both descending. Owners/admins retain operational access after a tenancy ends;
+tenant reads still require their own currently active tenancy.
+
+`GET /api/v1/landlord-maintenance-requests` exposes the same filtered queue;
+`GET /api/v1/landlord-maintenance-requests/{id}` includes priority, revision,
+allowed next statuses and ordered audit history. Non-owner resources are concealed
+as 404. Admin takes precedence over other roles. The tenant API is unchanged except
+for additive previous-status/note history fields; actor identifiers are available
+only on authorized operational reads.
+
+`POST /api/v1/landlord-maintenance-requests/{id}/triage` accepts `expectedRevision`
+(required), optional `newStatus`, `priority` and `note` (at most 1000 characters).
+Status names are `Submitted`, `InProgress`, `Resolved`, `Closed`; priorities are
+`Low`, `Normal`, `High`, `Urgent`. Defined numeric enum values are also accepted.
+A status change must follow the centralized transition rules. Omit `newStatus`
+(and any note) to change priority alone. No-op updates and notes without a status
+change are rejected. Cookie mutations require the existing CSRF header/token.
+
+Read the revision from detail or the rendered update form. A competing change
+returns 409; reload before trying again. Every accepted change increments the
+maintenance-only revision through a conditional SQL update that also rechecks
+ownership. Status changes append one event in the same transaction; failed or
+stale writes commit neither priority/status nor an event. Priority-only changes
+advance the revision without inventing a status transition. A status-only check
+would miss competing priority edits and reopened status cycles; the scalar revision
+closes those gaps using the existing conditional-update approach, without adding
+rowversion to other aggregates.
+
+The incremental `MaintenanceTriageAudit` migration defaults existing priorities to
+Normal and revisions to zero. Historical actor/previous-status/note fields remain
+null because they were not recorded; migration baselines retain their original
+meaning. New submissions record the tenant actor with no previous status. New
+transitions record authenticated actor, previous/new status, server UTC time and
+optional note. Actor IDs are retained as historical facts without a user-delete
+cascade. Downgrade refuses to discard recorded triage/audit data. Descriptions and
+notes render as encoded text. Phase 7 query/index measurement remains deferred.

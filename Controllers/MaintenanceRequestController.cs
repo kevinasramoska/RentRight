@@ -24,6 +24,7 @@ public class MaintenanceRequestController(
             MaintenanceOutcomeStatus.Success => View(ToIndexViewModel(outcome.List!)),
             MaintenanceOutcomeStatus.Unauthenticated => Challenge(),
             MaintenanceOutcomeStatus.Forbidden => Forbid(),
+            MaintenanceOutcomeStatus.Unavailable => StatusCode(503),
             _ => throw new InvalidOperationException("Unknown maintenance list outcome.")
         };
     }
@@ -37,6 +38,7 @@ public class MaintenanceRequestController(
             MaintenanceOutcomeStatus.Success => View(ToDetailsViewModel(outcome.Detail!)),
             MaintenanceOutcomeStatus.Unauthenticated => Challenge(),
             MaintenanceOutcomeStatus.Forbidden => Forbid(),
+            MaintenanceOutcomeStatus.Unavailable => StatusCode(503),
             MaintenanceOutcomeStatus.NotFound or
                 MaintenanceOutcomeStatus.ConcealedNotFound => NotFound(),
             _ => throw new InvalidOperationException("Unknown maintenance detail outcome.")
@@ -70,6 +72,8 @@ public class MaintenanceRequestController(
                 return Challenge();
             case MaintenanceOutcomeStatus.Forbidden:
                 return Forbid();
+            case MaintenanceOutcomeStatus.Unavailable:
+                return StatusCode(503);
             case MaintenanceOutcomeStatus.NotFound:
             case MaintenanceOutcomeStatus.ConcealedNotFound:
                 return NotFound();
@@ -99,8 +103,10 @@ public class MaintenanceRequestController(
         MaintenanceRequestStatusUpdateInputModel model,
         CancellationToken cancellationToken)
     {
+        if (!ModelState.IsValid)
+            return MapStatusFormOutcome(await queryService.GetStatusUpdateAsync(id, cancellationToken), model.NewStatus);
         var outcome = await commandService.UpdateStatusAsync(
-            new UpdateMaintenanceRequestStatusCommand(id, model.Id, model.NewStatus),
+            new UpdateMaintenanceRequestStatusCommand(id, model.Id, model.NewStatus, model.ExpectedRevision, model.Priority, model.Note),
             cancellationToken);
 
         switch (outcome.Status)
@@ -112,11 +118,13 @@ public class MaintenanceRequestController(
                 return Challenge();
             case MaintenanceOutcomeStatus.Forbidden:
                 return Forbid();
+            case MaintenanceOutcomeStatus.Unavailable:
+                return StatusCode(503);
             case MaintenanceOutcomeStatus.NotFound:
             case MaintenanceOutcomeStatus.ConcealedNotFound:
                 return NotFound();
             case MaintenanceOutcomeStatus.Conflict:
-                return Conflict();
+                return Conflict("The request changed. Reload it before trying again.");
             case MaintenanceOutcomeStatus.Validation:
                 AddValidationErrors(outcome.Errors);
                 var formOutcome = await queryService.GetStatusUpdateAsync(
@@ -147,6 +155,8 @@ public class MaintenanceRequestController(
                 return Challenge();
             case MaintenanceOutcomeStatus.Forbidden:
                 return Forbid();
+            case MaintenanceOutcomeStatus.Unavailable:
+                return StatusCode(503);
             default:
                 throw new InvalidOperationException("Unknown maintenance create-form outcome.");
         }
@@ -163,6 +173,7 @@ public class MaintenanceRequestController(
                 selectedStatus)),
             MaintenanceOutcomeStatus.Unauthenticated => Challenge(),
             MaintenanceOutcomeStatus.Forbidden => Forbid(),
+            MaintenanceOutcomeStatus.Unavailable => StatusCode(503),
             MaintenanceOutcomeStatus.NotFound or
                 MaintenanceOutcomeStatus.ConcealedNotFound => NotFound(),
             _ => throw new InvalidOperationException("Unknown maintenance status-form outcome.")
@@ -207,6 +218,8 @@ public class MaintenanceRequestController(
         new()
         {
             History = detail.History,
+            Priority = detail.Priority,
+            Revision = detail.Revision,
             Id = detail.Id,
             PropertyTitle = detail.PropertyTitle,
             PropertyAddress = detail.PropertyAddress,
@@ -227,6 +240,8 @@ public class MaintenanceRequestController(
             PropertyTitle = update.PropertyTitle,
             TenantName = update.TenantName,
             CurrentStatus = update.CurrentStatus,
+            ExpectedRevision = update.Revision,
+            Priority = update.Priority,
             NewStatus = selectedStatus,
             AllowedStatuses = update.AllowedStatuses
                 .Select(status => new SelectListItem

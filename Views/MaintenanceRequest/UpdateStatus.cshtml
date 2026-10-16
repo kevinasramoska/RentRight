@@ -2,13 +2,13 @@
 @model RentRight.ViewModels.MaintenanceRequestStatusUpdateViewModel
 
 @{
-    ViewData["Title"] = "Update Maintenance Status";
+    ViewData["Title"] = "Update Maintenance Request";
     var currentStatus = Model.CurrentStatus == MaintenanceRequestStatus.InProgress
         ? "In Progress"
         : Model.CurrentStatus.ToString();
 }
 
-<h2 class="mb-4">Update Maintenance Status</h2>
+<h2 class="mb-4">Update Maintenance Request</h2>
 
 <p><strong>Property:</strong> @Model.PropertyTitle</p>
 <p><strong>Tenant:</strong> @Model.TenantName</p>
@@ -16,27 +16,35 @@
 
 @if (Model.AllowedStatuses.Count == 0)
 {
-    <div class="alert alert-info">This request is closed and has no further status transitions.</div>
-    <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-secondary">Back</a>
+    <p>This request has no further status transitions. You can still update its priority.</p>
 }
-else
-{
-    <form asp-action="UpdateStatus" asp-route-id="@Model.Id" method="post">
-        <input asp-for="Id" type="hidden" />
-        <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
 
-        <div class="mb-3">
-            <label asp-for="NewStatus" class="form-label"></label>
-            <select asp-for="NewStatus" asp-items="Model.AllowedStatuses" class="form-select">
-                <option value="">Select the next status</option>
-            </select>
-            <span asp-validation-for="NewStatus" class="text-danger"></span>
-        </div>
+<form asp-action="UpdateStatus" asp-route-id="@Model.Id" method="post">
+    <input asp-for="Id" type="hidden" />
+    <input asp-for="ExpectedRevision" type="hidden" />
+    <div class="mb-3">
+        <label asp-for="Priority" class="form-label"></label>
+        <select asp-for="Priority" asp-items="Html.GetEnumSelectList<MaintenancePriority>()" class="form-select"></select>
+        <span asp-validation-for="Priority" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Note" class="form-label">Status change note (optional)</label>
+        <textarea asp-for="Note" maxlength="1000" class="form-control"></textarea>
+        <span asp-validation-for="Note" class="text-danger"></span>
+    </div>
+    <div asp-validation-summary="All" class="text-danger mb-3"></div>
 
-        <button type="submit" class="btn btn-primary">Update Status</button>
-        <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-secondary">Cancel</a>
-    </form>
-}
+    <div class="mb-3">
+        <label asp-for="NewStatus" class="form-label"></label>
+        <select asp-for="NewStatus" asp-items="Model.AllowedStatuses" class="form-select">
+            <option value="">Keep current status (priority changes only)</option>
+        </select>
+        <span asp-validation-for="NewStatus" class="text-danger"></span>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Update Request</button>
+    <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-secondary">Cancel</a>
+</form>
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />

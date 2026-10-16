@@ -64,6 +64,28 @@ public class TenantMaintenanceServiceTests
         Assert.Equal(TenantMaintenanceStatus.Invalid, (await Service(db).ListAsync(page, pageSize, default)).Status);
     }
 
+    [Fact]
+    public async Task LandlordQueue_DependencyFailure_ReturnsUnavailable()
+    {
+        await using var db = Context();
+        var service = new LandlordMaintenanceService(db, new User(true, "owner", "Landlord"));
+        Assert.Equal(TenantMaintenanceStatus.Unavailable, (await service.ListAsync(new(), default)).Status);
+        Assert.Equal(TenantMaintenanceStatus.Unavailable, (await service.GetAsync(1, default)).Status);
+        var commands = new MaintenanceCommandService(new EfMaintenanceStore(db), new User(true, "owner", "Landlord"), new Clock());
+        Assert.Equal(MaintenanceOutcomeStatus.Unavailable, (await commands.UpdateStatusAsync(new(1, 1, RentRight.Models.MaintenanceRequestStatus.InProgress), default)).Status);
+    }
+
+    [Theory]
+    [InlineData("1")]
+    [InlineData("Unknown")]
+    [InlineData("xxxxxxxxxxxxxxxxxxxxx")]
+    public async Task LandlordQueue_InvalidStatus_RejectsBeforeDatabase(string status)
+    {
+        await using var db = Context();
+        var service = new LandlordMaintenanceService(db, new User(true, "owner", "Landlord"));
+        Assert.Equal(TenantMaintenanceStatus.Invalid, (await service.ListAsync(new() { Status = status }, default)).Status);
+    }
+
     private static ApplicationDbContext Context() => new(new DbContextOptionsBuilder<ApplicationDbContext>()
         .UseSqlServer("Server=unused;Database=unused;Integrated Security=true")
         .AddInterceptors(new UnavailableConnection()).Options);

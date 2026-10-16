@@ -249,7 +249,7 @@ Implementation checkpoint (2026-08-11): the focused core-domain request is imple
 
 ### P05-03 — Implement landlord maintenance triage and status history
 
-- **Implementation status:** Partially delivered early in Phase 1 — Landlord/Admin Razor list/detail/status updates and owner scoping are working. P05-02 supplies immutable history and records existing Razor transitions. Queue pagination/filtering, new transition commands/API, optimistic concurrency UI, and admin triage remain in P05-03.
+- **Implementation status:** Implemented — bounded owner/Admin queue with status/property/UTC-date filters, versioned triage API, retained Razor priority/status controls, mandatory expected revision, atomic actor/previous-status/time/note events, truthful legacy defaults, and ended-tenancy operational visibility. Tenant access remains active-tenancy scoped. See README for contracts and concurrency decisions.
 
 - **Why it matters:** A request workflow is incomplete until the owning landlord can prioritize, progress, resolve, and explain work while tenants retain visibility.
 - **Files/components likely affected:** maintenance workflow service, landlord dashboard/query model, API/MVC endpoints, status-event model/configuration, Razor views if retained, tests.

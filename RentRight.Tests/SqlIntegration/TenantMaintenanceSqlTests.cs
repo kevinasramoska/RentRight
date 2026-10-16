@@ -56,6 +56,8 @@ public sealed class TenantMaintenanceSqlTests(SqlServerFixture server) : IClassF
             Assert.InRange(r.DateSubmitted, before, DateTime.UtcNow);
             Assert.Equal(r.DateSubmitted, r.LastUpdatedUtc);
             Assert.Equal(r.DateSubmitted, Assert.Single(r.StatusHistory).OccurredUtc);
+            Assert.Equal("Tenant", Assert.Single(r.StatusHistory).ActorUserId);
+            Assert.Null(Assert.Single(r.StatusHistory).PreviousStatus);
         });
         Assert.DoesNotContain(description, string.Join('\n', _app.Logs));
     }
@@ -231,7 +233,18 @@ public sealed class TenantMaintenanceSqlTests(SqlServerFixture server) : IClassF
         await migrator.MigrateAsync();
         var history = await db.MaintenanceStatusEvents.OrderBy(e => e.MaintenanceRequestId).ToListAsync();
         Assert.Equal(2, history.Count);
-        Assert.All(history, e => Assert.True(e.IsLegacyBaseline));
+        Assert.All(history, e =>
+        {
+            Assert.True(e.IsLegacyBaseline);
+            Assert.Null(e.ActorUserId);
+            Assert.Null(e.PreviousStatus);
+            Assert.Null(e.Note);
+        });
+        Assert.All(await db.MaintenanceRequests.ToListAsync(), r =>
+        {
+            Assert.Equal(MaintenancePriority.Normal, r.Priority);
+            Assert.Equal(0, r.Revision);
+        });
         Assert.Equal(MaintenanceRequestStatus.Resolved, history[1].Status);
         Assert.Equal(new DateTime(2026, 1, 3), history[1].OccurredUtc);
         Assert.Equal(2, await db.MaintenanceRequests.CountAsync());
@@ -290,7 +303,7 @@ public sealed class TenantMaintenanceSqlTests(SqlServerFixture server) : IClassF
         var receipt = await submitted.Content.ReadFromJsonAsync<MaintenanceSubmissionResponse>();
         using var owner = await ClientAsync(Actor.OwningLandlord);
         using var updated = await owner.PostAsync("/MaintenanceRequest/UpdateStatus/" + receipt!.Id,
-            new FormUrlEncodedContent(new Dictionary<string, string> { ["Id"] = receipt.Id.ToString(), ["NewStatus"] = "InProgress" }));
+            new FormUrlEncodedContent(new Dictionary<string, string> { ["Id"] = receipt.Id.ToString(), ["NewStatus"] = "InProgress", ["ExpectedRevision"] = "0" }));
         Assert.Equal(HttpStatusCode.Redirect, updated.StatusCode);
         await using var db = _app.CreateContext();
         Assert.Equal(MaintenanceRequestStatus.InProgress, (await db.MaintenanceRequests.SingleAsync()).Status);

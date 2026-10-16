@@ -34,6 +34,8 @@ public class MaintenanceRequestDetailsViewModel
     public DateTime DateSubmitted { get; init; }
     public DateTime LastUpdatedUtc { get; init; }
     public MaintenanceRequestStatus Status { get; init; }
+    public MaintenancePriority Priority { get; init; }
+    public long Revision { get; init; }
     public bool CanUpdateStatus { get; init; }
 }
 
@@ -56,6 +58,9 @@ public class MaintenanceRequestStatusUpdateViewModel
     public required string PropertyTitle { get; init; }
     public required string TenantName { get; init; }
     public MaintenanceRequestStatus CurrentStatus { get; init; }
+    public long? ExpectedRevision { get; set; }
+    public MaintenancePriority? Priority { get; set; }
+    [StringLength(1000)] public string? Note { get; set; }
 
     [Display(Name = "New status")]
     public MaintenanceRequestStatus? NewStatus { get; set; }
@@ -67,7 +72,10 @@ public class MaintenanceRequestStatusUpdateInputModel
 {
     public int Id { get; set; }
 
-    [Required]
+    [Required] public long? ExpectedRevision { get; set; }
+    [EnumDataType(typeof(MaintenancePriority))] public MaintenancePriority? Priority { get; set; }
+    [StringLength(1000)] public string? Note { get; set; }
+
     [Display(Name = "New status")]
     public MaintenanceRequestStatus? NewStatus { get; set; }
 }

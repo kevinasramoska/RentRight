@@ -81,6 +81,15 @@ public sealed class MaintenanceCommandService(
     }
 
     public async Task<UpdateMaintenanceRequestStatusOutcome> UpdateStatusAsync(
+        UpdateMaintenanceRequestStatusCommand command, CancellationToken cancellationToken)
+    {
+        try { return await UpdateCoreAsync(command, cancellationToken); }
+        catch (Exception exception) when (exception is System.Data.Common.DbException or DbUpdateException or TimeoutException
+            || exception is InvalidOperationException { InnerException: System.Data.Common.DbException or TimeoutException })
+        { return new(MaintenanceOutcomeStatus.Unavailable); }
+    }
+
+    private async Task<UpdateMaintenanceRequestStatusOutcome> UpdateCoreAsync(
         UpdateMaintenanceRequestStatusCommand command,
         CancellationToken cancellationToken)
     {
@@ -113,9 +122,22 @@ public sealed class MaintenanceCommandService(
             return UpdateMaintenanceRequestStatusOutcome.ConcealedNotFound();
         }
 
-        if (!command.NewStatus.HasValue ||
+        var errors = new List<MaintenanceValidationError>();
+        if (command.ExpectedRevision is null or < 0)
+            errors.Add(new(nameof(command.ExpectedRevision), "Supply the revision from the request detail or update form."));
+        if (command.Note?.Length > 1000)
+            errors.Add(new(nameof(command.Note), "A status note cannot exceed 1000 characters."));
+        if (command.Priority.HasValue && !Enum.IsDefined(command.Priority.Value))
+            errors.Add(new(nameof(command.Priority), "Select a valid priority."));
+        if (errors.Count > 0) return UpdateMaintenanceRequestStatusOutcome.Validation(errors);
+        if (request.Revision != command.ExpectedRevision)
+            return UpdateMaintenanceRequestStatusOutcome.Conflict();
+        var priority = command.Priority ?? request.Priority;
+        var nextStatus = command.NewStatus ?? request.Status;
+        var priorityOnly = nextStatus == request.Status && priority != request.Priority && string.IsNullOrWhiteSpace(command.Note);
+        if (!priorityOnly && (!command.NewStatus.HasValue ||
             !Enum.IsDefined(command.NewStatus.Value) ||
-            !request.Status.CanTransitionTo(command.NewStatus.Value))
+            !request.Status.CanTransitionTo(command.NewStatus.Value)))
         {
             return UpdateMaintenanceRequestStatusOutcome.Validation(
                 [new MaintenanceValidationError(
@@ -128,14 +150,17 @@ public sealed class MaintenanceCommandService(
             var updated = await store.TryUpdateStatusAsync(
                 request.Id,
                 request.Status,
-                command.NewStatus.Value,
+                nextStatus,
                 clock.UtcNow,
-                cancellationToken);
+                cancellationToken,
+                new MaintenanceMutation(command.ExpectedRevision.Value, priority, userId, isAdministrator,
+                    string.IsNullOrWhiteSpace(command.Note) ? null : command.Note.Trim()));
             return updated
                 ? UpdateMaintenanceRequestStatusOutcome.Success(request.Id)
                 : UpdateMaintenanceRequestStatusOutcome.Conflict();
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException exception) when (exception.InnerException is not TimeoutException &&
+            exception.InnerException is not System.Data.Common.DbException { IsTransient: true })
         {
             return UpdateMaintenanceRequestStatusOutcome.Conflict();
         }

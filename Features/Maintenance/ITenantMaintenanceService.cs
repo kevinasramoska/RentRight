@@ -1,7 +1,8 @@
 namespace RentRight.Features.Maintenance;
 
 public enum TenantMaintenanceStatus { Success, Unauthenticated, Forbidden, NotFound, NoActiveTenancy, Conflict, Invalid, Unavailable }
-public sealed record MaintenanceHistoryItem(string Status, DateTime OccurredUtc, bool IsLegacyBaseline);
+public sealed record MaintenanceHistoryItem(string Status, DateTime OccurredUtc, bool IsLegacyBaseline,
+    string? PreviousStatus = null, string? Note = null, string? ActorUserId = null);
 public sealed record TenantMaintenanceItem(int Id, string PropertyTitle, string PropertyAddress,
     string Description, DateTime SubmittedUtc, DateTime LastUpdatedUtc, string Status);
 public sealed record TenantMaintenanceDetail(TenantMaintenanceItem Request, IReadOnlyList<MaintenanceHistoryItem> History);

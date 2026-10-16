@@ -1,0 +1,48 @@
+@using RentRight.Models
+@model RentRight.ViewModels.MaintenanceQueueViewModel
+@{ ViewData["Title"] = "Maintenance work queue"; }
+<h1>Maintenance work queue</h1>
+<p>Requests remain available after a tenancy ends. Submitted dates are inclusive UTC dates.</p>
+<form method="get" class="mb-4">
+    <div asp-validation-summary="All" class="text-danger"></div>
+    <label for="status">Status</label>
+    <select id="status" name="Status" class="form-select">
+        <option value="">All statuses</option>
+        @foreach (var status in Enum.GetNames<MaintenanceRequestStatus>())
+        { <option value="@status" selected="@(Model.Query.Status == status)">@status</option> }
+    </select>
+    <label for="property">Property number</label>
+    <input id="property" name="PropertyId" type="number" min="1" value="@Model.Query.PropertyId" class="form-control" />
+    <label for="from">Submitted from</label>
+    <input id="from" name="SubmittedFrom" type="date" value="@Model.Query.SubmittedFrom?.ToString("yyyy-MM-dd")" class="form-control" />
+    <label for="to">Submitted to</label>
+    <input id="to" name="SubmittedTo" type="date" value="@Model.Query.SubmittedTo?.ToString("yyyy-MM-dd")" class="form-control" />
+    <label for="size">Requests per page (1–100)</label>
+    <input id="size" name="PageSize" type="number" min="1" max="100" value="@Model.Query.PageSize" class="form-control" />
+    <button class="btn btn-primary mt-2" type="submit">Filter</button>
+</form>
+<p>@Model.Page.TotalCount requests · Page @Model.Query.Page</p>
+@if (Model.Page.Items.Count == 0) { <p>No maintenance requests match these filters.</p> }
+else
+{
+    <table class="table">
+        <thead><tr><th>Property</th><th>Submitted (UTC)</th><th>Status</th><th>Priority</th><th>Actions</th></tr></thead>
+        <tbody>
+        @foreach (var item in Model.Page.Items)
+        {
+            <tr><td>@item.PropertyTitle (#@item.PropertyId)</td><td>@item.SubmittedUtc.ToString("yyyy-MM-dd HH:mm")</td><td>@item.Status</td><td>@item.Priority</td>
+                <td><a asp-controller="MaintenanceRequest" asp-action="Details" asp-route-id="@item.Id">View request</a>
+                    <a asp-controller="MaintenanceRequest" asp-action="UpdateStatus" asp-route-id="@item.Id">Update request</a></td></tr>
+        }
+        </tbody>
+    </table>
+}
+@foreach (var pageNumber in new[] { Model.Query.Page - 1, Model.Query.Page + 1 })
+{
+    if (pageNumber >= 1 && pageNumber <= 10000 && (pageNumber < Model.Query.Page || (long)Model.Query.Page * Model.Query.PageSize < Model.Page.TotalCount))
+    {
+        <a asp-action="Index" asp-route-page="@pageNumber" asp-route-pageSize="@Model.Query.PageSize" asp-route-status="@Model.Query.Status"
+           asp-route-propertyId="@Model.Query.PropertyId" asp-route-submittedFrom="@Model.Query.SubmittedFrom?.ToString("yyyy-MM-dd")"
+           asp-route-submittedTo="@Model.Query.SubmittedTo?.ToString("yyyy-MM-dd")">Page @pageNumber</a>
+    }
+}

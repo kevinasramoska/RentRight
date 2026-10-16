@@ -30,7 +30,9 @@ public sealed record MaintenanceRequestStoreData(
     MaintenanceRequestStatus Status,
     string? TenantId,
     string LandlordId,
-    int TenancyId);
+    int TenancyId,
+    MaintenancePriority Priority = MaintenancePriority.Normal,
+    long Revision = 0);
 
 public sealed record MaintenanceTenancyStoreData(
     int Id,
@@ -48,6 +50,8 @@ public sealed record NewMaintenanceRequest(
     DateTime DateSubmitted,
     DateTime LastUpdatedUtc,
     string TenantId);
+
+public sealed record MaintenanceMutation(long ExpectedRevision, MaintenancePriority Priority, string ActorUserId, bool IsAdmin, string? Note);
 
 public interface IMaintenanceStore
 {
@@ -81,5 +85,6 @@ public interface IMaintenanceStore
         MaintenanceRequestStatus expectedStatus,
         MaintenanceRequestStatus newStatus,
         DateTime lastUpdatedUtc,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        MaintenanceMutation mutation);
 }

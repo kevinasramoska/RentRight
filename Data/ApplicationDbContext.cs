@@ -118,6 +118,9 @@ namespace RentRight.Data
 
             builder.Entity<MaintenanceStatusEvent>(entity =>
             {
+                entity.Property(e => e.PreviousStatus).HasConversion<string>().HasMaxLength(20);
+                entity.Property(e => e.ActorUserId).HasMaxLength(450);
+                entity.Property(e => e.Note).HasMaxLength(1000);
                 entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
                 entity.HasOne<MaintenanceRequest>().WithMany(r => r.StatusHistory)
                     .HasForeignKey(e => e.MaintenanceRequestId).OnDelete(DeleteBehavior.NoAction);
@@ -128,6 +131,12 @@ namespace RentRight.Data
 
             builder.Entity<MaintenanceRequest>(entity =>
             {
+                entity.Property(request => request.Priority).HasConversion<string>().HasMaxLength(20)
+                    .HasSentinel((MaintenancePriority)0)
+                    .HasDefaultValue(MaintenancePriority.Normal);
+                entity.Property(request => request.Revision).HasDefaultValue(0L);
+                entity.ToTable(table => table.HasCheckConstraint("CK_MaintenanceRequests_Priority",
+                    "[Priority] IN (N'Low', N'Normal', N'High', N'Urgent')"));
                 entity.Property(request => request.Description).HasMaxLength(2000);
                 entity.Property(request => request.Status)
                     .HasConversion<string>()
