@@ -363,12 +363,19 @@ public sealed class TenancyLifecycleSqlTests(SqlServerFixture server) : IClassFi
     [Fact]
     public async Task Migrate_RollbackWithLifecycleAudit_StopsBeforeDataLoss()
     {
-        await InviteAsync(await PropertyAsync());
         await using var db = _app.CreateContext();
+        // Exercise this migration's own downgrade boundary. Newer migrations can
+        // legitimately commit their Down before the tenancy guard is reached.
+        await db.GetService<IMigrator>().MigrateAsync("20261016115250_TenancyInvitationLifecycle");
+        await InviteAsync(await PropertyAsync());
+        var appliedBefore = (await db.Database.GetAppliedMigrationsAsync()).ToArray();
         var exception = await Assert.ThrowsAsync<SqlException>(() => db.GetService<IMigrator>().MigrateAsync("20260811163855_CompleteCoreRentalDomain"));
         Assert.Equal(51000, exception.Number);
-        Assert.Single(await db.Tenancies.ToListAsync());
-        Assert.Empty(await db.Database.GetPendingMigrationsAsync());
+        var tenancy = await db.Tenancies.SingleAsync();
+        Assert.Equal(TenancyStatus.Pending, tenancy.Status);
+        Assert.NotNull(tenancy.InvitedUtc);
+        Assert.NotNull(tenancy.InvitationTokenHash);
+        Assert.Equal(appliedBefore, (await db.Database.GetAppliedMigrationsAsync()).ToArray());
     }
 
     [Fact]

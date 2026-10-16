@@ -89,7 +89,9 @@ public class DashboardController(
                 "TenantDashboard",
                 new TenantDashboardViewModel
                 {
-                    Tenancies = outcome.Dashboard!.Tenancies
+                    OpenRequestCount = outcome.Dashboard!.Counts.Open,
+                    RecentRequestCount = outcome.Dashboard.Counts.Recent,
+                    Tenancies = outcome.Dashboard.Tenancies
                         .Select(tenancy => new TenantTenancySummaryViewModel
                         {
                             Id = tenancy.Id,

@@ -14,6 +14,27 @@ namespace RentRight.Data
         public DbSet<Tenancy> Tenancies => Set<Tenancy>();
         public DbSet<MaintenanceRequest> MaintenanceRequests => Set<MaintenanceRequest>();
 
+        public DbSet<MaintenanceStatusEvent> MaintenanceStatusEvents => Set<MaintenanceStatusEvent>();
+
+        private void ValidateHistory()
+        {
+            if (ChangeTracker.Entries<MaintenanceStatusEvent>().Any(entry =>
+                entry.State is EntityState.Modified or EntityState.Deleted))
+                throw new InvalidOperationException("Maintenance status history is append-only.");
+        }
+
+        public override int SaveChanges(bool acceptAllChangesOnSuccess)
+        {
+            ValidateHistory();
+            return base.SaveChanges(acceptAllChangesOnSuccess);
+        }
+
+        public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+        {
+            ValidateHistory();
+            return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
@@ -93,6 +114,16 @@ namespace RentRight.Data
                         "CK_Tenancies_Status",
                         "[Status] IN (N'Active', N'Ended', N'Pending')");
                 });
+            });
+
+            builder.Entity<MaintenanceStatusEvent>(entity =>
+            {
+                entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
+                entity.HasOne<MaintenanceRequest>().WithMany(r => r.StatusHistory)
+                    .HasForeignKey(e => e.MaintenanceRequestId).OnDelete(DeleteBehavior.NoAction);
+                entity.HasIndex(e => new { e.MaintenanceRequestId, e.OccurredUtc, e.Id });
+                entity.ToTable(table => table.HasCheckConstraint("CK_MaintenanceStatusEvents_Status",
+                    "[Status] IN (N'Submitted', N'InProgress', N'Resolved', N'Closed')"));
             });
 
             builder.Entity<MaintenanceRequest>(entity =>

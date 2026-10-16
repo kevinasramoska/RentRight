@@ -41,7 +41,8 @@ public sealed class MaintenanceQueryService(
                 userId,
                 IncludeAll: isAdministrator,
                 IncludeLandlordOwned: !isAdministrator && isLandlord,
-                IncludeTenantOwned: !isAdministrator && isTenant),
+                IncludeTenantOwned: !isAdministrator && isTenant,
+                Today: DateOnly.FromDateTime(clock.UtcNow)),
             page,
             pageSize,
             cancellationToken);
@@ -97,6 +98,11 @@ public sealed class MaintenanceQueryService(
 
         var landlordOwnsRequest = isLandlord && request.LandlordId == userId;
         var tenantOwnsRequest = isTenant && request.TenantId == userId;
+        if (tenantOwnsRequest)
+        {
+            var activeTenancies = await store.ListActiveTenanciesAsync(userId, DateOnly.FromDateTime(clock.UtcNow), cancellationToken);
+            tenantOwnsRequest = activeTenancies.Any(t => t.Id == request.TenancyId);
+        }
         if (!isAdministrator && !landlordOwnsRequest && !tenantOwnsRequest)
         {
             return MaintenanceDetailOutcome.ConcealedNotFound();
@@ -111,7 +117,10 @@ public sealed class MaintenanceQueryService(
             request.DateSubmitted,
             request.LastUpdatedUtc,
             request.Status,
-            CanUpdateStatus: isAdministrator || landlordOwnsRequest));
+            CanUpdateStatus: isAdministrator || landlordOwnsRequest)
+        {
+            History = await store.GetHistoryAsync(requestId, cancellationToken)
+        });
     }
 
     public async Task<MaintenanceCreateFormOutcome> GetCreateFormAsync(

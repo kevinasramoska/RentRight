@@ -4,6 +4,8 @@ namespace RentRight.Features.Dashboards;
 
 public interface IDashboardDataStore
 {
+    Task<TenantMaintenanceCounts> GetTenantMaintenanceCountsAsync(string tenantId, DateOnly today, DateTime recentSince, CancellationToken cancellationToken);
+
     Task<AdminDashboardSummary> GetAdminSummaryAsync(CancellationToken cancellationToken);
 
     Task<IReadOnlyList<LandlordPropertySummary>> ListLandlordPropertiesAsync(
@@ -19,6 +21,7 @@ public interface IDashboardDataStore
 
     Task<IReadOnlyList<TenantMaintenanceSummary>> ListTenantMaintenanceAsync(
         string tenantId,
+        DateOnly today,
         int maximumResults,
         CancellationToken cancellationToken);
 }

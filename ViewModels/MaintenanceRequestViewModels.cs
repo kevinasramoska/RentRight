@@ -24,6 +24,8 @@ public class MaintenanceRequestRowViewModel
 
 public class MaintenanceRequestDetailsViewModel
 {
+    public IReadOnlyList<RentRight.Features.Maintenance.MaintenanceHistoryItem> History { get; init; } = [];
+
     public int Id { get; init; }
     public required string PropertyTitle { get; init; }
     public required string PropertyAddress { get; init; }

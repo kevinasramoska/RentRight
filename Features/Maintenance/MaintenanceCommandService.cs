@@ -68,11 +68,13 @@ public sealed class MaintenanceCommandService(
                     description,
                     MaintenanceRequestStatus.Submitted,
                     now,
-                    now),
+                    now,
+                    userId),
                 cancellationToken);
             return CreateMaintenanceRequestOutcome.Success(requestId);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException exception) when (exception.InnerException is not TimeoutException &&
+            exception.InnerException is not System.Data.Common.DbException { IsTransient: true })
         {
             return CreateMaintenanceRequestOutcome.Conflict();
         }

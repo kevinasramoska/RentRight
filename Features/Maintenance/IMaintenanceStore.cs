@@ -6,7 +6,8 @@ public sealed record MaintenanceListAccess(
     string UserId,
     bool IncludeAll,
     bool IncludeLandlordOwned,
-    bool IncludeTenantOwned);
+    bool IncludeTenantOwned,
+    DateOnly Today);
 
 public sealed record MaintenanceListStoreRow(
     int Id,
@@ -28,7 +29,8 @@ public sealed record MaintenanceRequestStoreData(
     DateTime LastUpdatedUtc,
     MaintenanceRequestStatus Status,
     string? TenantId,
-    string LandlordId);
+    string LandlordId,
+    int TenancyId);
 
 public sealed record MaintenanceTenancyStoreData(
     int Id,
@@ -44,10 +46,13 @@ public sealed record NewMaintenanceRequest(
     string Description,
     MaintenanceRequestStatus Status,
     DateTime DateSubmitted,
-    DateTime LastUpdatedUtc);
+    DateTime LastUpdatedUtc,
+    string TenantId);
 
 public interface IMaintenanceStore
 {
+    Task<IReadOnlyList<MaintenanceHistoryItem>> GetHistoryAsync(int requestId, CancellationToken cancellationToken);
+
     Task<IReadOnlyList<MaintenanceListStoreRow>> ListAsync(
         MaintenanceListAccess access,
         int page,

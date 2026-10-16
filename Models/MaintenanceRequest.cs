@@ -4,6 +4,8 @@ namespace RentRight.Models;
 
 public class MaintenanceRequest
 {
+    public ICollection<MaintenanceStatusEvent> StatusHistory { get; set; } = [];
+
     public int Id { get; set; }
 
     [Required]

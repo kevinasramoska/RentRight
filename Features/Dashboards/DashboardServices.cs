@@ -98,7 +98,8 @@ public sealed class TenantDashboardQueryService(
             return TenantDashboardOutcome.Forbidden();
         }
 
-        var today = DateOnly.FromDateTime(clock.UtcNow);
+        var now = clock.UtcNow;
+        var today = DateOnly.FromDateTime(now);
         var tenancies = await dataStore.ListTenantTenanciesAsync(
             currentUser.UserId,
             today,
@@ -106,10 +107,12 @@ public sealed class TenantDashboardQueryService(
             cancellationToken);
         var maintenanceRequests = await dataStore.ListTenantMaintenanceAsync(
             currentUser.UserId,
+            today,
             MaximumRecentMaintenanceRequests,
             cancellationToken);
 
+        var counts = await dataStore.GetTenantMaintenanceCountsAsync(currentUser.UserId, today, now.AddDays(-30), cancellationToken);
         return TenantDashboardOutcome.Success(
-            new TenantDashboardSummary(tenancies, maintenanceRequests));
+            new TenantDashboardSummary(tenancies, maintenanceRequests) { Counts = counts });
     }
 }

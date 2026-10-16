@@ -38,6 +38,16 @@
     <dd class="col-sm-9" style="white-space: pre-wrap;">@Model.Description</dd>
 </dl>
 
+<h3 class="h5">Status history</h3>
+<ol>
+    @foreach (var entry in Model.History)
+    {
+        <li>@entry.Status — @entry.OccurredUtc.ToString("dd MMM yyyy HH:mm") UTC
+            @if (entry.IsLegacyBaseline) { <span>(Imported baseline; earlier transitions were not recorded)</span> }
+        </li>
+    }
+</ol>
+
 @if (Model.CanUpdateStatus)
 {
     <a asp-action="UpdateStatus" asp-route-id="@Model.Id" class="btn btn-primary">Update Status</a>

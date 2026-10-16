@@ -18,10 +18,12 @@
         </div>
     </div>
 
-    <h3 class="h5 mb-3">My Tenancies</h3>
+    <p><strong>@Model.OpenRequestCount</strong> open requests ·
+        <strong>@Model.RecentRequestCount</strong> submitted in the last 30 days</p>
+    <h3 class="h5 mb-3">My Active Tenancies</h3>
     @if (Model.Tenancies.Count == 0)
     {
-        <div class="alert alert-info">No property tenancy is associated with your account yet.</div>
+        <div class="alert alert-info">You do not have a currently active tenancy. Accept a valid invitation to get started.</div>
     }
     else
     {

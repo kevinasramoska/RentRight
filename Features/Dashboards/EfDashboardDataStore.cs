@@ -44,7 +44,9 @@ public sealed class EfDashboardDataStore(ApplicationDbContext dbContext) : IDash
         await dbContext.Tenancies
             .AsNoTracking()
             .Where(tenancy => tenancy.TenantId == tenantId &&
-                (tenancy.InvitedUtc == null || tenancy.AcceptedUtc != null))
+                (tenancy.InvitedUtc == null || tenancy.AcceptedUtc != null) &&
+                tenancy.Status == TenancyStatus.Active && tenancy.StartDate <= today &&
+                (tenancy.EndDate == null || tenancy.EndDate >= today))
             .OrderByDescending(tenancy => tenancy.Status == TenancyStatus.Active)
             .ThenByDescending(tenancy => tenancy.StartDate)
             .ThenByDescending(tenancy => tenancy.Id)
@@ -63,11 +65,15 @@ public sealed class EfDashboardDataStore(ApplicationDbContext dbContext) : IDash
 
     public async Task<IReadOnlyList<TenantMaintenanceSummary>> ListTenantMaintenanceAsync(
         string tenantId,
+        DateOnly today,
         int maximumResults,
         CancellationToken cancellationToken) =>
         await dbContext.MaintenanceRequests
             .AsNoTracking()
-            .Where(request => request.Tenancy!.TenantId == tenantId)
+            .Where(request => request.Tenancy!.TenantId == tenantId &&
+                request.Tenancy.Status == TenancyStatus.Active && request.Tenancy.StartDate <= today &&
+                (request.Tenancy.EndDate == null || request.Tenancy.EndDate >= today) &&
+                (request.Tenancy.InvitedUtc == null || request.Tenancy.AcceptedUtc != null))
             .OrderByDescending(request => request.DateSubmitted)
             .ThenByDescending(request => request.Id)
             .Take(maximumResults)
@@ -77,4 +83,16 @@ public sealed class EfDashboardDataStore(ApplicationDbContext dbContext) : IDash
                 request.DateSubmitted,
                 request.Status))
             .ToListAsync(cancellationToken);
+
+    public async Task<TenantMaintenanceCounts> GetTenantMaintenanceCountsAsync(string tenantId, DateOnly today,
+        DateTime recentSince, CancellationToken cancellationToken) =>
+        await dbContext.MaintenanceRequests.AsNoTracking()
+            .Where(r => r.Tenancy!.TenantId == tenantId && r.Tenancy.Status == TenancyStatus.Active &&
+                r.Tenancy.StartDate <= today && (r.Tenancy.EndDate == null || r.Tenancy.EndDate >= today) &&
+                (r.Tenancy.InvitedUtc == null || r.Tenancy.AcceptedUtc != null))
+            .GroupBy(r => 1)
+            .Select(g => new TenantMaintenanceCounts(
+                g.Count(r => r.Status == MaintenanceRequestStatus.Submitted || r.Status == MaintenanceRequestStatus.InProgress),
+                g.Count(r => r.DateSubmitted >= recentSince)))
+            .SingleOrDefaultAsync(cancellationToken) ?? new(0, 0);
 }
