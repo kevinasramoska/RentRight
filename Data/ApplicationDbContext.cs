@@ -132,6 +132,7 @@ namespace RentRight.Data
             builder.Entity<MaintenanceRequest>(entity =>
             {
                 entity.Property(request => request.Priority).HasConversion<string>().HasMaxLength(20)
+                    .HasSentinel((MaintenancePriority)0)
                     .HasDefaultValue(MaintenancePriority.Normal);
                 entity.Property(request => request.Revision).HasDefaultValue(0L);
                 entity.ToTable(table => table.HasCheckConstraint("CK_MaintenanceRequests_Priority",
