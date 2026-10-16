@@ -310,3 +310,90 @@ transitions record authenticated actor, previous/new status, server UTC time and
 optional note. Actor IDs are retained as historical facts without a user-delete
 cascade. Downgrade refuses to discard recorded triage/audit data. Descriptions and
 notes render as encoded text. Phase 7 query/index measurement remains deferred.
+
+## React foundation (P06-01)
+
+The React shell lives at `/app/`; Razor, Identity and `/api/v1` retain their existing
+routes and server authorization. P06-02's tenant portal is not implemented yet.
+Node **24 LTS** and npm are required for frontend development and `dotnet publish`.
+Dependencies use exact versions and a committed lockfile. No database changes are
+required by this phase. The existing Dockerfile has no Node runtime and is not yet
+compatible with this publish step; container integration remains deferred.
+
+### Local ASP.NET + Vite workflow
+
+Keep your existing SQL Server/user-secrets setup. From the repository root, prepare
+a trusted local HTTPS certificate **outside the checkout** (the PEM private key is
+unencrypted, so protect its directory and never commit it):
+
+```sh
+mkdir -p "$HOME/.aspnet/https"
+chmod 700 "$HOME/.aspnet/https"
+dotnet dev-certs https --trust
+dotnet dev-certs https --export-path "$HOME/.aspnet/https/rentright.pem" --format Pem --no-password
+chmod 600 "$HOME/.aspnet/https/rentright.pem" "$HOME/.aspnet/https/rentright.key"
+npm ci --prefix ClientApp
+npm run build --prefix ClientApp
+dotnet run --launch-profile https
+```
+
+In a second terminal, from the repository root:
+
+```sh
+export RENTRIGHT_DEV_CERT="$HOME/.aspnet/https/rentright.pem"
+export RENTRIGHT_DEV_KEY="$HOME/.aspnet/https/rentright.key"
+export NODE_EXTRA_CA_CERTS="$RENTRIGHT_DEV_CERT"
+npm run dev --prefix ClientApp
+```
+
+Open `https://localhost:5173/app/` and sign in **through this origin**. Vite binds to
+loopback only and proxies API, Identity, existing MVC navigation and their assets
+to `https://localhost:7216`, retaining the request host. Both hops use HTTPS and
+upstream certificate validation stays enabled; no permissive CORS is installed.
+Cookies on localhost are shared across ports; keep the same hostname throughout.
+Vite refuses to start without the certificate paths. Never place secrets in
+`VITE_*` variables: those values become public browser code.
+
+For certificate errors, verify the exported certificate matches the certificate
+used by ASP.NET, trust it in your browser, and restart Vite after setting
+`NODE_EXTRA_CA_CERTS`. Do not disable TLS verification. Check that ASP.NET is
+listening on port 7216 and port 5173 is free. For stale CSRF failures after changing
+accounts, refresh the page; unsafe API requests bootstrap a fresh request token
+before each mutation. The token stays in memory only. Authentication remains the
+server's HttpOnly Identity cookie; the client stores no authentication tokens.
+
+### Checks and production publish
+
+```sh
+npm ci --prefix ClientApp
+npm run lint --prefix ClientApp
+npm run type-check --prefix ClientApp
+npm test --prefix ClientApp
+npm run build --prefix ClientApp
+npm audit --prefix ClientApp
+dotnet build RentRight.slnx --configuration Release
+dotnet test RentRight.Tests/RentRight.Tests.csproj --configuration Release
+dotnet publish RentRight.csproj --configuration Release --output ./artifacts/publish
+```
+
+Run the frontend build before the .NET HTTP suite: its smoke test loads the real
+host and hashed assets. CI performs the frontend checks before backend checks.
+`dotnet publish` automatically runs `npm ci` and the strict frontend production
+build, then includes `wwwroot/app/index.html` and hashed JS/CSS under
+`wwwroot/app/assets/`. Normal .NET builds do not invoke npm. Generated frontend
+output and node_modules are ignored. Publish output should go outside the checkout
+(or an ignored directory); `artifacts/` is ignored for the command above.
+
+Only extensionless `/app` routes fall back to the React host. Missing assets return
+404; routes outside `/app` keep MVC/API/Identity behavior. No client router, state
+library or UI framework is introduced. React Testing Library and jsdom are
+build-time dependencies for semantic rendering, retry and escaping tests; Vitest,
+ESLint/typescript-eslint, TypeScript, Vite and its React plugin support the required
+checks and build. Production dependencies are only React and React DOM.
+
+`GET /api/v1/session` returns `{ "isAuthenticated": false, "roles": [] }` for
+anonymous users; authenticated responses include only the known presentation roles
+(`Admin`, `Landlord`, `Tenant`). Both it and `GET /api/v1/session/antiforgery` are
+no-store. The latter sets the HttpOnly antiforgery cookie and returns only
+`requestToken`; unsafe API methods must submit it as `X-CSRF-TOKEN`. Roles in React
+choose presentation only; existing server authorization remains authoritative.

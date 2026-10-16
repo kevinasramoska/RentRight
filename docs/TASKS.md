@@ -271,6 +271,8 @@ Implementation checkpoint (2026-08-11): the focused core-domain request is imple
 
 ### P06-01 — Establish the React/TypeScript build and API foundation
 
+**Implemented:** isolated `/app` shell, pinned Vite/React/strict TypeScript build, cookie/CSRF API client, no-store session/token endpoints, frontend and HTTP tests, and publish integration. See README for the Node 24 HTTPS workflow. Tenant portal work remains P06-02.
+
 - **Why it matters:** React should be introduced as a maintainable client with a reproducible build, typed errors, secure cookies, and a clear ASP.NET integration—not as disconnected demo code.
 - **Files/components likely affected:** new `ClientApp` Vite project, TypeScript/ESLint/Vitest configuration, `RentRight.csproj` build targets, `Program.cs` static-file/fallback routing, development proxy, API client, antiforgery endpoint/host page.
 - **Implementation steps:**
