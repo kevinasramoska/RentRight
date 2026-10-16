@@ -1,5 +1,7 @@
 # Phase 1 manual verification
 
+**Historical Phase 1 checklist:** P05-01 supersedes direct assignment and Admin-only tenancy access. Use [TENANCY_LIFECYCLE.md](TENANCY_LIFECYCLE.md) for the current invite/accept/end workflow.
+
 This checklist verifies the MVC tenancy and maintenance workflow added in Phase 1. Use synthetic local accounts and a disposable development database.
 
 ## Prerequisites

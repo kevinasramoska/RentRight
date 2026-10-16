@@ -1,3 +1,6 @@
+using System.Data;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using RentRight.Data;
 using RentRight.Features.Tenancies.Contracts;
@@ -5,174 +8,147 @@ using RentRight.Models;
 
 namespace RentRight.Features.Tenancies;
 
-public sealed class EfTenancyStore(ApplicationDbContext dbContext) : ITenancyStore
+public sealed class EfTenancyStore(ApplicationDbContext db, ILookupNormalizer normalizer) : ITenancyStore
 {
-    private readonly Dictionary<int, Tenancy> _loadedTenancies = [];
+    private IQueryable<Tenancy> Visible(TenancyActor actor, DateOnly today) => db.Tenancies.AsNoTracking()
+        .Where(t => actor.IsAdmin || (actor.IsLandlord && t.Property!.LandlordId == actor.UserId)
+            || (actor.IsTenant && t.TenantId == actor.UserId && t.Status == TenancyStatus.Active
+                && t.StartDate <= today && (t.EndDate == null || t.EndDate >= today)));
 
-    public async Task<IReadOnlyList<TenancyAdminRow>> ListForAdministrationAsync(
-        int maximumResults,
-        CancellationToken cancellationToken) =>
-        await dbContext.Tenancies
-            .AsNoTracking()
-            .OrderByDescending(tenancy => tenancy.Status == TenancyStatus.Active)
-            .ThenBy(tenancy => tenancy.Property!.Title)
-            .ThenBy(tenancy => tenancy.Id)
-            .Take(maximumResults)
-            .Select(tenancy => new TenancyAdminRow(
-                tenancy.Id,
-                tenancy.Property!.Title,
-                tenancy.Property.Address,
-                tenancy.Tenant!.FullName,
-                tenancy.Tenant.Email ?? string.Empty,
-                tenancy.StartDate,
-                tenancy.EndDate,
-                tenancy.Status))
-            .ToListAsync(cancellationToken);
+    private static IQueryable<TenancyAdminRow> Project(IQueryable<Tenancy> query) => query.Select(t => new TenancyAdminRow(
+        t.Id, t.Property!.Title, t.Property.Address,
+        // Pending/cancelled invitation data must not reveal account existence.
+        t.AcceptedUtc != null || (t.InvitedUtc == null && t.TenantId != null) ? t.Tenant!.FullName : string.Empty,
+        t.AcceptedUtc != null || (t.InvitedUtc == null && t.TenantId != null) ? t.Tenant!.Email ?? string.Empty : string.Empty,
+        t.StartDate, t.EndDate, t.Status));
 
-    public async Task<IReadOnlyList<TenancySelectionOption>> ListAvailablePropertiesAsync(
-        int maximumResults,
-        CancellationToken cancellationToken) =>
-        await dbContext.Properties
-            .AsNoTracking()
-            .Where(property => !property.Tenancies.Any(tenancy =>
-                tenancy.Status == TenancyStatus.Active))
-            .OrderBy(property => property.Title)
-            .ThenBy(property => property.Id)
-            .Take(maximumResults)
-            .Select(property => new TenancySelectionOption(
-                property.Id.ToString(),
-                property.Title + " — " + property.Address))
-            .ToListAsync(cancellationToken);
+    public async Task<IReadOnlyList<TenancyAdminRow>> ListAsync(TenancyActor actor, DateOnly today, int skip, int take, CancellationToken cancellationToken) =>
+        await Project(Visible(actor, today).OrderByDescending(t => t.Id).Skip(skip).Take(take)).ToListAsync(cancellationToken);
 
-    public async Task<IReadOnlyList<TenancySelectionOption>> ListTenantAccountsAsync(
-        int maximumResults,
-        CancellationToken cancellationToken)
+    public Task<int> CountAsync(TenancyActor actor, DateOnly today, CancellationToken cancellationToken) =>
+        Visible(actor, today).CountAsync(cancellationToken);
+
+    public Task<TenancyAdminRow?> GetAsync(int id, TenancyActor actor, DateOnly today, CancellationToken cancellationToken) =>
+        Project(Visible(actor, today).Where(t => t.Id == id)).SingleOrDefaultAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<TenancySelectionOption>> ListAvailablePropertiesAsync(TenancyActor actor, DateTime now, int limit, CancellationToken cancellationToken) =>
+        await db.Properties.AsNoTracking().Where(p => actor.IsAdmin || p.LandlordId == actor.UserId)
+            .Where(p => !p.Tenancies.Any(t => t.Status == TenancyStatus.Active
+                || (t.Status == TenancyStatus.Pending && t.InvitationExpiresUtc > now)))
+            .OrderBy(p => p.Title).ThenBy(p => p.Id).Take(limit)
+            .Select(p => new TenancySelectionOption(p.Id.ToString(), p.Title + " — " + p.Address)).ToListAsync(cancellationToken);
+
+    // Every lifecycle mutation first locks the same persisted property row. This serializes
+    // invite/accept/end and ownership/delete changes, including cross-operation races.
+    private Task<Property?> LockPropertyAsync(int id, CancellationToken cancellationToken) =>
+        db.Properties.FromSqlInterpolated($"SELECT * FROM [Properties] WITH (UPDLOCK, HOLDLOCK) WHERE [Id] = {id}")
+            .AsNoTracking().SingleOrDefaultAsync(cancellationToken);
+
+    private static bool CanManage(Property property, TenancyActor actor) =>
+        actor.IsAdmin || (actor.IsLandlord && property.LandlordId == actor.UserId);
+
+    private Task<bool> IsTenantAsync(string id, CancellationToken cancellationToken) =>
+        (from ur in db.UserRoles join r in db.Roles on ur.RoleId equals r.Id
+         where ur.UserId == id && r.NormalizedName == "TENANT" select ur.UserId).AnyAsync(cancellationToken);
+
+    public async Task<CreateTenancyStatus> InviteAsync(InviteTenancyRecord record, TenancyActor actor, CancellationToken cancellationToken)
     {
-        const string normalizedTenantRole = "TENANT";
-
-        return await (
-                from user in dbContext.Users.AsNoTracking()
-                join userRole in dbContext.UserRoles.AsNoTracking()
-                    on user.Id equals userRole.UserId
-                join role in dbContext.Roles.AsNoTracking()
-                    on userRole.RoleId equals role.Id
-                where role.NormalizedName == normalizedTenantRole
-                orderby user.FullName, user.Email, user.Id
-                select new TenancySelectionOption(
-                    user.Id,
-                    string.IsNullOrWhiteSpace(user.FullName)
-                        ? user.Email ?? user.UserName ?? user.Id
-                        : user.FullName + " — " + user.Email))
-            .Take(maximumResults)
-            .ToListAsync(cancellationToken);
-    }
-
-    public Task<bool> PropertyExistsAsync(
-        int propertyId,
-        CancellationToken cancellationToken) =>
-        dbContext.Properties
-            .AsNoTracking()
-            .AnyAsync(property => property.Id == propertyId, cancellationToken);
-
-    public Task<bool> TenantAccountExistsAsync(
-        string tenantId,
-        CancellationToken cancellationToken)
-    {
-        const string normalizedTenantRole = "TENANT";
-
-        return (
-                from user in dbContext.Users.AsNoTracking()
-                join userRole in dbContext.UserRoles.AsNoTracking()
-                    on user.Id equals userRole.UserId
-                join role in dbContext.Roles.AsNoTracking()
-                    on userRole.RoleId equals role.Id
-                where user.Id == tenantId && role.NormalizedName == normalizedTenantRole
-                select user.Id)
-            .AnyAsync(cancellationToken);
-    }
-
-    public Task<bool> HasActiveTenancyAsync(
-        int propertyId,
-        CancellationToken cancellationToken) =>
-        dbContext.Tenancies
-            .AsNoTracking()
-            .AnyAsync(
-                tenancy => tenancy.PropertyId == propertyId &&
-                    tenancy.Status == TenancyStatus.Active,
-                cancellationToken);
-
-    public async Task<CreateTenancyPersistenceResult> CreateAsync(
-        CreateTenancyRecord tenancy,
-        CancellationToken cancellationToken)
-    {
-        var entity = new Tenancy
-        {
-            PropertyId = tenancy.PropertyId,
-            TenantId = tenancy.TenantId,
-            StartDate = tenancy.StartDate,
-            EndDate = tenancy.EndDate,
-            Status = TenancyStatus.Active
-        };
-
-        dbContext.Tenancies.Add(entity);
-
         try
         {
-            await dbContext.SaveChangesAsync(cancellationToken);
-            return CreateTenancyPersistenceResult.Success;
-        }
-        catch (DbUpdateException)
-        {
-            dbContext.Entry(entity).State = EntityState.Detached;
-            var activeTenancyNowExists = await HasActiveTenancyAsync(
-                tenancy.PropertyId,
-                cancellationToken);
+            await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+            var property = await LockPropertyAsync(record.Command.PropertyId!.Value, cancellationToken);
+            if (property is null || !CanManage(property, actor)) return CreateTenancyStatus.PropertyNotFound;
+            if (await db.Tenancies.AnyAsync(t => t.PropertyId == property.Id &&
+                (t.Status == TenancyStatus.Active || (t.Status == TenancyStatus.Pending && t.InvitationExpiresUtc > record.UtcNow)), cancellationToken))
+                return CreateTenancyStatus.Conflict;
 
-            if (!activeTenancyNowExists)
+            var expired = await db.Tenancies.Where(t => t.PropertyId == property.Id && t.Status == TenancyStatus.Pending).ToListAsync(cancellationToken);
+            foreach (var old in expired)
             {
-                throw;
+                old.Status = TenancyStatus.Ended;
+                old.InvitationTokenHash = null;
+                old.EndedUtc = record.UtcNow;
+                old.EndReason = "Expired";
             }
+            // Release the pending unique slot before inserting its replacement in this transaction.
+            await db.SaveChangesAsync(cancellationToken);
 
-            return CreateTenancyPersistenceResult.ActiveTenancyConflict;
+            var identifier = normalizer.NormalizeName(record.Command.TenantId.Trim());
+            var tenantId = await (from u in db.Users
+                join ur in db.UserRoles on u.Id equals ur.UserId
+                join r in db.Roles on ur.RoleId equals r.Id
+                where u.NormalizedUserName == identifier && r.NormalizedName == "TENANT"
+                select u.Id).SingleOrDefaultAsync(cancellationToken);
+
+            db.Tenancies.Add(new Tenancy
+            {
+                PropertyId = property.Id, TenantId = tenantId, StartDate = record.Command.StartDate,
+                EndDate = record.Command.EndDate, Status = TenancyStatus.Pending,
+                InvitedByUserId = actor.UserId, InvitedUtc = record.UtcNow,
+                InvitationExpiresUtc = record.UtcNow.AddDays(7), InvitationTokenHash = record.TokenHash
+            });
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return CreateTenancyStatus.Success;
+        }
+        catch (Exception exception) when (IsConflict(exception))
+        {
+            db.ChangeTracker.Clear();
+            return CreateTenancyStatus.Conflict;
         }
     }
 
-    public async Task<TenancyEndState?> GetForEndAsync(
-        int tenancyId,
-        CancellationToken cancellationToken)
+    public async Task<AcceptTenancyStatus> AcceptAsync(string tokenHash, TenancyActor actor, DateTime now, CancellationToken cancellationToken)
     {
-        var tenancy = await dbContext.Tenancies
-            .SingleOrDefaultAsync(item => item.Id == tenancyId, cancellationToken);
-        if (tenancy is null)
-        {
-            return null;
-        }
-
-        _loadedTenancies[tenancy.Id] = tenancy;
-        return new TenancyEndState(tenancy.Id, tenancy.StartDate, tenancy.Status);
-    }
-
-    public async Task<EndTenancyPersistenceResult> SaveEndAsync(
-        int tenancyId,
-        DateOnly endDate,
-        CancellationToken cancellationToken)
-    {
-        if (!_loadedTenancies.TryGetValue(tenancyId, out var tenancy))
-        {
-            throw new InvalidOperationException("The tenancy must be loaded before it is ended.");
-        }
-
-        tenancy.Status = TenancyStatus.Ended;
-        tenancy.EndDate = endDate;
-
+        // Read only a routing hint before acquiring the shared property lock; recheck all state inside it.
+        var propertyId = await db.Tenancies.AsNoTracking().Where(t => t.InvitationTokenHash == tokenHash)
+            .Select(t => (int?)t.PropertyId).SingleOrDefaultAsync(cancellationToken);
+        if (propertyId is null) return AcceptTenancyStatus.NotFound;
         try
         {
-            await dbContext.SaveChangesAsync(cancellationToken);
-            return EndTenancyPersistenceResult.Success;
+            await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+            if (await LockPropertyAsync(propertyId.Value, cancellationToken) is null) return AcceptTenancyStatus.NotFound;
+            var tenancy = await db.Tenancies.SingleOrDefaultAsync(t => t.InvitationTokenHash == tokenHash, cancellationToken);
+            if (tenancy is null || tenancy.TenantId != actor.UserId || !actor.IsTenant
+                || !await IsTenantAsync(actor.UserId, cancellationToken)) return AcceptTenancyStatus.NotFound;
+            if (!tenancy.CanAccept(actor.UserId, now)) return AcceptTenancyStatus.Conflict;
+            if (await db.Tenancies.AnyAsync(t => t.PropertyId == propertyId && t.Status == TenancyStatus.Active, cancellationToken))
+                return AcceptTenancyStatus.Conflict;
+            tenancy.Accept(actor.UserId, now);
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return AcceptTenancyStatus.Success;
         }
-        catch (DbUpdateConcurrencyException)
+        catch (Exception exception) when (IsConflict(exception))
         {
-            return EndTenancyPersistenceResult.Conflict;
+            db.ChangeTracker.Clear();
+            return AcceptTenancyStatus.Conflict;
         }
     }
+
+    public async Task<EndTenancyOutcome> EndAsync(int id, TenancyActor actor, DateTime now, CancellationToken cancellationToken)
+    {
+        var propertyId = await db.Tenancies.AsNoTracking().Where(t => t.Id == id).Select(t => (int?)t.PropertyId).SingleOrDefaultAsync(cancellationToken);
+        if (propertyId is null) return EndTenancyOutcome.NotFound();
+        try
+        {
+            await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+            var property = await LockPropertyAsync(propertyId.Value, cancellationToken);
+            if (property is null || !CanManage(property, actor)) return EndTenancyOutcome.NotFound();
+            var tenancy = await db.Tenancies.SingleAsync(t => t.Id == id, cancellationToken);
+            if (!tenancy.End(actor.UserId, now)) return EndTenancyOutcome.Conflict();
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return EndTenancyOutcome.Success(changed: true);
+        }
+        catch (Exception exception) when (IsConflict(exception))
+        {
+            db.ChangeTracker.Clear();
+            return EndTenancyOutcome.Conflict();
+        }
+    }
+
+    private static bool IsConflict(Exception exception) => exception is DbUpdateConcurrencyException
+        || exception is SqlException { Number: 1205 or 2601 or 2627 }
+        || exception is DbUpdateException { InnerException: SqlException { Number: 1205 or 2601 or 2627 } };
 }

@@ -28,7 +28,8 @@ public class TenancyCreateViewModel
     public int? PropertyId { get; set; }
 
     [Required(ErrorMessage = "Select a tenant.")]
-    [Display(Name = "Tenant")]
+    [StringLength(256)]
+    [Display(Name = "Exact tenant login identifier")]
     public string TenantId { get; set; } = string.Empty;
 
     [DataType(DataType.Date)]
@@ -40,5 +41,10 @@ public class TenancyCreateViewModel
     public DateOnly? EndDate { get; set; }
 
     public IReadOnlyList<SelectListItem> AvailableProperties { get; set; } = [];
-    public IReadOnlyList<SelectListItem> AvailableTenants { get; set; } = [];
+}
+
+public sealed class TenancyAcceptViewModel
+{
+    [Required, StringLength(64, MinimumLength = 64)]
+    public string Token { get; set; } = string.Empty;
 }

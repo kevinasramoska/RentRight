@@ -71,7 +71,7 @@ public abstract class ApiV1ControllerBase : ControllerBase
                 "A successful or unsupported property mutation outcome cannot be mapped as a failure.")
         };
 
-    private ObjectResult ApiProblem(int statusCode, string errorCode)
+    protected ObjectResult ApiProblem(int statusCode, string errorCode)
     {
         var problemDetails = HttpContext.RequestServices
             .GetRequiredService<ProblemDetailsFactory>()
@@ -85,7 +85,7 @@ public abstract class ApiV1ControllerBase : ControllerBase
         };
     }
 
-    private ObjectResult ApiValidationProblem(
+    protected ObjectResult ApiValidationProblem(
         IReadOnlyDictionary<string, string[]> validationErrors)
     {
         foreach (var (field, errors) in validationErrors)

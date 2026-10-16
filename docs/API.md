@@ -150,3 +150,65 @@ to Phase 7; no concurrency value is accepted or returned by this API version yet
 POST, PUT, and DELETE use the existing Identity cookie and require the
 `X-CSRF-TOKEN` antiforgery header. OpenAPI declares their cookie security requirement,
 request/response schemas, query filters, and documented status responses.
+
+## Tenancy lifecycle (P05-01)
+
+All routes below require an Identity application cookie. Every POST requires the
+matching `X-CSRF-TOKEN`, as do existing API writes. Responses use `Cache-Control:
+no-store`. All input types are dedicated DTOs; actors, ownership, statuses and UTC
+timestamps are server-derived. Unrecognized JSON properties cannot override them.
+
+| Method/path | Capability | Success |
+| --- | --- | --- |
+| GET `/api/v1/tenancies?page=1&pageSize=20` | Admin, owning Landlord, currently active Tenant | 200 paged `TenancyResponse` |
+| GET `/api/v1/tenancies/{id}` | Same resource scope | 200 `TenancyResponse` |
+| POST `/api/v1/tenancies` | Admin or owning Landlord | 202 `InvitationResponse` |
+| POST `/api/v1/tenancies/accept` | Invited Tenant role account | 204 |
+| POST `/api/v1/tenancies/{id}/end` | Admin or owning Landlord | 204 |
+
+Invite JSON: `propertyId` (positive integer), `tenantIdentifier` (exact login
+identifier, maximum 256 characters), `startDate` and optional `endDate` (ISO calendar
+dates). End must not precede start or today's UTC date. Identity's normalizer is
+used with exact equality against unique NormalizedUserName; no substring search,
+email directory, or global account listing exists. The identifier is resolved once
+at invitation time, and Tenant role is rechecked against SQL on acceptance.
+
+`InvitationResponse` contains **only** `token` (64 uppercase hexadecimal characters,
+256 random bits) and `expiresUtc` (seven days after issue). This is the only response
+that returns the raw token, for private manual delivery. A receipt has identical
+shape/status for known, unknown and non-Tenant accounts. Each reserves the property;
+the latter two cannot be accepted. There is deliberately no invitation ID/target in
+the receipt. Token loss requires cancelling the reservation through the manager
+list and issuing another. There is no recovery or delivery provider.
+
+Acceptance JSON: `token` only. It must match both the hash and the persisted invited
+tenant. A wrong tenant, invalid token, removed Tenant role, or consumed token returns
+concealed 404. A correctly matched but expired invitation, or a tenancy whose end
+date has passed, returns 409. Expiry is exclusive: equality with expiresUtc is expired.
+No token appears in URLs. Malformed DTOs return validation 400; tokens are never
+echoed into errors. Successful acceptance clears the hash and records actor/time.
+Admin cannot consent for another tenant, including a multi-role Admin.
+
+`TenancyResponse` contains `id`, `propertyTitle`, `propertyAddress`, `startDate`,
+`endDate`, and string `status` (`Pending`, `Active`, `Ended`). No account identity,
+token/hash, audit IDs, or rowversion is exposed. Lists use standard paging limits
+(1–100 items; maximum page 10,000) and deterministic newest-ID ordering. Tenant
+queries include only their currently active, date-eligible tenancies. Manager
+queries include owned history; Admin explicitly overrides ownership. Inaccessible
+and missing IDs both return 404. An authenticated account without a supported role receives 403; anonymous receives 401.
+
+Only one Pending or Active row can reserve a property. An expired Pending row is
+retained as Ended with reason Expired and a system time (no invented human actor)
+when a new invitation replaces it. Ending Pending means cancellation; ending Active
+records the UTC calendar end date, bounded by a future start date. Repeated ending
+returns 409 and leaves the original audit untouched. All mutations lock the property
+inside a serializable transaction, re-read state, and use rowversion/unique-index
+protection. Concurrent commands are ordered by this lock: a stale or losing command
+returns 404/409 as appropriate. There is no client If-Match/version contract because
+commands have immutable targets, explicit state preconditions and no editable fields.
+A sequential accept followed by end can legitimately both succeed.
+
+Failures use existing Problem Details codes (`validation_failed`,
+`authentication_required`, `access_denied`, `resource_not_found`, `resource_conflict`)
+and trace IDs. OpenAPI exposes token fields intentionally on issuance/acceptance
+DTOs only, without token examples or persistence entities.

@@ -292,8 +292,8 @@ P03-01 implements the shared conventions below in `RentRight.Api` and
 `Controllers/Api/V1/ApiV1ControllerBase.cs`. The exact runtime contract, stable error
 codes, pagination bounds, and browser request requirements are documented in
 [`API.md`](API.md). P03-02 implements the property list/detail/create/update/delete
-routes through the existing property service; tenancy and maintenance routes remain
-future work.
+routes through the existing property service. P05-01 implements tenancy lifecycle
+routes through ITenancyService; maintenance API routes remain future work.
 
 - JSON uses a documented naming convention and ISO-8601 UTC timestamps.
 - Use dedicated request and response DTOs with bounded validation.
@@ -511,3 +511,44 @@ Create short ADRs as these decisions are implemented:
 - Native mobile apps.
 - Real-time chat or notification infrastructure.
 - High-scale multi-region, sharding, event sourcing, or eventual-consistency design.
+
+## Implemented P05-01 lifecycle decision (2026-10-16)
+
+The earlier diagrams are target proposals; the running schema remains authoritative.
+No separate Phase 1 ADR exists in this checkout; its manual verification document
+records the one-Active-per-property decision. P05-01 preserves that invariant and
+strengthens the reservation index to one Pending **or** Active row per property.
+
+`ITenancyService` handles capabilities, input validation, time and token issuance;
+`ITenancyStore` implements scoped projections and transactional SQL commands.
+`Tenancy` centralizes accept/end transition rules. MVC and API use the same boundary.
+A single row represents an invitation, accepted occupancy and ended history, so
+nullable fixed audit fields truthfully record each once-only transition without a
+new generic audit/event subsystem. Legacy rows keep null audit values; historical
+consent and actors are never fabricated. TenantId is nullable for unknown/ineligible
+invitation targets, while a SQL check requires it for Active occupancy. New Pending
+rows require hash, expiry and invitation actor/time. Pending/cancelled projections
+hide account details, preserving the same observable outcome for arbitrary account
+identifiers. Identity's exact unique normalized login identifier avoids ambiguous
+email matches. Only a matching account already eligible at issuance can consent;
+SQL rechecks Tenant membership at acceptance.
+
+Tokens use 32 cryptographically random bytes; only a SHA-256 hash is persisted.
+The raw token is returned once on a no-store issuance response and submitted in a
+POST body. It is absent from URLs, lists, detail, audit and logs. No email provider
+or recovery mechanism is added. Transport/operational limits and manual verification
+are documented in [TENANCY_LIFECYCLE.md](TENANCY_LIFECYCLE.md).
+
+A serializable transaction obtains UPDLOCK/HOLDLOCK on the persisted Property before
+reading or mutating lifecycle state, serializing create/accept/end and property
+ownership/deletion changes. The combined filtered unique index prevents reservation
+collisions even outside the service. SQL rowversion rejects stale tracked writes;
+deadlocks, unique collisions and EF concurrency failures map to conflict, without
+blind retries. The command API does not expose rowversion: there are no editable
+lifecycle fields, state transitions are checked after locking, and each invitation
+has an immutable token target. End-after-accept is a valid sequential outcome;
+second acceptance/ending never rewrites original audit values.
+
+All existing properties are treated as lifecycle-available subject to reservations:
+archive/publication state does not exist yet. Historical rows are never deleted.
+Maintenance status/history and broad property concurrency work remain separate tasks.

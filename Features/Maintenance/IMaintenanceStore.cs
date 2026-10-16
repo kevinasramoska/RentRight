@@ -16,7 +16,7 @@ public sealed record MaintenanceListStoreRow(
     DateTime DateSubmitted,
     MaintenanceRequestStatus Status,
     string LandlordId,
-    string TenantId);
+    string? TenantId);
 
 public sealed record MaintenanceRequestStoreData(
     int Id,
@@ -27,12 +27,12 @@ public sealed record MaintenanceRequestStoreData(
     DateTime DateSubmitted,
     DateTime LastUpdatedUtc,
     MaintenanceRequestStatus Status,
-    string TenantId,
+    string? TenantId,
     string LandlordId);
 
 public sealed record MaintenanceTenancyStoreData(
     int Id,
-    string TenantId,
+    string? TenantId,
     TenancyStatus Status,
     DateOnly StartDate,
     DateOnly? EndDate,

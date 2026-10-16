@@ -70,8 +70,10 @@ Coverage includes anonymous/Tenant/owner/other landlord/Admin/multi-role Admin
 create, update and delete; public projection/paging; cookie 401/403 and ownership
 404; CSRF rejection/acceptance; validation 400; history 409; last-admin protection;
 and SQL Server foreign-key, date-check and filtered-unique violations. Tests
-cover current behavior, without introducing publication/archive or concurrency
-features planned for later phases.
+cover current behavior. P05-01 adds tenancy invite/accept/end, scoped list/detail,
+privacy/token handling, fixed lifecycle audit, reservation/rowversion constraints,
+serialized lifecycle races and migration preservation/guarded rollback. It does not
+introduce property publication/archive state or maintenance status history.
 
 ## Verification record (2026-10-16)
 
@@ -87,3 +89,18 @@ features planned for later phases.
 - Docker Desktop server 29.6.2, Linux/x86-64. The initial unavailable-daemon
   blocker was resolved before the successful SQL runs. Application-image
   build/deployment validation remains outside P04-02.
+
+## P05-01 lifecycle suite
+
+`TenancyLifecycleSqlTests` adds real-cookie actor matrices, no-enumeration receipts,
+exact normalized identifiers, persisted role rechecks, token expiry/user/reuse
+checks, future occupancy, Razor workflows, dashboard consent visibility and existing
+maintenance authorization regression. Independent contexts/HTTP clients race
+invite/invite, accept/accept, end/end, accept/end, invite/accept and invite/end.
+Relational checks cover Pending/Active reservation collisions, active tenant and
+pending expiry requirements, unique token hashes and stale rowversion writes.
+Legacy-schema upgrade verifies untouched Active/Ended rows and unknown legacy
+consent/audit fields; rollback with lifecycle audit must fail before data loss.
+Test-host logging is captured to assert that raw tokens never reach the logs.
+
+The final verification counts are recorded in [TENANCY_LIFECYCLE.md](TENANCY_LIFECYCLE.md).
