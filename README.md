@@ -454,3 +454,13 @@ audit references. Unused properties can still be deleted with a current version.
 There is no automated purge, invented retention period, archive UI or anonymization
 job. See [the concurrency, retention and migration report](docs/CONCURRENCY_RETENTION.md)
 for contracts, deployment/rollback limits, changed files and verification evidence.
+
+## Authorization foundation (P08-01, in progress)
+
+Property MVC/API, MVC maintenance and Admin endpoints now use named audience
+policies. Property/maintenance resource decisions share tested ownership and
+Admin-override rules with the registered resource-policy handler; database scopes,
+conditional writes and antiforgery remain authoritative. This is only the first
+P08-01 slice: Identity/cookie/onboarding hardening and concurrent usable-last-admin
+protection are not complete. See [Authorization](docs/AUTHORIZATION.md) for the
+policy matrix, changed files, verification and remaining work.

@@ -218,6 +218,26 @@ public sealed class SqlPipelineTests(SqlServerFixture server) : IClassFixture<Sq
         Assert.Equal(new[] { "Admin" }, await manager.GetRolesAsync(admin!));
     }
 
+    [Theory]
+    [InlineData(Actor.Anonymous, 302, "/Identity/Account/Login")]
+    [InlineData(Actor.Tenant, 302, "/Identity/Account/AccessDenied")]
+    [InlineData(Actor.OwningLandlord, 302, "/Identity/Account/AccessDenied")]
+    [InlineData(Actor.OtherLandlord, 302, "/Identity/Account/AccessDenied")]
+    [InlineData(Actor.Admin, 200, null)]
+    [InlineData(Actor.MultiRoleAdmin, 200, null)]
+    public async Task Admin_NamedRolePolicy_EnforcesCookieActorMatrix(Actor actor, int status, string? redirectPath)
+    {
+        using var client = await _app.CreateActorClientAsync(actor);
+
+        using var response = await client.GetAsync("/Admin");
+
+        Assert.Equal(status, (int)response.StatusCode);
+        if (redirectPath is not null)
+            Assert.Equal(redirectPath, new Uri(client.BaseAddress!, response.Headers.Location!).AbsolutePath);
+        else
+            Assert.Null(response.Headers.Location);
+    }
+
     private async Task<string> PropertyVersionAsync(int id)
     {
         await using var db = _app.CreateContext();

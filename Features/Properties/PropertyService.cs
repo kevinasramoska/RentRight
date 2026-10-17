@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
 using RentRight.Application.Abstractions;
+using RentRight.Authorization;
 using RentRight.Features.Properties.Contracts;
 
 namespace RentRight.Features.Properties;
@@ -9,8 +10,8 @@ public sealed class PropertyService(
     IPropertyStore propertyStore,
     ICurrentUser currentUser) : IPropertyService
 {
-    private const string AdministratorRole = "Admin";
-    private const string LandlordRole = "Landlord";
+    private const string AdministratorRole = AppRoles.Admin;
+    private const string LandlordRole = AppRoles.Landlord;
 
     public async Task<PropertyQueryOutcome<PropertyPage<PublishedPropertyListItem>>>
         SearchPublishedAsync(
@@ -288,16 +289,7 @@ public sealed class PropertyService(
             : PropertyMutationOutcome.Forbidden();
     }
 
-    private bool CanManage(string landlordId)
-    {
-        if (currentUser.IsInRole(AdministratorRole))
-        {
-            return true;
-        }
-
-        return currentUser.IsInRole(LandlordRole) &&
-            string.Equals(landlordId, currentUser.UserId, StringComparison.Ordinal);
-    }
+    private bool CanManage(string landlordId) => RentalAccess.CanManageProperty(currentUser, landlordId);
 
     private static PropertyMutationOutcome? ToMutationFailure(PropertyOperationStatus status) =>
         status switch

@@ -554,3 +554,14 @@ archive/publication state does not exist yet. Historical rows are never deleted.
 Maintenance status/history is implemented in P05-02/P05-03. P07-02 extends
 rowversion to properties and maintenance and defines retained-history SQL guards;
 see [CONCURRENCY_RETENTION.md](CONCURRENCY_RETENTION.md).
+
+## P08-01 authorization foundation (partial)
+
+Named audience policies now protect property MVC/API, MVC maintenance and Admin
+endpoints. Shared `RentalAccess` resource decisions are used by property/maintenance
+services and a registered ASP.NET Core resource handler. EF scoping, current-tenancy
+checks and conditional mutation ownership/version predicates remain in place.
+Resource policies require trusted server-loaded facts and do not replace invitation
+consent, database races or domain status transitions. The executable policy matrix
+and precise implementation boundary are in [AUTHORIZATION.md](AUTHORIZATION.md).
+Identity/account hardening and the rest of P08-01/P08-02 remain planned work.

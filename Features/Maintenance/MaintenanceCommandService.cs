@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RentRight.Application.Abstractions;
+using RentRight.Authorization;
 using RentRight.Features.Maintenance.Contracts;
 using RentRight.Models;
 
@@ -10,9 +11,9 @@ public sealed class MaintenanceCommandService(
     ICurrentUser currentUser,
     IClock clock) : IMaintenanceCommandService
 {
-    private const string AdministratorRole = "Admin";
-    private const string LandlordRole = "Landlord";
-    private const string TenantRole = "Tenant";
+    private const string AdministratorRole = AppRoles.Admin;
+    private const string LandlordRole = AppRoles.Landlord;
+    private const string TenantRole = AppRoles.Tenant;
     private const int MinimumDescriptionLength = 10;
     private const int MaximumDescriptionLength = 2000;
 
@@ -117,7 +118,7 @@ public sealed class MaintenanceCommandService(
             return UpdateMaintenanceRequestStatusOutcome.NotFound();
         }
 
-        if (!isAdministrator && request.LandlordId != userId)
+        if (!RentalAccess.CanManageProperty(currentUser, request.LandlordId))
         {
             return UpdateMaintenanceRequestStatusOutcome.ConcealedNotFound();
         }
