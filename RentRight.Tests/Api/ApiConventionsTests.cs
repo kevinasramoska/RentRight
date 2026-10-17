@@ -167,6 +167,11 @@ public class ApiConventionsTests
             secureOperation.GetProperty("security")[0]
                 .GetProperty(ApiConventions.IdentityCookieSecurityScheme)
                 .ValueKind);
+        var paths = document.RootElement.GetProperty("paths");
+        Assert.True(paths.GetProperty(ProbeRoute + "/secure").GetProperty("post")
+            .GetProperty("responses").TryGetProperty("429", out var limited));
+        Assert.Contains("Retry-After", limited.GetProperty("description").GetString());
+        Assert.False(secureOperation.GetProperty("responses").TryGetProperty("429", out _));
     }
 
     [Fact]

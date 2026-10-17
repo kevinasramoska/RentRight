@@ -33,7 +33,9 @@ interface RequestOptions {
 }
 // Restrict credentials and request tokens to our API. Tokens live only in a local variable.
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  if (!path.startsWith('/api/v1/') || /[\\\r\n]/.test(path)) throw new Error('Expected a same-origin API path.');
+  const pathname = path.split(/[?#]/)[0] ?? '';
+  if (!path.startsWith('/api/v1/') || /[\\\r\n\t#]/.test(path) || /%2f|%5c/i.test(pathname)
+    || new URL(path, 'https://rentright.invalid').pathname !== pathname) throw new Error('Expected a same-origin API path.');
   const method = options.method ?? 'GET';
   const headers = new Headers({ Accept: 'application/json' });
   if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {

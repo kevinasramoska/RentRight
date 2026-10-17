@@ -10,6 +10,7 @@ using RentRight.Features.Maintenance;
 using RentRight.Features.Properties;
 using RentRight.Features.Tenancies;
 using RentRight.Models;
+using RentRight.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -44,6 +45,7 @@ builder.Services.AddControllersWithViews(options =>
 })
 .AddApiJsonConventions();
 builder.Services.AddApiConventions();
+builder.Services.AddBrowserSecurity(builder.Configuration, builder.Environment);
 builder.Services.AddRazorPages(); // ✅ needed for Identity UI
 
 var app = builder.Build();
@@ -97,6 +99,7 @@ using (var scope = app.Services.CreateScope())
 // -----------------
 // Middleware pipeline
 // -----------------
+app.UseBrowserSecurityHeaders();
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
@@ -109,6 +112,7 @@ app.UseStaticFiles();
 app.UseRouting();
 app.UseApiProblemDetails();
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 
 // -----------------

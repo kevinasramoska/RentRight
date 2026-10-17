@@ -376,6 +376,9 @@ Implementation checkpoint (2026-08-11): the focused core-domain request is imple
 
 ### P08-02 — Add external OpenID Connect and secure the browser API boundary
 
+- **Scope decision:** External OIDC/provider selection, account linking and callback tests are deferred by user choice. Keep the existing local Identity login; no paid/free provider registration is required to continue the portfolio work.
+- **Implementation status:** Browser-security portion implemented and verified: 499 fast backend tests, 53 frontend tests and 68 focused real-SQL account/property-pipeline tests passed; Release build clean and no EF model drift. Secure antiforgery cookies, same-origin client path checks, baseline headers, per-IP account/per-user write rate limits and opt-in encrypted external key-ring configuration. No schema/package change or production key-store provisioning. Original OIDC acceptance criteria are not complete. See [BROWSER_SECURITY.md](BROWSER_SECURITY.md).
+
 - **Why it matters:** External sign-in demonstrates standards-based federation, while React plus cookie authentication requires an explicit CSRF, CORS, redirect, and data-protection design.
 - **Files/components likely affected:** authentication registration/options in `Program.cs`, external-login Identity UI customization, configuration/options classes, secret documentation, antiforgery token endpoint/header handling, React API client, security-header/rate-limit middleware, tests.
 - **Implementation steps:**
