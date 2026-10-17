@@ -153,7 +153,7 @@ From the project directory, configure local secrets without committing them:
 ```bash
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Server=localhost,1433;Database=RentRightDB;User Id=sa;Password=<password>;TrustServerCertificate=True;MultipleActiveResultSets=True;"
 dotnet user-secrets set "SeedAdmin:Email" "admin@example.test"
-dotnet user-secrets set "SeedAdmin:Password" "use-a-strong-local-password"
+dotnet user-secrets set "SeedAdmin:Password" "<your-unique-password-meeting-the-rules-below>"
 ```
 
 Replace the password example with a unique secret of at least 12 characters,
@@ -474,7 +474,9 @@ Development registration atomically assigns Tenant only. Production/Staging
 self-registration is closed until real onboarding exists; existing provisioned
 accounts can still sign in. No working confirmation/recovery email service is
 claimed. Self-service account deletion is blocked to protect history/admin access.
-Role mutations require a password verified within 10 minutes and are serialized
-in SQL, preserving a usable local Admin and committing role/stamp changes together.
+Sensitive account actions and role mutations require a password verified within
+10 minutes. Role mutations are serialized in SQL, preserving a usable local Admin
+and committing role/stamp changes together. Legitimate self-service stamp changes
+refresh only the current session without extending those security times.
 See [Authorization](docs/AUTHORIZATION.md) for policies, operational limits,
 verification and every changed file. OIDC/browser-boundary work remains P08-02.

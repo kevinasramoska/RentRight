@@ -355,7 +355,7 @@ Implementation checkpoint (2026-08-11): the focused core-domain request is imple
 
 ### P08-01 — Centralize resource authorization and harden Identity/account rules
 
-- **Implementation status:** Implementation in place; final SQL regression verification in progress — named policies, Identity/cookie/session hardening, tenant-only development onboarding, closed production self-registration, recent-password role changes and serialized usable-last-admin protection. No schema/package change. See [AUTHORIZATION.md](AUTHORIZATION.md) for verification and operational boundaries; P08-02 remains separate.
+- **Implementation status:** Implemented and verified — named policies, Identity/cookie/session hardening, tenant-only development onboarding, closed production self-registration/demo confirmation, recent-password account/role actions and serialized usable-last-admin protection. Release build clean; 459 fast and 45 frontend tests passed; SQL regression/focused runs cover 207 distinct passing cases with one opt-in benchmark skipped. No schema/package change. See [AUTHORIZATION.md](AUTHORIZATION.md) for exact run scopes and operational boundaries; P08-02 remains separate.
 
 - **Why it matters:** Role attributes alone cannot answer whether a landlord owns a property or a tenant participates in a tenancy. Identity defaults and scattered role strings also leave account onboarding and multi-role behavior ambiguous.
 - **Files/components likely affected:** new `Authorization/*` requirements/handlers, role/policy constants, services/controllers/views, `Program.cs` Identity/cookie options, registration/onboarding customization if needed, admin role service, integration tests.

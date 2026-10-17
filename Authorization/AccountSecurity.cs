@@ -1,10 +1,13 @@
 using System.Globalization;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.EntityFrameworkCore;
 using RentRight.Models;
 
 namespace RentRight.Authorization;
@@ -32,6 +35,15 @@ public static class AccountSecurity
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<IAccountSessionValidator, AccountSessionValidator>();
         services.AddScoped<RecentAuthenticationFilter>();
+        services.AddScoped<AccountSessionRefreshFilter>();
+        services.Configure<RazorPagesOptions>(options =>
+        {
+            options.Conventions.AddAreaFolderApplicationModelConvention("Identity", "/Account/Manage", model =>
+            {
+                model.Filters.Add(new ServiceFilterAttribute(typeof(RecentAuthenticationFilter)));
+                model.Filters.Add(new ServiceFilterAttribute(typeof(AccountSessionRefreshFilter)));
+            });
+        });
         services.Configure<IdentityOptions>(options =>
         {
             options.Password.RequiredLength = 12;
@@ -99,12 +111,45 @@ public sealed class RecentAuthenticationFilter(TimeProvider time) : IAsyncAuthor
 {
     public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
     {
+        if (context.ActionDescriptor is PageActionDescriptor page)
+        {
+            // Basic authenticated account navigation stays usable; self-deletion always
+            // reaches the explicit denial handler. Everything else defaults to step-up.
+            if (page.ViewEnginePath == "/Account/Manage/DeletePersonalData") return;
+            if ((HttpMethods.IsGet(context.HttpContext.Request.Method) || HttpMethods.IsHead(context.HttpContext.Request.Method)) &&
+                page.ViewEnginePath is "/Account/Manage/Index" or "/Account/Manage/PersonalData" or "/Account/Manage/TwoFactorAuthentication")
+                return;
+        }
         var authentication = await context.HttpContext.AuthenticateAsync(IdentityConstants.ApplicationScheme);
         if (authentication.Succeeded && authentication.Properties is not null &&
             AccountSecurity.IsWithin(authentication.Properties, AccountSecurity.PasswordVerified,
                 time.GetUtcNow(), AccountSecurity.RecentAuthenticationAge)) return;
 
         // Never replay a sensitive POST automatically after reauthentication.
-        context.Result = new RedirectToPageResult("/Account/Reauthenticate", new { area = "Identity", returnUrl = "/Admin" });
+        var returnUrl = context.ActionDescriptor is PageActionDescriptor ? "/Identity/Account/Manage" : "/Admin";
+        context.Result = new RedirectToPageResult("/Account/Reauthenticate", new { area = "Identity", returnUrl });
+    }
+}
+
+// Some framework account handlers rotate the stamp without refreshing the current
+// cookie (including initial authenticator-key creation). Preserve that legitimate
+// recent-password journey without accepting an externally changed/unpersisted stamp.
+public sealed class AccountSessionRefreshFilter(UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signIn) : IAsyncPageFilter
+{
+    public Task OnPageHandlerSelectionAsync(PageHandlerSelectedContext context) => Task.CompletedTask;
+
+    public async Task OnPageHandlerExecutionAsync(PageHandlerExecutingContext context, PageHandlerExecutionDelegate next)
+    {
+        var user = await users.GetUserAsync(context.HttpContext.User);
+        var originalStamp = user?.SecurityStamp;
+        var executed = await next();
+        if (executed.Exception is not null || executed.Canceled || user is null || user.SecurityStamp == originalStamp ||
+            context.HttpContext.User.FindFirstValue(users.Options.ClaimsIdentity.SecurityStampClaimType) == user.SecurityStamp)
+            return;
+
+        var persistedStamp = await users.Users.AsNoTracking().Where(item => item.Id == user.Id)
+            .Select(item => item.SecurityStamp).SingleOrDefaultAsync(context.HttpContext.RequestAborted);
+        if (persistedStamp == user.SecurityStamp)
+            await signIn.RefreshSignInAsync(user);
     }
 }

@@ -373,6 +373,64 @@ public sealed class AccountSecuritySqlTests : IClassFixture<SqlServerFixture>, I
     }
 
     [Theory]
+    [InlineData(Actor.Tenant)]
+    [InlineData(Actor.Admin)]
+    public async Task Account_SensitiveIdentityPages_RequireRecentPasswordWithoutExposingOrCreatingKeys(Actor actor)
+    {
+        using var client = await _app.CreateActorClientAsync(actor);
+        await SqlApplication.AddAntiforgeryAsync(client);
+        _clock.Advance(TimeSpan.FromMinutes(11));
+        foreach (var overview in new[] { "", "/PersonalData", "/TwoFactorAuthentication", "/DeletePersonalData" })
+        {
+            using var navigation = await client.GetAsync("/Identity/Account/Manage" + overview);
+            Assert.Equal(HttpStatusCode.OK, navigation.StatusCode);
+        }
+        foreach (var page in new[] { "ChangePassword", "SetPassword", "Email", "ExternalLogins", "EnableAuthenticator",
+            "ResetAuthenticator", "Disable2fa", "GenerateRecoveryCodes", "ShowRecoveryCodes" })
+        {
+            using var response = await client.GetAsync("/Identity/Account/Manage/" + page);
+            Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+            Assert.StartsWith(Reauthenticate, response.Headers.Location!.OriginalString);
+            Assert.Contains("returnUrl=%2FIdentity%2FAccount%2FManage", response.Headers.Location.OriginalString, StringComparison.OrdinalIgnoreCase);
+        }
+        using var download = await client.PostAsync("/Identity/Account/Manage/DownloadPersonalData", new FormUrlEncodedContent(new Dictionary<string, string>()));
+        Assert.Equal(HttpStatusCode.Redirect, download.StatusCode);
+        Assert.StartsWith(Reauthenticate, download.Headers.Location!.OriginalString);
+        using var profileChange = await client.PostAsync("/Identity/Account/Manage", new FormUrlEncodedContent(new Dictionary<string, string>
+        { ["Input.PhoneNumber"] = "+353000000000" }));
+        Assert.Equal(HttpStatusCode.Redirect, profileChange.StatusCode);
+        Assert.StartsWith(Reauthenticate, profileChange.Headers.Location!.OriginalString);
+        await UsersAsync(async users =>
+        {
+            var user = (await users.FindByIdAsync(actor.ToString()))!;
+            Assert.Null(await users.GetAuthenticatorKeyAsync(user));
+            Assert.Equal(0, await users.CountRecoveryCodesAsync(user));
+            Assert.Null(user.PhoneNumber);
+        });
+    }
+
+    [Fact]
+    public async Task Account_FreshPassword_AllowsAuthenticatorSetupAndProtectedPersonalDataDownload()
+    {
+        using var client = await _app.CreateActorClientAsync(Actor.Tenant);
+        using var otherSession = await _app.CreateActorClientAsync(Actor.Tenant);
+        await SqlApplication.AddAntiforgeryAsync(client);
+        _clock.Advance(TimeSpan.FromMinutes(5));
+        using var setup = await client.GetAsync("/Identity/Account/Manage/EnableAuthenticator");
+        Assert.Equal(HttpStatusCode.OK, setup.StatusCode);
+        await UsersAsync(async users => Assert.NotNull(await users.GetAuthenticatorKeyAsync((await users.FindByIdAsync("Tenant"))!)));
+        using var revoked = await otherSession.GetAsync("/api/v1/tenancies");
+        Assert.Equal(HttpStatusCode.Unauthorized, revoked.StatusCode);
+        using var download = await client.PostAsync("/Identity/Account/Manage/DownloadPersonalData", new FormUrlEncodedContent(new Dictionary<string, string>()));
+        Assert.Equal(HttpStatusCode.OK, download.StatusCode);
+        Assert.Equal("attachment", download.Content.Headers.ContentDisposition?.DispositionType);
+        _clock.Advance(TimeSpan.FromMinutes(6));
+        using var noManufacturedRecency = await client.GetAsync("/Identity/Account/Manage/ChangePassword");
+        Assert.Equal(HttpStatusCode.Redirect, noManufacturedRecency.StatusCode);
+        Assert.StartsWith(Reauthenticate, noManufacturedRecency.Headers.Location!.OriginalString);
+    }
+
+    [Theory]
     [InlineData("Testing")]
     [InlineData("Production")]
     public async Task RegisterConfirmation_NoEmailSender_CannotExposeConfirmationTokenOrUserExistence(string environment)

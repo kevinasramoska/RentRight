@@ -4,7 +4,7 @@
     ViewData["Title"] = "Verify your password";
 }
 <h1>Verify your password</h1>
-<p>Administrator role changes require password verification within the last 10 minutes. After verification, review and submit the change again.</p>
+<p>Sensitive account and role changes require password verification within the last 10 minutes. After verification, review and submit the action again.</p>
 <form method="post" asp-route-returnUrl="@Model.ReturnUrl">
     <div asp-validation-summary="All" class="text-danger" role="alert"></div>
     <label asp-for="Password"></label>

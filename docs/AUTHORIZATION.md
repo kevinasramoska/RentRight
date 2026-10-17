@@ -1,7 +1,6 @@
 # P08-01 — authorization and account security
 
-Extends the policy foundation on merged P07-02. Implementation is in place; final
-SQL regression verification is in progress. P08-02 (OIDC, headers, rate limiting
+Implemented and verified on merged P07-02. P08-02 (OIDC, headers, rate limiting
 and durable data-protection deployment configuration) remains separate. No package,
 schema, migration, API DTO or rental-domain rule changes were needed. No developer/
 shared database was used or migrated.
@@ -126,6 +125,18 @@ only local redirects. Success returns to Admin to review and resubmit; it never
 automatically replays a sensitive POST. MFA login paths without recent-password
 metadata also require this step; it does not replace MFA at initial sign-in.
 
+The same filter defaults the whole account-management folder to recent-password
+verification, covering password/email/external-login, authenticator/recovery-code,
+profile writes and personal-data downloads, including GET paths that expose/create
+a secret. Only basic authenticated profile/personal-data/2FA-overview GET/HEAD
+navigation is exempt; self-delete always reaches its explicit denial handler.
+The fixed return destination is the account hub rather than Admin. No pending
+account action or export is automatically replayed.
+Framework self-service handlers that successfully rotate their own user's stamp
+refresh only the current session, after a persisted-stamp check, preserving the
+original session/recent-password times. Other cookies remain revoked. This also
+keeps initial authenticator setup usable with per-request stamp validation.
+
 Supported role mutations acquire a database-scoped, transaction-owned exclusive
 `sp_getapplock` before reading user/role state, inside the serializable transaction.
 The actor must still be a persisted, unlocked, password-capable Admin after
@@ -152,12 +163,27 @@ schema object or application-specific SQL grant is added. See [SQL application l
 
 ## Verification
 
-Release solution build: zero warnings/errors. **459 fast .NET tests**, **45 frontend
-tests**, frontend lint/type-check/build passed, and EF reports no pending changes.
-The focused account-security SQL run passed **25 checks** including the existing
-last-admin regression; the additional **seven** role/locked-owner actor checks
-passed. The complete SQL regression suite is running; final evidence will be
-recorded before marking P08-01 complete. No shared/developer DB was used/migrated.
+Final local verification (2026-10-17): Release solution build passed with zero
+warnings/errors; **459 fast .NET tests**, **45 frontend tests**, frontend lint/
+type-check/build passed, and EF reports no pending model changes.
+
+| SQL verification | Result |
+| --- | --- |
+| Complete SQL regression run before the final account-page refinements | **202 passed, 0 failed, 1 skipped**, 20m23s. The skip is the existing opt-in performance benchmark. |
+| Final runtime: all account-security tests and existing HTTP/SQL pipeline | **68 passed, 0 failed, 0 skipped**, 7m05s. Includes the five new confirmation/account-page cases added after the complete regression run. |
+| Final strengthened navigation/session-time assertions | **3 passed, 0 failed**, 12s. Basic account pages remain accessible; profile/secret actions require step-up; setup at minute five does not extend password recency past minute ten. |
+
+There are **207 distinct passing SQL test cases across these runs**, deduplicated
+by TRX test ID (two existing long SQL cases have the same truncated display name).
+This is not a claim that a single final invocation ran 207 cases. Ignored evidence:
+`artifacts/test-results/p08-01/p08-01-sql.trx`, `p08-01-final-security.trx` and
+`p08-01-final-account-pages.trx`. No shared/developer DB was used or migrated.
+
+A new authenticator journey initially returned a login redirect instead of the
+expected download response because upstream key initialization rotates the stamp.
+The current-session refresh fix passed the original assertion and stronger checks:
+the other session is revoked, original security times are preserved, and stale
+sessions cannot generate/display keys or change profile data.
 
 SQL tests use real password login, production account/cookie validation and
 disposable Testcontainers databases. Fast HTTP contract tests use protected
@@ -215,7 +241,7 @@ All changed files are listed below; generated frontend/build/TRX outputs remain 
 | `docs/ARCHITECTURE.md` | Implemented authorization/account boundaries; separate P08-02 scope. |
 | `docs/TASKS.md` | Accurate implementation/verification checkpoint. |
 | `docs/AUTHORIZATION.md` | Policies, operational limits, verification and file inventory. |
-| `Authorization/AccountSecurity.cs` | Identity/cookie configuration, session validation and protected recent-auth filter. |
+| `Authorization/AccountSecurity.cs` | Identity/cookie configuration, session validation, recent-auth guards and safe current-session refresh after account changes. |
 | `Controllers/Api/V1/LandlordMaintenanceRequestsController.cs` | Named manager triage audience. |
 | `Controllers/Api/V1/MaintenanceRequestsController.cs` | Named Tenant request audience. |
 | `Controllers/Api/V1/SessionController.cs` | Supported role constants in session projection. |
