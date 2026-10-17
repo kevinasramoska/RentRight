@@ -3,12 +3,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RentRight.Api;
+using RentRight.Authorization;
 using RentRight.Features.Dashboards;
 using RentRight.Features.Dashboards.Contracts;
 
 namespace RentRight.Controllers.Api.V1;
 
-[Authorize(Roles = "Tenant")]
+[Authorize(Policy = RentalPolicies.Tenant)]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public sealed class TenantDashboardController(ITenantDashboardQueryService service) : ApiV1ControllerBase
 {

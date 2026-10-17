@@ -19,7 +19,7 @@ public sealed class RentalAuthorizationTests
     [InlineData(true, "tenant", "Admin,Landlord,Tenant", true, true, true)]
     [InlineData(true, "tenant", "Landlord,Tenant", false, true, false)]
     [InlineData(true, "owner", "Landlord,Tenant", true, true, false)]
-    [InlineData(true, null, "Admin", false, false, true)]
+    [InlineData(true, null, "Admin", false, false, false)]
     [InlineData(true, " ", "Landlord", false, false, false)]
     [InlineData(true, "OWNER", "Landlord", false, false, false)]
     [InlineData(true, "owner", "landlord", false, false, false)]
@@ -103,6 +103,32 @@ public sealed class RentalAuthorizationTests
     }
 
     private static ServiceProvider Services() => new ServiceCollection().AddLogging().AddRentalAuthorization().BuildServiceProvider();
+
+    [Theory]
+    [InlineData(RentalPolicies.Manager)]
+    [InlineData(RentalPolicies.Landlord)]
+    [InlineData(RentalPolicies.Tenant)]
+    [InlineData(RentalPolicies.Participant)]
+    [InlineData(RentalPolicies.AdministerRoles)]
+    public async Task Authorize_AudienceWithoutUserIdentifier_FailsClosed(string policy)
+    {
+        using var services = Services();
+        var authorization = services.GetRequiredService<IAuthorizationService>();
+        foreach (var id in new string?[] { null, "", " " })
+            Assert.False((await authorization.AuthorizeAsync(User(true, id, "Admin,Landlord,Tenant"), null, policy)).Succeeded);
+    }
+
+    [Theory]
+    [InlineData("Admin", false)]
+    [InlineData("Landlord", true)]
+    [InlineData("Tenant", false)]
+    [InlineData("Admin,Landlord,Tenant", true)]
+    public async Task Authorize_LandlordDashboard_PreservesDedicatedRoleRequirement(string roles, bool expected)
+    {
+        using var services = Services();
+        Assert.Equal(expected, (await services.GetRequiredService<IAuthorizationService>()
+            .AuthorizeAsync(User(true, "user", roles), null, RentalPolicies.Landlord)).Succeeded);
+    }
 
     private static ClaimsPrincipal User(bool authenticated, string? userId, string roles)
     {

@@ -1,17 +1,18 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using RentRight.Authorization;
 using RentRight.Features.Tenancies;
 using RentRight.Features.Tenancies.Contracts;
 using RentRight.ViewModels;
 
 namespace RentRight.Controllers;
 
-[Authorize(Roles = "Admin,Landlord,Tenant")]
+[Authorize(Policy = RentalPolicies.Participant)]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public class TenanciesController(ITenancyService tenancyService) : Controller
 {
-    [Authorize(Roles = "Admin,Landlord")]
+    [Authorize(Policy = RentalPolicies.Manager)]
     public async Task<IActionResult> Index(CancellationToken cancellationToken)
     {
         var outcome = await tenancyService.ListForAdministrationAsync(cancellationToken);
@@ -30,7 +31,7 @@ public class TenanciesController(ITenancyService tenancyService) : Controller
         };
     }
 
-    [Authorize(Roles = "Admin,Landlord")]
+    [Authorize(Policy = RentalPolicies.Manager)]
     public async Task<IActionResult> Create(CancellationToken cancellationToken)
     {
         var outcome = await tenancyService.GetCreateFormAsync(cancellationToken);
@@ -45,7 +46,7 @@ public class TenanciesController(ITenancyService tenancyService) : Controller
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin,Landlord")]
+    [Authorize(Policy = RentalPolicies.Manager)]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(
         TenancyCreateViewModel model,
@@ -91,7 +92,7 @@ public class TenanciesController(ITenancyService tenancyService) : Controller
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin,Landlord")]
+    [Authorize(Policy = RentalPolicies.Manager)]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> End(int id, CancellationToken cancellationToken, string? expectedVersion = null)
     {
@@ -122,11 +123,11 @@ public class TenanciesController(ITenancyService tenancyService) : Controller
         }
     }
 
-    [Authorize(Roles = "Tenant")]
+    [Authorize(Policy = RentalPolicies.Tenant)]
     public IActionResult Accept() => View(new TenancyAcceptViewModel());
 
     [HttpPost]
-    [Authorize(Roles = "Tenant")]
+    [Authorize(Policy = RentalPolicies.Tenant)]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Accept(TenancyAcceptViewModel model, CancellationToken cancellationToken)
     {

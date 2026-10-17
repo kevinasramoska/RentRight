@@ -1,4 +1,5 @@
 using RentRight.Application.Abstractions;
+using RentRight.Authorization;
 using RentRight.Features.Dashboards.Contracts;
 
 namespace RentRight.Features.Dashboards;
@@ -12,17 +13,17 @@ public sealed class DashboardRouteService(ICurrentUser currentUser) : IDashboard
             return DashboardRouteOutcome.Unauthenticated();
         }
 
-        if (currentUser.IsInRole("Admin"))
+        if (currentUser.IsInRole(AppRoles.Admin))
         {
             return DashboardRouteOutcome.Success(DashboardDestination.Admin);
         }
 
-        if (currentUser.IsInRole("Landlord"))
+        if (currentUser.IsInRole(AppRoles.Landlord))
         {
             return DashboardRouteOutcome.Success(DashboardDestination.Landlord);
         }
 
-        return currentUser.IsInRole("Tenant")
+        return currentUser.IsInRole(AppRoles.Tenant)
             ? DashboardRouteOutcome.Success(DashboardDestination.Tenant)
             : DashboardRouteOutcome.Success(DashboardDestination.Generic);
     }
@@ -40,7 +41,7 @@ public sealed class AdminDashboardQueryService(
             return AdminDashboardOutcome.Unauthenticated();
         }
 
-        if (!currentUser.IsInRole("Admin"))
+        if (!currentUser.IsInRole(AppRoles.Admin))
         {
             return AdminDashboardOutcome.Forbidden();
         }
@@ -64,7 +65,7 @@ public sealed class LandlordDashboardQueryService(
             return LandlordDashboardOutcome.Unauthenticated();
         }
 
-        if (!currentUser.IsInRole("Landlord"))
+        if (!currentUser.IsInRole(AppRoles.Landlord))
         {
             return LandlordDashboardOutcome.Forbidden();
         }
@@ -93,7 +94,7 @@ public sealed class TenantDashboardQueryService(
             return TenantDashboardOutcome.Unauthenticated();
         }
 
-        if (!currentUser.IsInRole("Tenant"))
+        if (!currentUser.IsInRole(AppRoles.Tenant))
         {
             return TenantDashboardOutcome.Forbidden();
         }

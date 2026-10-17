@@ -30,6 +30,7 @@ namespace RentRight.Controllers
 
         // POST: /Admin/UpdateRoles
         [HttpPost]
+        [ServiceFilter(typeof(RecentAuthenticationFilter))]
         public async Task<IActionResult> UpdateRoles(
             string userId,
             List<string>? selectedRoles,

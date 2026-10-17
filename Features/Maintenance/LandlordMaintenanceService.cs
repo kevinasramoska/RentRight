@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
 using RentRight.Application.Abstractions;
+using RentRight.Authorization;
 using RentRight.Data;
 using RentRight.Models;
 
@@ -33,7 +34,7 @@ public interface ILandlordMaintenanceService
 public sealed class LandlordMaintenanceService(ApplicationDbContext db, ICurrentUser user) : ILandlordMaintenanceService
 {
     private IQueryable<MaintenanceRequest> Visible() => db.MaintenanceRequests.AsNoTracking()
-        .Where(r => user.IsInRole("Admin") || r.Tenancy!.Property!.LandlordId == user.UserId);
+        .Where(r => user.IsInRole(AppRoles.Admin) || r.Tenancy!.Property!.LandlordId == user.UserId);
 
     private static IQueryable<MaintenanceQueueItem> Project(IQueryable<MaintenanceRequest> query) => query.Select(r =>
         new MaintenanceQueueItem(r.Id, r.Tenancy!.PropertyId, r.Tenancy.Property!.Title,
@@ -92,7 +93,7 @@ public sealed class LandlordMaintenanceService(ApplicationDbContext db, ICurrent
     private async Task<TenantMaintenanceResult<T>> ExecuteAsync<T>(Func<Task<TenantMaintenanceResult<T>>> action)
     {
         if (!user.IsAuthenticated || string.IsNullOrWhiteSpace(user.UserId)) return new(TenantMaintenanceStatus.Unauthenticated);
-        if (!user.IsInRole("Admin") && !user.IsInRole("Landlord")) return new(TenantMaintenanceStatus.Forbidden);
+        if (!user.IsInRole(AppRoles.Admin) && !user.IsInRole(AppRoles.Landlord)) return new(TenantMaintenanceStatus.Forbidden);
         try { return await action(); }
         catch (Exception exception) when (exception is DbException or DbUpdateException or TimeoutException
             || exception is InvalidOperationException { InnerException: DbException or TimeoutException })

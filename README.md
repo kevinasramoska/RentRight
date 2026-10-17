@@ -22,7 +22,7 @@ The application uses ASP.NET Core Identity for authentication and role managemen
 
 - Public home page with latest property listings
 - Public property list and property details pages
-- Authentication with built-in Identity UI
+- Authentication with Identity UI and focused account-security overrides
 - Automatic seeding of roles: `Admin`, `Landlord`, `Tenant`
 - Automatic seeding of a default admin user on startup
 - Admin dashboard with total user and property counts
@@ -156,6 +156,10 @@ dotnet user-secrets set "SeedAdmin:Email" "admin@example.test"
 dotnet user-secrets set "SeedAdmin:Password" "use-a-strong-local-password"
 ```
 
+Replace the password example with a unique secret of at least 12 characters,
+including uppercase/lowercase, a digit and a symbol (at least four distinct
+characters). Do not commit it.
+
 ## Getting Started
 
 1. Restore dependencies:
@@ -182,6 +186,8 @@ By default, local launch settings use:
 
 - `https://localhost:7216`
 - `http://localhost:5022`
+
+Use the HTTPS address for sign-in; application cookies are Secure Always.
 
 When running in Development, the generated API contract is available at
 `/openapi/v1.json`. The property REST resource is available at `/api/v1/properties`;
@@ -241,7 +247,7 @@ property forms post to `/Properties/Create` and retain antiforgery protection.
 ## Repository notes
 
 - Generated `bin/`, `obj/`, IDE files, and local secrets are intentionally excluded from Git
-- The app uses default Identity UI routes such as `/Identity/Account/Login`
+- The app preserves Identity routes such as `/Identity/Account/Login`, with local login/registration/reauthentication/retention overrides
 - Some UI and controller files suggest work in progress, so the `README` intentionally documents only behaviour visible in the current code
 
 ## Tenancy invitations (P05-01)
@@ -455,12 +461,20 @@ There is no automated purge, invented retention period, archive UI or anonymizat
 job. See [the concurrency, retention and migration report](docs/CONCURRENCY_RETENTION.md)
 for contracts, deployment/rollback limits, changed files and verification evidence.
 
-## Authorization foundation (P08-01, in progress)
+## Authorization and account security (P08-01)
 
-Property MVC/API, MVC maintenance and Admin endpoints now use named audience
-policies. Property/maintenance resource decisions share tested ownership and
-Admin-override rules with the registered resource-policy handler; database scopes,
-conditional writes and antiforgery remain authoritative. This is only the first
-P08-01 slice: Identity/cookie/onboarding hardening and concurrent usable-last-admin
-protection are not complete. See [Authorization](docs/AUTHORIZATION.md) for the
-policy matrix, changed files, verification and remaining work.
+Named policies protect role-specific MVC/API endpoints, with shared resource
+decisions and existing database ownership/current-tenancy scoping. Sessions validate
+persisted account state and security stamps on every request; role changes revoke
+the target's previous cookies. Cookies are Secure/HttpOnly/SameSite=Lax, with
+30-minute sliding idle expiry and an eight-hour absolute cap. Five failed password
+attempts lock an account for 15 minutes. Rollout requires existing users to sign in again.
+
+Development registration atomically assigns Tenant only. Production/Staging
+self-registration is closed until real onboarding exists; existing provisioned
+accounts can still sign in. No working confirmation/recovery email service is
+claimed. Self-service account deletion is blocked to protect history/admin access.
+Role mutations require a password verified within 10 minutes and are serialized
+in SQL, preserving a usable local Admin and committing role/stamp changes together.
+See [Authorization](docs/AUTHORIZATION.md) for policies, operational limits,
+verification and every changed file. OIDC/browser-boundary work remains P08-02.

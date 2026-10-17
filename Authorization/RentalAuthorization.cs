@@ -9,6 +9,7 @@ public static class RentalPolicies
 {
     // Endpoint audience policies are deliberately separate from resource policies.
     public const string Manager = "Rental.Manager";
+    public const string Landlord = "Rental.Landlord";
     public const string Tenant = "Rental.Tenant";
     public const string Participant = "Rental.Participant";
     public const string AdministerRoles = "Rental.AdministerRoles";
@@ -27,16 +28,19 @@ public static class RentalAuthorization
     {
         services.AddAuthorization(options =>
         {
-            options.AddPolicy(RentalPolicies.Manager, policy => policy.RequireAuthenticatedUser()
-                .RequireRole(AppRoles.Admin, AppRoles.Landlord));
-            options.AddPolicy(RentalPolicies.Tenant, policy => policy.RequireAuthenticatedUser().RequireRole(AppRoles.Tenant));
-            options.AddPolicy(RentalPolicies.Participant, policy => policy.RequireAuthenticatedUser()
-                .RequireRole(AppRoles.Admin, AppRoles.Landlord, AppRoles.Tenant));
-            options.AddPolicy(RentalPolicies.AdministerRoles, policy => policy.RequireAuthenticatedUser().RequireRole(AppRoles.Admin));
+            AddAudience(RentalPolicies.Manager, AppRoles.Admin, AppRoles.Landlord);
+            AddAudience(RentalPolicies.Landlord, AppRoles.Landlord);
+            AddAudience(RentalPolicies.Tenant, AppRoles.Tenant);
+            AddAudience(RentalPolicies.Participant, AppRoles.Admin, AppRoles.Landlord, AppRoles.Tenant);
+            AddAudience(RentalPolicies.AdministerRoles, AppRoles.Admin);
             AddResourcePolicy(RentalPolicies.ManageProperty, RentalOperation.ManageProperty);
             AddResourcePolicy(RentalPolicies.ParticipateInTenancy, RentalOperation.ReadTenancy);
             AddResourcePolicy(RentalPolicies.ReadMaintenance, RentalOperation.ReadMaintenance);
             AddResourcePolicy(RentalPolicies.TransitionMaintenance, RentalOperation.TransitionMaintenance);
+
+            void AddAudience(string name, params string[] roles) => options.AddPolicy(name, policy => policy
+                .RequireAuthenticatedUser().RequireRole(roles)
+                .RequireAssertion(context => !string.IsNullOrWhiteSpace(context.User.FindFirstValue(ClaimTypes.NameIdentifier))));
 
             void AddResourcePolicy(string name, RentalOperation operation) =>
                 options.AddPolicy(name, policy => policy.RequireAuthenticatedUser()

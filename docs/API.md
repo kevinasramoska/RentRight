@@ -76,7 +76,7 @@ is the support/correlation handle. A controller must deliberately choose conceal
 
 ## Identity cookie and antiforgery behavior
 
-The planned React client is hosted on the same origin and uses the existing ASP.NET
+The React client is hosted on the same origin and uses the existing ASP.NET
 Core Identity application cookie with `credentials: "include"`. The API does not issue
 or accept a custom JWT.
 
@@ -85,10 +85,20 @@ to Identity HTML pages. Existing MVC routes retain their login/access-denied red
 
 The existing global `AutoValidateAntiforgeryToken` filter protects unsafe methods
 (`POST`, `PUT`, `PATCH`, and `DELETE`). A browser client must obtain a server-generated
-request token from a future authenticated host bootstrap/token endpoint and send it in
+request token from `GET /api/v1/session/antiforgery` and send it in
 the `X-CSRF-TOKEN` header while also including the Identity cookie. The antiforgery
-cookie alone is insufficient. P03-01 configures and tests this header contract but does
-not add a token endpoint or weaken validation for API actions.
+cookie alone is insufficient. The endpoint is no-store and issues a request token
+for the current session (including anonymous bootstrap); it does not weaken write
+authorization or antiforgery validation.
+
+P08-01 cookies are Secure/HttpOnly/SameSite=Lax, with a 30-minute sliding idle
+lifetime and an eight-hour absolute cap. Every authenticated request validates the
+persisted security stamp/account/lockout state. A role change invalidates previous
+cookies; the next protected API request returns 401 and requires a new sign-in.
+Expired/disabled sessions do not receive HTML login redirects. Rollout logs out
+older cookies that lack the protected original-session timestamp. Public resource
+DTOs and all existing version/revision preconditions remain unchanged. See
+[AUTHORIZATION.md](AUTHORIZATION.md) for the account and role-administration boundary.
 
 OpenAPI describes the Identity application cookie as the `IdentityCookie` cookie
 security scheme and marks operations carrying authorization metadata. Authorization

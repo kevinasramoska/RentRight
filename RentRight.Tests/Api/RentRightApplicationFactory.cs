@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using RentRight.Authorization;
 
 namespace RentRight.Tests.Api;
 
@@ -19,6 +21,10 @@ public sealed class RentRightApplicationFactory(
         builder.UseSetting("SeedAdmin:Password", string.Empty);
         builder.ConfigureServices(services =>
         {
+            // These HTTP contract tests use protected synthetic cookies, not persisted accounts.
+            // Real login, stamp/lockout and revocation checks run unchanged in the SQL suite.
+            services.RemoveAll<IAccountSessionValidator>();
+            services.AddScoped<IAccountSessionValidator, SyntheticSessionValidator>();
             services.RemoveAll<IRoleStore<IdentityRole>>();
             services.AddSingleton<IRoleStore<IdentityRole>, InMemoryRoleStore>();
             services.AddControllers()
@@ -26,6 +32,11 @@ public sealed class RentRightApplicationFactory(
                     new AssemblyPart(typeof(ApiConventionProbeController).Assembly));
             configureServices?.Invoke(services);
         });
+    }
+
+    private sealed class SyntheticSessionValidator : IAccountSessionValidator
+    {
+        public Task ValidateAsync(CookieValidatePrincipalContext context) => Task.CompletedTask;
     }
 
     private sealed class InMemoryRoleStore : IRoleStore<IdentityRole>

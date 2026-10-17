@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using RentRight.Data;
+using RentRight.Authorization;
 using RentRight.Features.Administration.Contracts;
 using RentRight.Models;
 
@@ -85,7 +86,7 @@ public sealed class IdentityAdministrationRoleStore(
         CancellationToken cancellationToken) =>
         await roleManager.Roles
             .AsNoTracking()
-            .Where(role => role.Name != null)
+            .Where(role => role.Name == AppRoles.Admin || role.Name == AppRoles.Landlord || role.Name == AppRoles.Tenant)
             .OrderBy(role => role.Name)
             .Select(role => role.Name!)
             .ToListAsync(cancellationToken);
@@ -101,6 +102,9 @@ public sealed class IdentityAdministrationRoleStore(
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+        // Authentication may already have tracked this user before the role lock was acquired.
+        await dbContext.Entry(user).ReloadAsync(cancellationToken);
+        if (dbContext.Entry(user).State == EntityState.Detached) return null;
         _loadedUsers[user.Id] = user;
         var roles = await userManager.GetRolesAsync(user);
         cancellationToken.ThrowIfCancellationRequested();
@@ -108,7 +112,7 @@ public sealed class IdentityAdministrationRoleStore(
         return new AdministrationUserRoleState(
             user.Id,
             user.Email ?? user.UserName ?? user.Id,
-            roles.ToArray());
+            roles.ToArray(), user.PasswordHash is not null && !await userManager.IsLockedOutAsync(user));
     }
 
     public async Task<int> CountUsersInRoleAsync(
@@ -121,8 +125,31 @@ public sealed class IdentityAdministrationRoleStore(
             .Select(role => role.Id)
             .SingleAsync(cancellationToken);
 
-        return await dbContext.UserRoles
-            .CountAsync(userRole => userRole.RoleId == roleId, cancellationToken);
+        var now = DateTimeOffset.UtcNow;
+        return await (from userRole in dbContext.UserRoles
+            join user in dbContext.Users on userRole.UserId equals user.Id
+            where userRole.RoleId == roleId && user.PasswordHash != null &&
+                (!user.LockoutEnabled || user.LockoutEnd == null || user.LockoutEnd <= now)
+            select user.Id).CountAsync(cancellationToken);
+    }
+
+    public Task<bool> IsUsableAdministratorAsync(string userId, CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.UtcNow;
+        return (from assignment in dbContext.UserRoles
+            join role in dbContext.Roles on assignment.RoleId equals role.Id
+            join user in dbContext.Users on assignment.UserId equals user.Id
+            where user.Id == userId && role.NormalizedName == "ADMIN" && user.PasswordHash != null &&
+                (!user.LockoutEnabled || user.LockoutEnd == null || user.LockoutEnd <= now)
+            select user.Id).AnyAsync(cancellationToken);
+    }
+
+    public async Task<AdministrationIdentityOperation> UpdateSecurityStampAsync(string userId, CancellationToken cancellationToken)
+    {
+        var user = await GetLoadedUserAsync(userId, cancellationToken);
+        var result = await userManager.UpdateSecurityStampAsync(user);
+        cancellationToken.ThrowIfCancellationRequested();
+        return ToOperation(result);
     }
 
     public async Task<AdministrationIdentityOperation> AddToRolesAsync(
@@ -153,7 +180,23 @@ public sealed class IdentityAdministrationRoleStore(
         var transaction = await dbContext.Database.BeginTransactionAsync(
             IsolationLevel.Serializable,
             cancellationToken);
-        return new AdministrationRoleTransaction(transaction);
+        try
+        {
+            // Cross-process serialization before reading any role/user state avoids count/write
+            // deadlocks and ensures two different administrators cannot demote the final pair.
+            await dbContext.Database.ExecuteSqlRawAsync("""
+                DECLARE @result int;
+                EXEC @result = sys.sp_getapplock @Resource=N'RentRight.Identity.RoleAdministration',
+                    @LockMode='Exclusive', @LockOwner='Transaction', @LockTimeout=5000;
+                IF @result < 0 THROW 51006, 'Role administration is busy. Reload and retry.', 1;
+                """, cancellationToken);
+            return new AdministrationRoleTransaction(transaction, dbContext, _loadedUsers);
+        }
+        catch
+        {
+            await transaction.DisposeAsync();
+            throw;
+        }
     }
 
     private async Task<ApplicationUser> GetLoadedUserAsync(
@@ -178,15 +221,25 @@ public sealed class IdentityAdministrationRoleStore(
             : AdministrationIdentityOperation.Failure(
                 result.Errors.Select(error => error.Description).ToArray());
 
-    private sealed class AdministrationRoleTransaction(IDbContextTransaction transaction)
+    private sealed class AdministrationRoleTransaction(IDbContextTransaction transaction,
+        ApplicationDbContext context, Dictionary<string, ApplicationUser> loadedUsers)
         : IAdministrationRoleTransaction
     {
         public Task CommitAsync(CancellationToken cancellationToken) =>
             transaction.CommitAsync(cancellationToken);
 
-        public Task RollbackAsync(CancellationToken cancellationToken) =>
-            transaction.RollbackAsync(cancellationToken);
+        public async Task RollbackAsync(CancellationToken cancellationToken)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            context.ChangeTracker.Clear();
+            loadedUsers.Clear();
+        }
 
-        public ValueTask DisposeAsync() => transaction.DisposeAsync();
+        public async ValueTask DisposeAsync()
+        {
+            await transaction.DisposeAsync();
+            context.ChangeTracker.Clear();
+            loadedUsers.Clear();
+        }
     }
 }

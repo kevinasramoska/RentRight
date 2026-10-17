@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.SqlClient;
 using RentRight.Application.Abstractions;
+using RentRight.Authorization;
 using RentRight.Features.Administration.Contracts;
 
 namespace RentRight.Features.Administration;
@@ -8,7 +10,7 @@ public sealed class AdministrationService(
     IAdministrationRoleStore roleStore,
     ICurrentUser currentUser) : IAdministrationService
 {
-    private const string AdministratorRole = "Admin";
+    private const string AdministratorRole = AppRoles.Admin;
     private static readonly StringComparer RoleComparer = StringComparer.OrdinalIgnoreCase;
 
     public async Task<ListAdministrationUsersOutcome> ListUsersAsync(
@@ -41,11 +43,16 @@ public sealed class AdministrationService(
             return authorizationFailure;
         }
 
-        await using var transaction =
-            await roleStore.BeginSerializableTransactionAsync(cancellationToken);
-
         try
         {
+            await using var transaction = await roleStore.BeginSerializableTransactionAsync(cancellationToken);
+            // Cookie claims may have been revoked while this request waited for the lock.
+            if (string.IsNullOrWhiteSpace(currentUser.UserId) ||
+                !await roleStore.IsUsableAdministratorAsync(currentUser.UserId, cancellationToken))
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return UpdateUserRolesOutcome.Forbidden();
+            }
             var user = await roleStore.GetUserRoleStateAsync(command.UserId, cancellationToken);
             if (user is null)
             {
@@ -54,8 +61,10 @@ public sealed class AdministrationService(
             }
 
             var storedRoles = await roleStore.GetStoredRoleNamesAsync(cancellationToken);
-            var canonicalRoles = storedRoles.ToDictionary(role => role, RoleComparer);
+            var canonicalRoles = storedRoles.Where(role =>
+                role is AppRoles.Admin or AppRoles.Landlord or AppRoles.Tenant).ToDictionary(role => role, RoleComparer);
             var requestedRoles = command.SelectedRoles
+                .Select(role => role ?? string.Empty)
                 .Distinct(RoleComparer)
                 .ToArray();
             var invalidRoles = requestedRoles
@@ -81,7 +90,7 @@ public sealed class AdministrationService(
                     storedAdministratorRole,
                     cancellationToken);
 
-                if (administratorCount <= 1)
+                if (administratorCount - (user.IsUsable ? 1 : 0) < 1)
                 {
                     await transaction.RollbackAsync(cancellationToken);
                     return UpdateUserRolesOutcome.LastAdministrator();
@@ -121,19 +130,27 @@ public sealed class AdministrationService(
                 }
             }
 
+            if (rolesToAdd.Length > 0 || rolesToRemove.Length > 0)
+            {
+                var stampResult = await roleStore.UpdateSecurityStampAsync(user.UserId, cancellationToken);
+                if (!stampResult.Succeeded)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    return UpdateUserRolesOutcome.IdentityFailure(stampResult.Errors);
+                }
+            }
             await transaction.CommitAsync(cancellationToken);
             return UpdateUserRolesOutcome.Success(user.Email);
         }
-        catch (DbUpdateException)
+        catch (Exception exception) when (exception is DbUpdateException or SqlException { Number: 1205 or 51006 })
         {
-            await transaction.RollbackAsync(cancellationToken);
             return UpdateUserRolesOutcome.ConcurrentUpdate();
         }
     }
 
     private ListAdministrationUsersOutcome? GetListAuthorizationFailure()
     {
-        if (!currentUser.IsAuthenticated)
+        if (!currentUser.IsAuthenticated || string.IsNullOrWhiteSpace(currentUser.UserId))
         {
             return ListAdministrationUsersOutcome.Unauthenticated();
         }
@@ -145,7 +162,7 @@ public sealed class AdministrationService(
 
     private UpdateUserRolesOutcome? GetUpdateAuthorizationFailure()
     {
-        if (!currentUser.IsAuthenticated)
+        if (!currentUser.IsAuthenticated || string.IsNullOrWhiteSpace(currentUser.UserId))
         {
             return UpdateUserRolesOutcome.Unauthenticated();
         }
