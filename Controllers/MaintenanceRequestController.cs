@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using RentRight.Authorization;
 using RentRight.Features.Maintenance;
 using RentRight.Features.Maintenance.Contracts;
 using RentRight.Models;
@@ -8,7 +9,7 @@ using RentRight.ViewModels;
 
 namespace RentRight.Controllers;
 
-[Authorize(Roles = "Tenant,Landlord,Admin")]
+[Authorize(Policy = RentalPolicies.Participant)]
 public class MaintenanceRequestController(
     IMaintenanceQueryService queryService,
     IMaintenanceCommandService commandService) : Controller
@@ -45,7 +46,7 @@ public class MaintenanceRequestController(
         };
     }
 
-    [Authorize(Roles = "Tenant")]
+    [Authorize(Policy = RentalPolicies.Tenant)]
     public async Task<IActionResult> Create(CancellationToken cancellationToken)
     {
         var outcome = await queryService.GetCreateFormAsync(cancellationToken);
@@ -54,7 +55,7 @@ public class MaintenanceRequestController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Roles = "Tenant")]
+    [Authorize(Policy = RentalPolicies.Tenant)]
     public async Task<IActionResult> Create(
         MaintenanceRequestCreateViewModel model,
         CancellationToken cancellationToken)
@@ -88,7 +89,7 @@ public class MaintenanceRequestController(
         }
     }
 
-    [Authorize(Roles = "Landlord,Admin")]
+    [Authorize(Policy = RentalPolicies.Manager)]
     public async Task<IActionResult> UpdateStatus(int id, CancellationToken cancellationToken)
     {
         var outcome = await queryService.GetStatusUpdateAsync(id, cancellationToken);
@@ -97,7 +98,7 @@ public class MaintenanceRequestController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Roles = "Landlord,Admin")]
+    [Authorize(Policy = RentalPolicies.Manager)]
     public async Task<IActionResult> UpdateStatus(
         int id,
         MaintenanceRequestStatusUpdateInputModel model,

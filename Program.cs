@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RentRight.Api;
 using RentRight.Application;
+using RentRight.Authorization;
 using RentRight.Data;
 using RentRight.Features.Administration;
 using RentRight.Features.Maintenance;
@@ -31,6 +32,7 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
 .AddDefaultUI(); // ✅ enables /Identity/Account/Login etc.
 
 builder.Services.AddApplicationFoundation();
+builder.Services.AddRentalAuthorization();
 builder.Services.AddAdministrationFeature();
 builder.Services.AddPropertiesFeature();
 builder.Services.AddTenanciesAndDashboardsFeature();
