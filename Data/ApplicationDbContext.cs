@@ -63,6 +63,10 @@ namespace RentRight.Data
                 entity.Property(property => property.Description).HasMaxLength(2000);
                 entity.Property(property => property.RentAmount).HasPrecision(18, 2);
 
+                // Public MVC/API ordering; measured plans and reads: docs/performance/QUERY_PERFORMANCE.md.
+                entity.HasIndex(property => new { property.Title, property.Address, property.Id })
+                    .IncludeProperties(property => new { property.RentAmount, property.Description, property.LandlordId });
+
                 entity.HasOne(property => property.Landlord)
                     .WithMany(user => user.PropertiesOwned)
                     .HasForeignKey(property => property.LandlordId)
@@ -147,7 +151,13 @@ namespace RentRight.Data
                     .HasForeignKey(request => request.TenancyId)
                     .OnDelete(DeleteBehavior.NoAction);
 
-                entity.HasIndex(request => new { request.TenancyId, request.DateSubmitted });
+                // Cover tenant dashboard status/count projections without per-request clustered lookups.
+                entity.HasIndex(request => new { request.TenancyId, request.DateSubmitted })
+                    .IncludeProperties(request => request.Status);
+                // Filtered landlord/Admin queues; preserve tenancy/property ownership joins.
+                entity.HasIndex(request => new { request.Status, request.DateSubmitted, request.Id })
+                    .IsDescending(false, true, true)
+                    .IncludeProperties(request => new { request.TenancyId, request.Priority, request.Revision });
 
                 entity.ToTable(table => table.HasCheckConstraint(
                     "CK_MaintenanceRequests_Status",

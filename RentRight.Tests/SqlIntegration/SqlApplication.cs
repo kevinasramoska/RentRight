@@ -7,6 +7,9 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using RentRight.Api;
@@ -24,10 +27,12 @@ public sealed class SqlApplication : WebApplicationFactory<Program>
 {
     public ConcurrentQueue<string> Logs { get; } = new();
     private readonly string _connectionString;
+    private readonly IInterceptor[] _interceptors;
     private readonly string _password = $"T!{Guid.NewGuid():N}a9";
 
-    public SqlApplication(string serverConnectionString)
+    public SqlApplication(string serverConnectionString, params IInterceptor[] interceptors)
     {
+        _interceptors = interceptors;
         _connectionString = new SqlConnectionStringBuilder(serverConnectionString)
         {
             InitialCatalog = $"RentRightTests_{Guid.NewGuid():N}",
@@ -36,7 +41,7 @@ public sealed class SqlApplication : WebApplicationFactory<Program>
     }
 
     public ApplicationDbContext CreateContext() => new(
-        new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlServer(_connectionString).Options);
+        new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlServer(_connectionString).AddInterceptors(_interceptors).Options);
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -47,15 +52,15 @@ public sealed class SqlApplication : WebApplicationFactory<Program>
         {
             services.AddLogging(logging => logging.AddProvider(new CaptureLogs(Logs)));
             services.RemoveAll<DbContextOptions<ApplicationDbContext>>();
-            services.AddDbContext<ApplicationDbContext>(options => options.UseSqlServer(_connectionString));
+            services.AddDbContext<ApplicationDbContext>(options => options.UseSqlServer(_connectionString).AddInterceptors(_interceptors));
         });
     }
 
-    public async Task InitializeAsync()
+    public async Task InitializeAsync(string? targetMigration = null)
     {
         await using (var context = CreateContext())
         {
-            await context.Database.MigrateAsync();
+            await context.GetService<IMigrator>().MigrateAsync(targetMigration);
         }
 
         // Starts the real host after migrations, allowing its normal role seeding.
