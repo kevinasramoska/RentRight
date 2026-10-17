@@ -144,7 +144,8 @@ public sealed class PropertyService(
                     Title = property.Value.Title,
                     Address = property.Value.Address,
                     RentAmount = property.Value.RentAmount,
-                    Description = property.Value.Description
+                    Description = property.Value.Description,
+                    ExpectedVersion = property.Value.Version
                 }),
             PropertyOperationStatus.Unauthenticated =>
                 PropertyQueryOutcome<PropertyEditInput>.Unauthenticated(),
@@ -174,15 +175,21 @@ public sealed class PropertyService(
             return validationFailure;
         }
 
+        if (!RentRight.Application.ExpectedVersion.TryParse(input.ExpectedVersion, out var version))
+            return PropertyMutationOutcome.ValidationFailed(new Dictionary<string, string[]>
+            { [nameof(input.ExpectedVersion)] = ["Reload the property and supply its version."] });
+        if (input.ExpectedVersion != property.Value!.Version) return PropertyMutationOutcome.Conflict();
+
         try
         {
             var updated = await propertyStore.UpdateAsync(
                 propertyId,
-                ToValues(input.Title, input.Address, input.RentAmount, input.Description),
+                ToValues(input.Title, input.Address, input.RentAmount, input.Description) with
+                { ExpectedVersion = version, ExpectedLandlordId = property.Value!.LandlordId },
                 cancellationToken);
             return updated
                 ? PropertyMutationOutcome.Success(propertyId)
-                : PropertyMutationOutcome.NotFound();
+                : PropertyMutationOutcome.Conflict();
         }
         catch (DbUpdateException)
         {
@@ -211,7 +218,7 @@ public sealed class PropertyService(
 
     public async Task<PropertyMutationOutcome> DeleteAsync(
         int propertyId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, string? expectedVersion = null)
     {
         var property = await FindAuthorizedAsync(propertyId, cancellationToken);
         var authorizationFailure = ToMutationFailure(property.Status);
@@ -220,7 +227,12 @@ public sealed class PropertyService(
             return authorizationFailure;
         }
 
-        var status = await propertyStore.DeleteAsync(propertyId, cancellationToken);
+        if (!RentRight.Application.ExpectedVersion.TryParse(expectedVersion, out var version))
+            return PropertyMutationOutcome.ValidationFailed(new Dictionary<string, string[]>
+            { ["ExpectedVersion"] = ["Reload the property and supply its version."] });
+        if (expectedVersion != property.Value!.Version) return PropertyMutationOutcome.Conflict();
+
+        var status = await propertyStore.DeleteAsync(propertyId, cancellationToken, version, property.Value.LandlordId);
         return status switch
         {
             PropertyDeleteStoreStatus.Deleted => PropertyMutationOutcome.Success(propertyId),
@@ -304,7 +316,8 @@ public sealed class PropertyService(
             property.Address,
             property.RentAmount,
             property.Description,
-            CanManage(property.LandlordId));
+            CanManage(property.LandlordId),
+            property.Version);
 
     private static PropertyValues ToValues(
         string title,

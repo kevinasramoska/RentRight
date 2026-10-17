@@ -93,9 +93,9 @@ public class TenanciesController(ITenancyService tenancyService) : Controller
     [HttpPost]
     [Authorize(Roles = "Admin,Landlord")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> End(int id, CancellationToken cancellationToken)
+    public async Task<IActionResult> End(int id, CancellationToken cancellationToken, string? expectedVersion = null)
     {
-        var outcome = await tenancyService.EndAsync(id, cancellationToken);
+        var outcome = await tenancyService.EndAsync(id, cancellationToken, expectedVersion);
 
         switch (outcome.Status)
         {
@@ -111,6 +111,8 @@ public class TenanciesController(ITenancyService tenancyService) : Controller
                 return Forbid();
             case EndTenancyStatus.NotFound:
                 return NotFound();
+            case EndTenancyStatus.InvalidVersion:
+                return BadRequest("Reload the tenancy and supply its version.");
             case EndTenancyStatus.Conflict:
                 TempData["Error"] =
                     "The tenancy changed before it could be ended. Reload and try again.";
@@ -168,6 +170,7 @@ public class TenanciesController(ITenancyService tenancyService) : Controller
             TenantEmail = tenancy.TenantEmail,
             StartDate = tenancy.StartDate,
             EndDate = tenancy.EndDate,
+            Version = tenancy.Version,
             Status = tenancy.Status
         };
 

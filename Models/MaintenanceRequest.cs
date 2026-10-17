@@ -7,6 +7,7 @@ public class MaintenanceRequest
     public ICollection<MaintenanceStatusEvent> StatusHistory { get; set; } = [];
 
     public int Id { get; set; }
+    public byte[] RowVersion { get; set; } = [];
     public MaintenancePriority Priority { get; set; } = MaintenancePriority.Normal;
     public long Revision { get; set; }
 

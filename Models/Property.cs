@@ -5,6 +5,7 @@ namespace RentRight.Models;
 public class Property
 {
     public int Id { get; set; }
+    public byte[] RowVersion { get; set; } = [];
     [Required]
     [StringLength(200)]
     public string Title { get; set; } = string.Empty;

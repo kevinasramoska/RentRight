@@ -212,7 +212,7 @@ public class TenancyServiceTests
         { Invite = record; Actor = actor; Token = cancellationToken; return Task.FromResult(InviteStatus); }
         public Task<AcceptTenancyStatus> AcceptAsync(string hash, TenancyActor actor, DateTime now, CancellationToken cancellationToken)
         { AcceptHash = hash; Actor = actor; Now = now; Token = cancellationToken; return Task.FromResult(AcceptStatus); }
-        public Task<EndTenancyOutcome> EndAsync(int id, TenancyActor actor, DateTime now, CancellationToken cancellationToken)
+        public Task<EndTenancyOutcome> EndAsync(int id, TenancyActor actor, DateTime now, CancellationToken cancellationToken, string? expectedVersion = null)
         { EndId = id; Actor = actor; Now = now; Token = cancellationToken; return Task.FromResult(new EndTenancyOutcome(EndStatus, EndStatus == EndTenancyStatus.Success)); }
         public Task<IReadOnlyList<TenancySelectionOption>> ListAvailablePropertiesAsync(TenancyActor actor, DateTime now, int limit, CancellationToken cancellationToken)
         { Actor = actor; Take = limit; return Task.FromResult<IReadOnlyList<TenancySelectionOption>>([]); }

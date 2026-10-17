@@ -74,11 +74,11 @@ public sealed class TenancyService(ITenancyStore store, ICurrentUser user, ICloc
         return new(await store.AcceptAsync(HashToken(command.Token), Actor, clock.UtcNow, cancellationToken));
     }
 
-    public Task<EndTenancyOutcome> EndAsync(int tenancyId, CancellationToken cancellationToken)
+    public Task<EndTenancyOutcome> EndAsync(int tenancyId, CancellationToken cancellationToken, string? expectedVersion = null)
     {
         if (!Authenticated) return Task.FromResult(EndTenancyOutcome.Unauthenticated());
         if (!CanManage) return Task.FromResult(EndTenancyOutcome.Forbidden());
-        return store.EndAsync(tenancyId, Actor, clock.UtcNow, cancellationToken);
+        return store.EndAsync(tenancyId, Actor, clock.UtcNow, cancellationToken, expectedVersion);
     }
 
     private static string HashToken(string token) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));

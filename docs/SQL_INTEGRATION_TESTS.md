@@ -46,7 +46,8 @@ cookie. Authenticated unsafe requests obtain an Identity Manage page token.
 There is no alternate authentication handler or production test endpoint.
 
 A database per case prevents cross-test state leakage and permits independent
-processes to run concurrently. Host disposal is followed by database deletion in
+processes to run concurrently. Container-owning test classes run serially to bound
+Docker memory; explicit concurrent request/two-context race tests remain parallel. Host disposal is followed by database deletion in
 a finally block; connection pooling is disabled for these databases. Fixture
 disposal removes SQL Server, and Testcontainers' resource reaper handles abandoned
 resources on process termination. Do not disable the reaper or enable reuse.

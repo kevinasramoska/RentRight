@@ -132,15 +132,17 @@ public class PropertiesController(IPropertyService propertyService) : Controller
     [Authorize(Roles = "Landlord,Admin")]
     public async Task<IActionResult> DeleteConfirmed(
         int id,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? expectedVersion = null)
     {
-        var outcome = await propertyService.DeleteAsync(id, cancellationToken);
+        var outcome = await propertyService.DeleteAsync(id, cancellationToken, expectedVersion);
         return outcome.Status switch
         {
             PropertyOperationStatus.Success => RedirectToAction(nameof(Index)),
             PropertyOperationStatus.Unauthenticated => Challenge(),
             PropertyOperationStatus.Forbidden => Forbid(),
             PropertyOperationStatus.NotFound => NotFound(),
+            PropertyOperationStatus.ValidationFailed => BadRequest("Reload the property and supply its version."),
             PropertyOperationStatus.HasHistory => RedirectWithError(
                 "A property with tenancy history cannot be deleted."),
             PropertyOperationStatus.Conflict => RedirectWithError(

@@ -149,7 +149,9 @@ public sealed class TenantMaintenanceSqlTests(SqlServerFixture server) : IClassF
         var other = await RequestAsync(await TenancyAsync("accepted", "MultiRoleAdmin"));
         await using (var db = _app.CreateContext())
         {
-            (await db.MaintenanceRequests.SingleAsync(r => r.Id == own)).Priority = MaintenancePriority.High;
+            var request = await db.MaintenanceRequests.SingleAsync(r => r.Id == own);
+            request.Priority = MaintenancePriority.High;
+            request.Revision++;
             db.MaintenanceStatusEvents.Add(new(MaintenanceRequestStatus.Closed, DateTime.UtcNow.AddMinutes(2), maintenanceRequestId: own));
             db.MaintenanceStatusEvents.Add(new(MaintenanceRequestStatus.InProgress, DateTime.UtcNow.AddMinutes(1), maintenanceRequestId: own));
             await db.SaveChangesAsync();
@@ -292,6 +294,8 @@ public sealed class TenantMaintenanceSqlTests(SqlServerFixture server) : IClassF
         var tenancy = await TenancyAsync("accepted");
         using var tenant = await ClientAsync(Actor.Tenant);
         using var owner = await ClientAsync(Actor.OwningLandlord);
+        await using (var versionDb = _app.CreateContext())
+            owner.DefaultRequestHeaders.Add("X-Expected-Version", Convert.ToBase64String((await versionDb.Tenancies.SingleAsync()).RowVersion));
         var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         async Task<HttpResponseMessage> Submit() { await gate.Task; return await tenant.PostAsJsonAsync(Route, new { description = "Concurrent kitchen leak" }); }
         async Task<HttpResponseMessage> End() { await gate.Task; return await owner.PostAsync("/api/v1/tenancies/" + tenancy + "/end", null); }
@@ -345,12 +349,13 @@ public sealed class TenantMaintenanceSqlTests(SqlServerFixture server) : IClassF
         var today = DateOnly.FromDateTime(now);
         var property = new Property { Title = "Home", Address = "Test Street", RentAmount = 1000, LandlordId = "OwningLandlord" };
         var tenancy = new Tenancy { Property = property, TenantId = tenant, StartDate = today.AddDays(-60),
-            Status = scenario is "pending" or "expired-invitation" ? TenancyStatus.Pending
+            Status = scenario is "pending" or "expired-invitation" or "unaccepted" ? TenancyStatus.Pending
                 : scenario is "ended" or "declined" ? TenancyStatus.Ended : TenancyStatus.Active,
             InvitedByUserId = "OwningLandlord", InvitedUtc = now.AddDays(-7),
+            AcceptedByUserId = scenario is "accepted" or "expired" or "ended" or "future" ? tenant : null,
             AcceptedUtc = scenario is "accepted" or "expired" or "ended" or "future" ? now.AddDays(-6) : null,
             InvitationExpiresUtc = scenario == "expired-invitation" ? now.AddDays(-1) : now.AddDays(1),
-            InvitationTokenHash = scenario is "pending" or "expired-invitation" ? new string('A', 64) : null,
+            InvitationTokenHash = scenario is "pending" or "expired-invitation" or "unaccepted" ? new string('A', 64) : null,
             EndReason = scenario == "declined" ? "Cancelled" : null };
         if (scenario == "expired") tenancy.EndDate = today.AddDays(-1);
         if (scenario == "future") tenancy.StartDate = today.AddDays(1);

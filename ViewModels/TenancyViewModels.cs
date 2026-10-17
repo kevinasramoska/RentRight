@@ -12,6 +12,7 @@ public class TenancyAdminIndexViewModel
 public class TenancyAdminRowViewModel
 {
     public int Id { get; init; }
+    public string? Version { get; init; }
     public required string PropertyTitle { get; init; }
     public required string PropertyAddress { get; init; }
     public required string TenantName { get; init; }

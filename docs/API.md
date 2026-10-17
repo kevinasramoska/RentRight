@@ -118,7 +118,7 @@ Results are ordered deterministically by title, address, and property ID before 
 The query performs a no-tracking count and projection and does not load landlord,
 tenancy, or maintenance entities.
 
-Create and update JSON accept exactly these writable values:
+Create JSON accepts these writable values (PUT additionally requires `expectedVersion`):
 
 ```json
 {
@@ -129,7 +129,7 @@ Create and update JSON accept exactly these writable values:
 }
 ```
 
-Owner/`landlordId`, IDs, roles, timestamps, publication state, concurrency state,
+Owner/`landlordId`, IDs, roles, timestamps, publication state,
 tenancies, and maintenance data are not mutation-contract fields. The owner is always
 the authenticated creator; updates preserve the persisted owner. Public list/detail
 responses contain only `id`, `title`, `address`, `rentAmount`, and `description`.
@@ -144,8 +144,19 @@ DELETE preserves the current MVC lifecycle rule: an unused property is hard-dele
 while a property with tenancy history is retained and produces `409`. The current EF
 model has no separate unpublished/archive flag, so every persisted property is a
 published listing today and public reads use a dedicated published-only service/store
-path. Persistent archive/unpublish state and opaque rowversion concurrency are deferred
-to Phase 7; no concurrency value is accepted or returned by this API version yet.
+path. Persistent archive/unpublish state remains deferred.
+
+P07-02 requires an opaque version on property mutations. Owner/Admin
+`GET /api/v1/properties/{propertyId}/edit` returns the editable fields, `id`, and
+`expectedVersion` (canonical base64 of the persisted eight-byte SQL rowversion),
+with no-store caching. Cross-owner reads are concealed as 404. PUT includes that
+`expectedVersion` in JSON; DELETE sends it in the `X-Expected-Version` header.
+Missing/malformed values return 400 after resource authorization; a well-formed
+stale/forged value returns 409. Reload the edit resource before retrying; never
+substitute a locally generated token. Successful mutations return 204 and require
+a fresh GET for another mutation. Public property list/detail contracts are unchanged.
+Razor edit/delete forms carry the persisted version in hidden inputs. Values are
+concurrency preconditions, never access credentials; all ownership checks still apply.
 
 POST, PUT, and DELETE use the existing Identity cookie and require the
 `X-CSRF-TOKEN` antiforgery header. OpenAPI declares their cookie security requirement,
@@ -190,8 +201,8 @@ echoed into errors. Successful acceptance clears the hash and records actor/time
 Admin cannot consent for another tenant, including a multi-role Admin.
 
 `TenancyResponse` contains `id`, `propertyTitle`, `propertyAddress`, `startDate`,
-`endDate`, and string `status` (`Pending`, `Active`, `Ended`). No account identity,
-token/hash, audit IDs, or rowversion is exposed. Lists use standard paging limits
+`endDate`, string `status` (`Pending`, `Active`, `Ended`), and opaque base64 `version`.
+No account identity, invitation token/hash, raw rowversion bytes, or audit IDs are exposed. Lists use standard paging limits
 (1–100 items; maximum page 10,000) and deterministic newest-ID ordering. Tenant
 queries include only their currently active, date-eligible tenancies. Manager
 queries include owned history; Admin explicitly overrides ownership. Inaccessible
@@ -204,9 +215,14 @@ records the UTC calendar end date, bounded by a future start date. Repeated endi
 returns 409 and leaves the original audit untouched. All mutations lock the property
 inside a serializable transaction, re-read state, and use rowversion/unique-index
 protection. Concurrent commands are ordered by this lock: a stale or losing command
-returns 404/409 as appropriate. There is no client If-Match/version contract because
-commands have immutable targets, explicit state preconditions and no editable fields.
-A sequential accept followed by end can legitimately both succeed.
+returns 404/409 as appropriate. P07-02 requires `X-Expected-Version` on
+`POST /api/v1/tenancies/{id}/end`, copied from the current list/detail `version`.
+Missing/malformed versions return 400; stale versions return 409. MVC end/cancel
+forms submit `ExpectedVersion`. Validation occurs after persisted ownership checks.
+An end form read before acceptance can no longer cancel a newly accepted tenancy;
+reload and review it first. Acceptance continues to use the persisted one-use
+invitation token and locked Pending-state precondition; no second version input
+is needed for that command.
 
 Failures use existing Problem Details codes (`validation_failed`,
 `authentication_required`, `access_denied`, `resource_not_found`, `resource_conflict`)

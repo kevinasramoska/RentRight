@@ -40,7 +40,7 @@ internal static class SyntheticQueryData
             '2024-01-01','2024-12-31','Ended' FROM Properties ORDER BY Id;
         INSERT MaintenanceRequests (TenancyId,Description,DateSubmitted,LastUpdatedUtc,Status,Priority,Revision)
         SELECT t.Id,REPLICATE(N'x',200),DATEADD(day,-(n.n%60),CAST('2026-10-17T12:00:00' AS datetime2)),
-            '2026-10-17',CASE WHEN n.n%20=0 THEN 'Submitted' WHEN n.n%20=1 THEN 'InProgress'
+            '2026-10-17T12:00:00',CASE WHEN n.n%20=0 THEN 'Submitted' WHEN n.n%20=1 THEN 'InProgress'
             WHEN n.n%20<6 THEN 'Resolved' ELSE 'Closed' END,'Normal',0
         FROM Tenancies t CROSS JOIN #Numbers n
         WHERE n.n<=20 OR (t.PropertyId=1 AND t.Status='Active' AND n.n<=200) ORDER BY t.Id,n.n;

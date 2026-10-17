@@ -161,7 +161,7 @@ public class TenanciesApiTests
             return Task.FromResult(new CreateTenancyOutcome(InviteStatus, [new("TenantId", "Invalid identifier.")], new(new string('A', 64), DateTime.UtcNow.AddDays(7))));
         }
         public Task<AcceptTenancyOutcome> AcceptAsync(AcceptTenancyCommand command, CancellationToken cancellationToken) => Task.FromResult(new AcceptTenancyOutcome(AcceptStatus));
-        public Task<EndTenancyOutcome> EndAsync(int id, CancellationToken cancellationToken) => Task.FromResult(new EndTenancyOutcome(EndStatus));
+        public Task<EndTenancyOutcome> EndAsync(int id, CancellationToken cancellationToken, string? expectedVersion = null) => Task.FromResult(new EndTenancyOutcome(EndStatus));
         public Task<GetTenancyOutcome> GetAsync(int id, CancellationToken cancellationToken) => Task.FromResult(new GetTenancyOutcome(TenancyQueryStatus.Success, id == 1 ? Row : null));
         public Task<ListTenanciesPageOutcome> ListAsync(int page, int pageSize, CancellationToken cancellationToken) =>
             Task.FromResult(new ListTenanciesPageOutcome(TenancyQueryStatus.Success, new([Row], 1)));

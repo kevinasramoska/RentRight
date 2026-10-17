@@ -65,7 +65,7 @@ public sealed class EfMaintenanceStore(ApplicationDbContext dbContext) : IMainte
                 request.Status,
                 request.Tenancy.TenantId,
                 request.Tenancy.Property.LandlordId,
-                request.TenancyId, request.Priority, request.Revision))
+                request.TenancyId, request.Priority, request.Revision, request.RowVersion))
             .SingleOrDefaultAsync(cancellationToken);
 
     public async Task<IReadOnlyList<MaintenanceTenancyStoreData>> ListActiveTenanciesAsync(
@@ -153,7 +153,7 @@ public sealed class EfMaintenanceStore(ApplicationDbContext dbContext) : IMainte
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         var affectedRows = await dbContext.MaintenanceRequests
             .Where(request => request.Id == requestId && request.Status == expectedStatus
-                && request.Revision == mutation.ExpectedRevision
+                && request.Revision == mutation.ExpectedRevision && request.RowVersion == mutation.ExpectedRowVersion
                 && (mutation.IsAdmin || request.Tenancy!.Property!.LandlordId == mutation.ActorUserId))
             .ExecuteUpdateAsync(
                 updates => updates

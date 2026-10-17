@@ -35,7 +35,8 @@ manual checklist describes the previous immediate Admin assignment workflow.
 - Every mutation locks the same property row within a serializable transaction,
   rechecks state/ownership and commits once. Database constraints and rowversion are
   independent safeguards. Losing commands return 404/409; there is no automatic
-  business retry, client version field or silent last-write-wins behavior.
+  business retry or silent last-write-wins behavior. P07-02 adds a required opaque
+  version to end/cancel forms and API requests; acceptance retains its one-use token.
 - The current model has no archive/publication state; existing properties are
   available unless reserved. P05-01 does not introduce that unrelated lifecycle.
 

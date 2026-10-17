@@ -14,5 +14,5 @@ public interface ITenancyStore
     Task<IReadOnlyList<TenancySelectionOption>> ListAvailablePropertiesAsync(TenancyActor actor, DateTime now, int limit, CancellationToken cancellationToken);
     Task<CreateTenancyStatus> InviteAsync(InviteTenancyRecord record, TenancyActor actor, CancellationToken cancellationToken);
     Task<AcceptTenancyStatus> AcceptAsync(string tokenHash, TenancyActor actor, DateTime now, CancellationToken cancellationToken);
-    Task<EndTenancyOutcome> EndAsync(int id, TenancyActor actor, DateTime now, CancellationToken cancellationToken);
+    Task<EndTenancyOutcome> EndAsync(int id, TenancyActor actor, DateTime now, CancellationToken cancellationToken, string? expectedVersion = null);
 }

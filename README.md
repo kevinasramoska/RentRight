@@ -299,8 +299,10 @@ ownership. Status changes append one event in the same transaction; failed or
 stale writes commit neither priority/status nor an event. Priority-only changes
 advance the revision without inventing a status transition. A status-only check
 would miss competing priority edits and reopened status cycles; the scalar revision
-closes those gaps using the existing conditional-update approach, without adding
-rowversion to other aggregates.
+closes those gaps. P07-02 adds SQL rowversion to property and maintenance rows;
+maintenance keeps this expectedRevision contract and checks its observed rowversion
+in the same conditional write. A SQL trigger requires every maintenance update to
+advance revision exactly once, including bulk SQL.
 
 The incremental `MaintenanceTriageAudit` migration defaults existing priorities to
 Normal and revisions to zero. Historical actor/previous-status/note fields remain
@@ -309,7 +311,7 @@ meaning. New submissions record the tenant actor with no previous status. New
 transitions record authenticated actor, previous/new status, server UTC time and
 optional note. Actor IDs are retained as historical facts without a user-delete
 cascade. Downgrade refuses to discard recorded triage/audit data. Descriptions and
-notes render as encoded text. Phase 7 query/index measurement remains deferred.
+notes render as encoded text. P07-01 query/index measurements are recorded below.
 
 ## React tenant portal (P06-01 / P06-02)
 
@@ -434,3 +436,21 @@ choose presentation only; existing server authorization remains authoritative.
 P07-01's opt-in disposable SQL benchmark, synthetic dataset, observed plans/reads,
 and index tradeoffs are documented in [Query performance](docs/performance/QUERY_PERFORMANCE.md).
 It runs separately from normal startup and test timing assertions.
+
+
+## Integrity, concurrency and retention (P07-02)
+
+Property PUT requires `expectedVersion` from owner/Admin
+`GET /api/v1/properties/{id}/edit`; property DELETE and tenancy end/cancel require
+`X-Expected-Version` (tenancy versions come from scoped list/detail). Razor forms
+carry the same values. Missing/malformed versions are rejected; stale versions
+conflict and require a reload. Tokens never grant resource access. Maintenance
+keeps its required `expectedRevision` API; SQL rowversion also protects its writes.
+
+Properties with tenancy history, all tenancies, maintenance requests and immutable
+status events are retained. SQL guards reject history updates/deletes and request/
+tenancy deletion, including bulk SQL; restrictive foreign keys preserve user and
+audit references. Unused properties can still be deleted with a current version.
+There is no automated purge, invented retention period, archive UI or anonymization
+job. See [the concurrency, retention and migration report](docs/CONCURRENCY_RETENTION.md)
+for contracts, deployment/rollback limits, changed files and verification evidence.

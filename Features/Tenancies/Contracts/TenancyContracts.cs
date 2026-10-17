@@ -10,7 +10,8 @@ public sealed record TenancyAdminRow(
     string TenantEmail,
     DateOnly StartDate,
     DateOnly? EndDate,
-    TenancyStatus Status);
+    TenancyStatus Status,
+    string? Version = null);
 
 public sealed record TenancySelectionOption(string Value, string Label);
 
@@ -98,6 +99,7 @@ public sealed record CreateTenancyOutcome(
 
 public enum EndTenancyStatus
 {
+    InvalidVersion,
     Success,
     Unauthenticated,
     Forbidden,

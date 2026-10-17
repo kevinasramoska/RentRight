@@ -59,6 +59,7 @@ else
                         @if (tenancy.Status is TenancyStatus.Active or TenancyStatus.Pending)
                         {
                             <form asp-action="End" asp-route-id="@tenancy.Id" method="post">
+                                <input type="hidden" name="ExpectedVersion" value="@tenancy.Version" />
                                 <button type="submit" class="btn btn-sm btn-outline-danger">End / Cancel</button>
                             </form>
                         }

@@ -58,6 +58,8 @@ public sealed class PropertyCreateRequest
 
 public sealed class PropertyUpdateRequest
 {
+    public string? ExpectedVersion { get; init; }
+
     [Required]
     [StringLength(200)]
     public string Title { get; init; } = string.Empty;
