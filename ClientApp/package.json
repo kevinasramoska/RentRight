@@ -8,6 +8,8 @@
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "demo": "npm run build && vite preview --host 127.0.0.1 --port 4173 --strictPort",
+    "demo:build": "npm run build && vite build --outDir dist",
     "lint": "eslint .",
     "type-check": "tsc --noEmit",
     "test": "vitest run",

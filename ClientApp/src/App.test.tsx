@@ -26,7 +26,7 @@ function open(path = '/app/') { history.replaceState(null, '', path); return ren
 it('shows the overview, active home, counts and semantic navigation', async () => {
   open();
   expect(await screen.findByRole('heading', { name: 'My home' })).toBeTruthy();
-  expect(screen.getByText(/open requests/).textContent).toContain('2');
+  expect(screen.getByRole('region', { name: 'Maintenance summary' }).textContent).toContain('2 open requests');
   expect(screen.getByRole('navigation', { name: 'Tenant navigation' })).toBeTruthy();
   expect(screen.getByRole('main').id).toBe('main');
   expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Overview' }));
@@ -203,4 +203,70 @@ it('keeps validation summary field anchors native without discarding form text',
   expect(fireEvent.click(within(summary).getByRole('link'))).toBe(true);
   expect(screen.getByRole('textbox', { name: 'Description' })).toBe(input);
   expect((input as HTMLTextAreaElement).value).toBe('short');
+});
+
+it('shows the explicitly labelled demo without calling the session or tenant APIs', async () => {
+  open('/app/demo/');
+  expect(await screen.findByRole('heading', { name: 'The Willow, Apartment 4B' })).toBeTruthy();
+  expect(screen.getByText('Portfolio demo')).toBeTruthy();
+  expect(screen.getByText(/fictional data/)).toBeTruthy();
+  expect(screen.getByRole('region', { name: 'Maintenance summary' }).textContent).toContain('3 open requests');
+  expect(fetchMock).not.toHaveBeenCalled();
+});
+
+it('simulates a demo submission and refreshes its overview without any network write', async () => {
+  open('/app/demo/requests/new');
+  const input = await screen.findByRole('textbox', { name: 'Description' });
+  fireEvent.change(input, { target: { value: '<script>A fictional loose door handle</script>' } });
+  fireEvent.submit(input.closest('form')!);
+  expect(await screen.findByRole('heading', { name: 'Request #1049' })).toBeTruthy();
+  expect(await screen.findByRole('heading', { name: '<script>A fictional loose door handle</script>' })).toBeTruthy();
+  expect(document.querySelector('script')).toBeNull();
+  fireEvent.click(screen.getByRole('link', { name: 'Overview' }));
+  await screen.findByRole('heading', { name: 'Your active tenancy' });
+  expect(screen.getByRole('region', { name: 'Maintenance summary' }).textContent).toContain('4 open requests');
+  expect(fetchMock).not.toHaveBeenCalled();
+});
+
+it('never treats a similar route name as a demo or bypasses a live session', async () => {
+  session = { isAuthenticated: false, roles: [] };
+  open('/app/demonstration');
+  expect(await screen.findByText('Sign in to access your RentRight account.')).toBeTruthy();
+  expect(fetchMock).toHaveBeenCalledWith('/api/v1/session', expect.anything());
+  expect(screen.queryByText('Portfolio demo')).toBeNull();
+});
+
+it('requires the real session when leaving the demo', async () => {
+  session = { isAuthenticated: false, roles: [] };
+  open('/app/demo/');
+  await screen.findByRole('heading', { name: 'The Willow, Apartment 4B' });
+  history.pushState(null, '', '/app/');
+  fireEvent.popState(window);
+  expect(await screen.findByText('Sign in to access your RentRight account.')).toBeTruthy();
+  expect(screen.queryByText('24 Willow Lane · Demo address')).toBeNull();
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+
+it('opens mobile navigation, supports Escape, and restores focus', async () => {
+  open('/app/demo/');
+  await screen.findByRole('heading', { name: 'Overview' });
+  const toggle = screen.getByRole('button', { name: 'Open navigation' });
+  fireEvent.click(toggle);
+  const dialog = screen.getByRole('dialog', { name: 'Workspace navigation' });
+  expect(dialog.getAttribute('aria-modal')).toBe('true');
+  expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close navigation' }));
+  fireEvent.keyDown(dialog, { key: 'Escape' });
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(document.activeElement).toBe(toggle);
+});
+
+it('releases the inert background when a drawer is resized to desktop', async () => {
+  open('/app/demo/');
+  await screen.findByRole('heading', { name: 'Overview' });
+  fireEvent.click(screen.getByRole('button', { name: 'Open navigation' }));
+  expect(screen.getByRole('dialog')).toBeTruthy();
+  vi.stubGlobal('innerWidth', 1024);
+  fireEvent(window, new Event('resize'));
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(screen.getByRole('main').parentElement?.hasAttribute('inert')).toBe(false);
 });
