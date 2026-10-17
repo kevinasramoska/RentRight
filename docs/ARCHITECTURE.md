@@ -554,3 +554,21 @@ archive/publication state does not exist yet. Historical rows are never deleted.
 Maintenance status/history is implemented in P05-02/P05-03. P07-02 extends
 rowversion to properties and maintenance and defines retained-history SQL guards;
 see [CONCURRENCY_RETENTION.md](CONCURRENCY_RETENTION.md).
+
+## P08-01 authorization and account security
+
+Named audience policies protect all role-specific MVC/API endpoints. Shared
+`RentalAccess` resource decisions are used by property/maintenance
+services and a registered ASP.NET Core resource handler. EF scoping, current-tenancy
+checks and conditional mutation ownership/version predicates remain in place.
+Resource policies require trusted server-loaded facts and do not replace invitation
+consent, database races or domain status transitions. The executable policy matrix
+and precise implementation boundary are in [AUTHORIZATION.md](AUTHORIZATION.md).
+Persisted account/stamp validation runs on every authenticated request. Cookie
+idle/absolute limits, failed-login lockout, closed production self-registration,
+tenant-only development onboarding and recent-password role mutations are explicit.
+Role mutations acquire a transaction-owned SQL application lock, revalidate the
+persisted actor, preserve a usable local Admin and atomically rotate the target's
+stamp. Self-deletion cannot bypass retention/last-admin protection. No new schema
+or dependency was needed. Operational limits and verification are documented in
+the authorization report; P08-02/OIDC and deployment configuration remain separate.

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RentRight.Api;
 using RentRight.Application;
+using RentRight.Authorization;
 using RentRight.Data;
 using RentRight.Features.Administration;
 using RentRight.Features.Maintenance;
@@ -31,6 +32,8 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
 .AddDefaultUI(); // ✅ enables /Identity/Account/Login etc.
 
 builder.Services.AddApplicationFoundation();
+builder.Services.AddRentalAuthorization();
+builder.Services.AddAccountSecurity();
 builder.Services.AddAdministrationFeature();
 builder.Services.AddPropertiesFeature();
 builder.Services.AddTenanciesAndDashboardsFeature();
@@ -52,7 +55,7 @@ using (var scope = app.Services.CreateScope())
     var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
     var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
 
-    string[] roles = { "Admin", "Landlord", "Tenant" };
+    string[] roles = { AppRoles.Admin, AppRoles.Landlord, AppRoles.Tenant };
 
     // Create roles if they don't exist
     foreach (var role in roles)
@@ -85,7 +88,7 @@ using (var scope = app.Services.CreateScope())
             var createAdminResult = await userManager.CreateAsync(newAdmin, adminPassword);
             EnsureIdentitySucceeded(createAdminResult, "create the configured development administrator");
 
-            var addAdminRoleResult = await userManager.AddToRoleAsync(newAdmin, "Admin");
+            var addAdminRoleResult = await userManager.AddToRoleAsync(newAdmin, AppRoles.Admin);
             EnsureIdentitySucceeded(addAdminRoleResult, "assign the Admin role to the development administrator");
         }
     }

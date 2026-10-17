@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RentRight.Authorization;
 
 namespace RentRight.Controllers.Api.V1;
 
@@ -15,7 +16,7 @@ public sealed class SessionController : ApiV1ControllerBase
     public ActionResult<SessionResponse> Get() => Ok(new SessionResponse(
         User.Identity?.IsAuthenticated == true,
         User.Identity?.IsAuthenticated == true
-            ? new[] { "Admin", "Landlord", "Tenant" }.Where(User.IsInRole).ToArray()
+            ? new[] { AppRoles.Admin, AppRoles.Landlord, AppRoles.Tenant }.Where(User.IsInRole).ToArray()
             : []));
 
     [HttpGet("antiforgery")]

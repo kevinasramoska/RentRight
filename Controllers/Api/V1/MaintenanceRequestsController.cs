@@ -2,11 +2,12 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RentRight.Api;
+using RentRight.Authorization;
 using RentRight.Features.Maintenance;
 
 namespace RentRight.Controllers.Api.V1;
 
-[Authorize(Roles = "Tenant")]
+[Authorize(Policy = RentalPolicies.Tenant)]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 [ProducesResponseType<ProblemDetails>(503, "application/problem+json")]
 public sealed class MaintenanceRequestsController(ITenantMaintenanceService service) : ApiV1ControllerBase

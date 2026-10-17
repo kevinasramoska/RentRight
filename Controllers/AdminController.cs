@@ -1,12 +1,13 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RentRight.Authorization;
 using RentRight.Features.Administration;
 using RentRight.Features.Administration.Contracts;
 using RentRight.ViewModels;
 
 namespace RentRight.Controllers
 {
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = RentalPolicies.AdministerRoles)]
     public class AdminController(IAdministrationService administrationService) : Controller
     {
         // GET: /Admin
@@ -29,6 +30,7 @@ namespace RentRight.Controllers
 
         // POST: /Admin/UpdateRoles
         [HttpPost]
+        [ServiceFilter(typeof(RecentAuthenticationFilter))]
         public async Task<IActionResult> UpdateRoles(
             string userId,
             List<string>? selectedRoles,

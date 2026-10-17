@@ -1,17 +1,18 @@
 using System.Security.Cryptography;
 using System.Text;
 using RentRight.Application.Abstractions;
+using RentRight.Authorization;
 using RentRight.Features.Tenancies.Contracts;
 
 namespace RentRight.Features.Tenancies;
 
 public sealed class TenancyService(ITenancyStore store, ICurrentUser user, IClock clock) : ITenancyService
 {
-    private TenancyActor Actor => new(user.UserId!, user.IsInRole("Admin"), user.IsInRole("Landlord"), user.IsInRole("Tenant"));
-    private bool Authenticated => user.IsAuthenticated && !string.IsNullOrEmpty(user.UserId);
-    private bool CanManage => user.IsInRole("Admin") || user.IsInRole("Landlord");
+    private TenancyActor Actor => new(user.UserId!, user.IsInRole(AppRoles.Admin), user.IsInRole(AppRoles.Landlord), user.IsInRole(AppRoles.Tenant));
+    private bool Authenticated => user.IsAuthenticated && !string.IsNullOrWhiteSpace(user.UserId);
+    private bool CanManage => user.IsInRole(AppRoles.Admin) || user.IsInRole(AppRoles.Landlord);
     private TenancyQueryStatus QueryStatus => !Authenticated ? TenancyQueryStatus.Unauthenticated
-        : CanManage || user.IsInRole("Tenant") ? TenancyQueryStatus.Success : TenancyQueryStatus.Forbidden;
+        : CanManage || user.IsInRole(AppRoles.Tenant) ? TenancyQueryStatus.Success : TenancyQueryStatus.Forbidden;
 
     public async Task<ListTenanciesOutcome> ListForAdministrationAsync(CancellationToken cancellationToken)
     {
@@ -68,7 +69,7 @@ public sealed class TenancyService(ITenancyStore store, ICurrentUser user, ICloc
     public async Task<AcceptTenancyOutcome> AcceptAsync(AcceptTenancyCommand command, CancellationToken cancellationToken)
     {
         if (!Authenticated) return new(AcceptTenancyStatus.Unauthenticated);
-        if (!user.IsInRole("Tenant")) return new(AcceptTenancyStatus.Forbidden);
+        if (!user.IsInRole(AppRoles.Tenant)) return new(AcceptTenancyStatus.Forbidden);
         if (command.Token is null || command.Token.Length != 64 || !command.Token.All(Uri.IsHexDigit))
             return new(AcceptTenancyStatus.NotFound);
         return new(await store.AcceptAsync(HashToken(command.Token), Actor, clock.UtcNow, cancellationToken));

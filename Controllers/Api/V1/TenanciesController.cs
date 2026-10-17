@@ -2,12 +2,13 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RentRight.Api;
+using RentRight.Authorization;
 using RentRight.Features.Tenancies;
 using RentRight.Features.Tenancies.Contracts;
 
 namespace RentRight.Controllers.Api.V1;
 
-[Authorize(Roles = "Admin,Landlord,Tenant")]
+[Authorize(Policy = RentalPolicies.Participant)]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public sealed class TenanciesController(ITenancyService service) : ApiV1ControllerBase
 {
@@ -30,7 +31,7 @@ public sealed class TenanciesController(ITenancyService service) : ApiV1Controll
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin,Landlord")]
+    [Authorize(Policy = RentalPolicies.Manager)]
     [ProducesResponseType<InvitationResponse>(202)]
     public async Task<IActionResult> Invite(InviteTenancyRequest request, CancellationToken cancellationToken)
     {
@@ -49,7 +50,7 @@ public sealed class TenanciesController(ITenancyService service) : ApiV1Controll
     }
 
     [HttpPost("accept")]
-    [Authorize(Roles = "Tenant")]
+    [Authorize(Policy = RentalPolicies.Tenant)]
     [ProducesResponseType(204)]
     public async Task<IActionResult> Accept(AcceptInvitationRequest request, CancellationToken cancellationToken)
     {
@@ -65,7 +66,7 @@ public sealed class TenanciesController(ITenancyService service) : ApiV1Controll
     }
 
     [HttpPost("{id:int}/end")]
-    [Authorize(Roles = "Admin,Landlord")]
+    [Authorize(Policy = RentalPolicies.Manager)]
     [ProducesResponseType(204)]
     public async Task<IActionResult> End(int id, CancellationToken cancellationToken,
         [FromHeader(Name = "X-Expected-Version")] string? expectedVersion = null)

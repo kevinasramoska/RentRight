@@ -1,0 +1,16 @@
+@page
+@model RentRight.Areas.Identity.Pages.Account.RegisterModel
+@{
+    ViewData["Title"] = "Create tenant account";
+}
+<h1>Create tenant account</h1>
+<p>Development accounts start as tenants. Only an administrator can grant other roles.</p>
+<p>Use at least 12 characters, including uppercase and lowercase letters, a number and a symbol.</p>
+<form method="post">
+    <div asp-validation-summary="All" class="text-danger" role="alert"></div>
+    <div class="mb-3"><label asp-for="Input.FullName"></label><input asp-for="Input.FullName" class="form-control" autocomplete="name" /></div>
+    <div class="mb-3"><label asp-for="Input.Email"></label><input asp-for="Input.Email" class="form-control" autocomplete="username" /><span asp-validation-for="Input.Email" class="text-danger"></span></div>
+    <div class="mb-3"><label asp-for="Input.Password"></label><input asp-for="Input.Password" class="form-control" autocomplete="new-password" /><span asp-validation-for="Input.Password" class="text-danger"></span></div>
+    <div class="mb-3"><label asp-for="Input.ConfirmPassword"></label><input asp-for="Input.ConfirmPassword" class="form-control" autocomplete="new-password" /><span asp-validation-for="Input.ConfirmPassword" class="text-danger"></span></div>
+    <button type="submit" class="btn btn-primary">Create account</button>
+</form>

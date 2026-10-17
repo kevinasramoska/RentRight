@@ -29,6 +29,8 @@ public sealed class SqlApplication : WebApplicationFactory<Program>
     private readonly string _connectionString;
     private readonly IInterceptor[] _interceptors;
     private readonly string _password = $"T!{Guid.NewGuid():N}a9";
+    public string EnvironmentName { get; init; } = "Testing";
+    public TimeProvider? Clock { get; init; }
 
     public SqlApplication(string serverConnectionString, params IInterceptor[] interceptors)
     {
@@ -45,7 +47,7 @@ public sealed class SqlApplication : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.UseEnvironment("Testing");
+        builder.UseEnvironment(EnvironmentName);
         builder.UseSetting("SeedAdmin:Email", string.Empty);
         builder.UseSetting("SeedAdmin:Password", string.Empty);
         builder.ConfigureServices(services =>
@@ -53,6 +55,11 @@ public sealed class SqlApplication : WebApplicationFactory<Program>
             services.AddLogging(logging => logging.AddProvider(new CaptureLogs(Logs)));
             services.RemoveAll<DbContextOptions<ApplicationDbContext>>();
             services.AddDbContext<ApplicationDbContext>(options => options.UseSqlServer(_connectionString).AddInterceptors(_interceptors));
+            if (Clock is not null)
+            {
+                services.RemoveAll<TimeProvider>();
+                services.AddSingleton(Clock);
+            }
         });
     }
 

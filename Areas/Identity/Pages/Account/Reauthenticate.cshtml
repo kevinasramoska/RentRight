@@ -1,0 +1,14 @@
+@page
+@model RentRight.Areas.Identity.Pages.Account.ReauthenticateModel
+@{
+    ViewData["Title"] = "Verify your password";
+}
+<h1>Verify your password</h1>
+<p>Sensitive account and role changes require password verification within the last 10 minutes. After verification, review and submit the action again.</p>
+<form method="post" asp-route-returnUrl="@Model.ReturnUrl">
+    <div asp-validation-summary="All" class="text-danger" role="alert"></div>
+    <label asp-for="Password"></label>
+    <input asp-for="Password" class="form-control mb-3" autocomplete="current-password" />
+    <button type="submit" class="btn btn-primary">Verify password</button>
+    <a href="@Model.ReturnUrl" class="btn btn-secondary">Cancel</a>
+</form>
