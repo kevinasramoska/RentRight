@@ -313,6 +313,8 @@ Implementation checkpoint (2026-08-11): the focused core-domain request is imple
 
 ### P07-01 — Measure queries and add evidence-based indexes/projections
 
+- **Implementation status (2026-10-17):** Implemented — opt-in disposable SQL measurements, three measured index improvements, bounded admin-role query-count checks, regression and migration coverage. See [query evidence and reproduction](performance/QUERY_PERFORMANCE.md). Existing projections, bounds, and authorization were preserved; historical N+1 claims were not present in current code.
+
 - **Why it matters:** SQL Server skill is best demonstrated by explaining real query shapes and measured improvements, not by adding speculative indexes.
 - **Files/components likely affected:** EF query services, entity configurations, new migration, SQL/query-plan notes under `docs`, performance test/seed tooling, dashboard/list endpoints.
 - **Implementation steps:**

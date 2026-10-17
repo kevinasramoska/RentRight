@@ -272,6 +272,13 @@ namespace RentRight.Migrations
 
                     b.HasIndex("TenancyId", "DateSubmitted");
 
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("TenancyId", "DateSubmitted"), new[] { "Status" });
+
+                    b.HasIndex("Status", "DateSubmitted", "Id")
+                        .IsDescending(false, true, true);
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("Status", "DateSubmitted", "Id"), new[] { "TenancyId", "Priority", "Revision" });
+
                     b.ToTable("MaintenanceRequests", t =>
                         {
                             t.HasCheckConstraint("CK_MaintenanceRequests_Priority", "[Priority] IN (N'Low', N'Normal', N'High', N'Urgent')");
@@ -357,6 +364,10 @@ namespace RentRight.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("LandlordId");
+
+                    b.HasIndex("Title", "Address", "Id");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("Title", "Address", "Id"), new[] { "RentAmount", "Description", "LandlordId" });
 
                     b.ToTable("Properties");
                 });

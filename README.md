@@ -428,3 +428,9 @@ anonymous users; authenticated responses include only the known presentation rol
 no-store. The latter sets the HttpOnly antiforgery cookie and returns only
 `requestToken`; unsafe API methods must submit it as `X-CSRF-TOKEN`. Roles in React
 choose presentation only; existing server authorization remains authoritative.
+
+### SQL query measurements
+
+P07-01's opt-in disposable SQL benchmark, synthetic dataset, observed plans/reads,
+and index tradeoffs are documented in [Query performance](docs/performance/QUERY_PERFORMANCE.md).
+It runs separately from normal startup and test timing assertions.
