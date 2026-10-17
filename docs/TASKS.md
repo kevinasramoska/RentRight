@@ -271,7 +271,7 @@ Implementation checkpoint (2026-08-11): the focused core-domain request is imple
 
 ### P06-01 — Establish the React/TypeScript build and API foundation
 
-**Implemented:** isolated `/app` shell, pinned Vite/React/strict TypeScript build, cookie/CSRF API client, no-store session/token endpoints, frontend and HTTP tests, and publish integration. See README for the Node 24 HTTPS workflow. Tenant portal work remains P06-02.
+**Implemented:** isolated `/app` shell, pinned Vite/React/strict TypeScript build, cookie/CSRF API client, no-store session/token endpoints, frontend and HTTP tests, and publish integration. See README for the Node 24 HTTPS workflow. Tenant portal delivered in P06-02.
 
 - **Why it matters:** React should be introduced as a maintainable client with a reproducible build, typed errors, secure cookies, and a clear ASP.NET integration—not as disconnected demo code.
 - **Files/components likely affected:** new `ClientApp` Vite project, TypeScript/ESLint/Vitest configuration, `RentRight.csproj` build targets, `Program.cs` static-file/fallback routing, development proxy, API client, antiforgery endpoint/host page.
@@ -290,6 +290,8 @@ Implementation checkpoint (2026-08-11): the focused core-domain request is imple
 - **Resume/portfolio value:** Demonstrates real React/TypeScript integration with an authenticated ASP.NET API and production build pipeline.
 
 ### P06-02 — Build and test the React tenant maintenance portal
+
+- **Implementation status:** Delivered: authenticated overview, paged list, detail/history and validated submission under `/app`; safe dashboard API adapter and read-only maintenance priority; session clearing/cancellation, fixed problem messages, responsive accessible controls, component integration and real-host HTTP smoke coverage. SQL tests verify dashboard eligibility/scoping. No dependencies or schema changes. Browser/device and assistive-technology testing remains manual; the smoke combines component integration with WebApplicationFactory rather than a browser runner. See README.
 
 - **Why it matters:** A focused, complete user journey is stronger portfolio evidence than a broad visual rewrite of working MVC screens.
 - **Files/components likely affected:** `ClientApp/src/features/dashboard`, `features/maintenance`, routes/components/forms, generated or maintained API types, CSS/design tokens, frontend tests, minimal server host view.

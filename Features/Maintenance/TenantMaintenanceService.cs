@@ -26,7 +26,7 @@ public sealed class TenantMaintenanceService(ApplicationDbContext db, ICurrentUs
     private static IQueryable<TenantMaintenanceItem> Project(IQueryable<MaintenanceRequest> query) =>
         query.Select(r => new TenantMaintenanceItem(r.Id, r.Tenancy!.Property!.Title,
             r.Tenancy.Property.Address, r.Description, DateTime.SpecifyKind(r.DateSubmitted, DateTimeKind.Utc),
-            DateTime.SpecifyKind(r.LastUpdatedUtc, DateTimeKind.Utc), r.Status.ToString()));
+            DateTime.SpecifyKind(r.LastUpdatedUtc, DateTimeKind.Utc), r.Status.ToString(), r.Priority.ToString()));
 
     public Task<TenantMaintenanceResult<int>> CreateAsync(string? description, CancellationToken cancellationToken) =>
         ExecuteAsync<int>(async () =>

@@ -37,6 +37,7 @@ public sealed class TenantMaintenanceSqlTests(SqlServerFixture server) : IClassF
             detail.EnsureSuccessStatusCode();
             var result = await detail.Content.ReadFromJsonAsync<TenantMaintenanceDetail>();
             Assert.Equal("Submitted", result!.Request.Status);
+            Assert.Equal("Normal", result.Request.Priority);
             Assert.Equal("Submitted", Assert.Single(result.History).Status);
             Assert.False(result.History[0].IsLegacyBaseline);
             using var razor = await client.GetAsync("/MaintenanceRequest/Details/" + receipt!.Id);
@@ -90,6 +91,11 @@ public sealed class TenantMaintenanceSqlTests(SqlServerFixture server) : IClassF
             using var razor = await client.GetAsync("/MaintenanceRequest/Details/" + requestId);
             Assert.Equal(HttpStatusCode.NotFound, razor.StatusCode);
         }
+        using var apiDashboard = await client.GetAsync("/api/v1/tenant-dashboard");
+        apiDashboard.EnsureSuccessStatusCode();
+        using var apiJson = JsonDocument.Parse(await apiDashboard.Content.ReadAsStringAsync());
+        Assert.Equal(0, apiJson.RootElement.GetProperty("tenancies").GetArrayLength());
+        Assert.Equal(0, apiJson.RootElement.GetProperty("counts").GetProperty("open").GetInt32());
         using var dashboard = await client.GetAsync("/Dashboard/TenantDashboard");
         dashboard.EnsureSuccessStatusCode();
         var html = await dashboard.Content.ReadAsStringAsync();
@@ -124,6 +130,13 @@ public sealed class TenantMaintenanceSqlTests(SqlServerFixture server) : IClassF
         using var client = await ClientAsync(Actor.Tenant);
         using var dashboard = await client.GetAsync("/Dashboard/TenantDashboard");
         var html = await dashboard.Content.ReadAsStringAsync();
+        using var apiDashboard = await client.GetAsync("/api/v1/tenant-dashboard");
+        apiDashboard.EnsureSuccessStatusCode();
+        using var apiJson = JsonDocument.Parse(await apiDashboard.Content.ReadAsStringAsync());
+        Assert.Single(apiJson.RootElement.GetProperty("tenancies").EnumerateArray());
+        Assert.Equal(2, apiJson.RootElement.GetProperty("counts").GetProperty("open").GetInt32());
+        Assert.Equal(6, apiJson.RootElement.GetProperty("counts").GetProperty("recent").GetInt32());
+        Assert.Equal(recent.Select(r => r.Id), apiJson.RootElement.GetProperty("recentMaintenanceRequests").EnumerateArray().Select(r => r.GetProperty("id").GetInt32()));
         Assert.Contains("<strong>2</strong> open requests", html);
         Assert.Contains("<strong>6</strong> submitted in the last 30 days", html);
         Assert.Contains("Submit Request</a>", html);
@@ -136,6 +149,7 @@ public sealed class TenantMaintenanceSqlTests(SqlServerFixture server) : IClassF
         var other = await RequestAsync(await TenancyAsync("accepted", "MultiRoleAdmin"));
         await using (var db = _app.CreateContext())
         {
+            (await db.MaintenanceRequests.SingleAsync(r => r.Id == own)).Priority = MaintenancePriority.High;
             db.MaintenanceStatusEvents.Add(new(MaintenanceRequestStatus.Closed, DateTime.UtcNow.AddMinutes(2), maintenanceRequestId: own));
             db.MaintenanceStatusEvents.Add(new(MaintenanceRequestStatus.InProgress, DateTime.UtcNow.AddMinutes(1), maintenanceRequestId: own));
             await db.SaveChangesAsync();
@@ -144,6 +158,8 @@ public sealed class TenantMaintenanceSqlTests(SqlServerFixture server) : IClassF
         using var detail = await client.GetAsync(Route + "/" + own);
         var result = await detail.Content.ReadFromJsonAsync<TenantMaintenanceDetail>();
         Assert.Equal(new[] { "InProgress", "Closed" }, result!.History.Select(e => e.Status));
+        Assert.Equal("High", result.Request.Priority);
+        Assert.All(result.History, e => Assert.Null(e.ActorUserId));
         foreach (var id in new[] { other, int.MaxValue })
         {
             using var response = await client.GetAsync(Route + "/" + id);
@@ -157,6 +173,7 @@ public sealed class TenantMaintenanceSqlTests(SqlServerFixture server) : IClassF
         var page = JsonDocument.Parse(await list.Content.ReadAsStringAsync()).RootElement;
         Assert.Equal(1, page.GetProperty("totalCount").GetInt32());
         Assert.Equal(own, page.GetProperty("items")[0].GetProperty("id").GetInt32());
+        Assert.Equal("High", page.GetProperty("items")[0].GetProperty("priority").GetString());
     }
 
     [Theory]
