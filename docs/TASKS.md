@@ -333,6 +333,8 @@ Implementation checkpoint (2026-08-11): the focused core-domain request is imple
 
 ### P07-02 — Add database-enforced integrity, optimistic concurrency, and retention rules
 
+- **Implementation status:** Implemented — SQL rowversion for mutable aggregates, required property/end versions, compatible maintenance revision protection, SQL constraints and retained-history guards, restrictive audit references, and reviewed incremental/idempotent migration. See [CONCURRENCY_RETENTION.md](CONCURRENCY_RETENTION.md) for deployment limits and verification.
+
 - **Why it matters:** Application checks alone are race-prone. Production-style workflows need database constraints, stale-write detection, and explicit history retention.
 - **Files/components likely affected:** domain entities, EF configurations, services/API contracts, migrations, Problem Details mapping, concurrency UI, database tests.
 - **Implementation steps:**

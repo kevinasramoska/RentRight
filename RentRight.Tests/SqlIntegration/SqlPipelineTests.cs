@@ -44,7 +44,7 @@ public sealed class SqlPipelineTests(SqlServerFixture server) : IClassFixture<Sq
         var id = await SeedPropertyAsync();
         using var client = await _app.CreateActorClientAsync(actor);
         if (actor != Actor.Anonymous) await SqlApplication.AddAntiforgeryAsync(client);
-        using var response = await client.PutAsJsonAsync($"{Route}/{id}", Values("Changed"));
+        using var response = await client.PutAsJsonAsync($"{Route}/{id}", Values("Changed", await PropertyVersionAsync(id)));
         Assert.Equal(expected, (int)response.StatusCode);
         if (expected != 204)
         {
@@ -104,6 +104,7 @@ public sealed class SqlPipelineTests(SqlServerFixture server) : IClassFixture<Sq
         var id = await SeedPropertyAsync();
         using var client = await _app.CreateActorClientAsync(actor);
         if (actor != Actor.Anonymous) await SqlApplication.AddAntiforgeryAsync(client);
+        client.DefaultRequestHeaders.Add("X-Expected-Version", await PropertyVersionAsync(id));
         using var response = await client.DeleteAsync($"{Route}/{id}");
         Assert.Equal(expected, (int)response.StatusCode);
         await using var context = _app.CreateContext();
@@ -142,6 +143,7 @@ public sealed class SqlPipelineTests(SqlServerFixture server) : IClassFixture<Sq
         }
         using var client = await _app.CreateActorClientAsync(Actor.OwningLandlord);
         await SqlApplication.AddAntiforgeryAsync(client);
+        client.DefaultRequestHeaders.Add("X-Expected-Version", await PropertyVersionAsync(id));
         using var conflict = await client.DeleteAsync($"{Route}/{id}");
         await AssertProblemAsync(conflict, 409, "resource_conflict");
         using var missing = await client.PutAsJsonAsync($"{Route}/2147483647", Values());
@@ -216,6 +218,12 @@ public sealed class SqlPipelineTests(SqlServerFixture server) : IClassFixture<Sq
         Assert.Equal(new[] { "Admin" }, await manager.GetRolesAsync(admin!));
     }
 
+    private async Task<string> PropertyVersionAsync(int id)
+    {
+        await using var db = _app.CreateContext();
+        return Convert.ToBase64String((await db.Properties.SingleAsync(p => p.Id == id)).RowVersion);
+    }
+
     private async Task<int> SeedPropertyAsync(string title = "Original")
     {
         await using var context = _app.CreateContext();
@@ -236,9 +244,9 @@ public sealed class SqlPipelineTests(SqlServerFixture server) : IClassFixture<Sq
         EndDate = status == TenancyStatus.Ended ? new DateOnly(2026, 2, 1) : null
     };
 
-    private static object Values(string title = "Apartment") => new
+    private static object Values(string title = "Apartment", string? expectedVersion = null) => new
     {
-        title, address = "1 Test Street", rentAmount = 1250m, description = "Test",
+        expectedVersion, title, address = "1 Test Street", rentAmount = 1250m, description = "Test",
         landlordId = Actor.OtherLandlord.ToString(), id = int.MaxValue
     };
 

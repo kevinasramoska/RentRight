@@ -66,7 +66,8 @@ public sealed record PropertyDetails(
     string Address,
     decimal RentAmount,
     string? Description,
-    bool CanManage);
+    bool CanManage,
+    string? Version = null);
 
 public sealed class PropertyCreateInput
 {
@@ -88,6 +89,9 @@ public sealed class PropertyCreateInput
 
 public sealed class PropertyEditInput
 {
+    [Required(ErrorMessage = "Reload the property and supply its version.")]
+    public string? ExpectedVersion { get; set; }
+
     public int Id { get; set; }
 
     [Required]

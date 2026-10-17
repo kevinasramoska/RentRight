@@ -20,5 +20,5 @@ public interface ITenancyService
 
     Task<EndTenancyOutcome> EndAsync(
         int tenancyId,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken, string? expectedVersion = null);
 }

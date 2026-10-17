@@ -146,8 +146,12 @@ public sealed class LandlordMaintenanceSqlTests(SqlServerFixture server) : IClas
     public async Task Update_EventFailure_RollsBackStatusPriorityRevisionAndHistory()
     {
         var id = await RequestAsync(await TenancyAsync("ended"));
+        byte[] versionBefore;
         await using (var db = _app.CreateContext())
+        {
+            versionBefore = (await db.MaintenanceRequests.SingleAsync()).RowVersion;
             await db.Database.ExecuteSqlRawAsync("ALTER TABLE [MaintenanceStatusEvents] ADD CONSTRAINT [CK_Test_RejectEvents] CHECK ([Status] <> N'InProgress')");
+        }
         using var owner = await ClientAsync(Actor.OwningLandlord);
         using var response = await owner.PostAsJsonAsync(Route + "/" + id + "/triage",
             new { expectedRevision = 0, newStatus = "InProgress", priority = "Urgent", note = "Secret failed note" });
@@ -157,6 +161,7 @@ public sealed class LandlordMaintenanceSqlTests(SqlServerFixture server) : IClas
         Assert.Equal(MaintenanceRequestStatus.Submitted, request.Status);
         Assert.Equal(MaintenancePriority.Normal, request.Priority);
         Assert.Equal(0, request.Revision);
+        Assert.Equal(versionBefore, request.RowVersion);
         Assert.Empty(await verify.MaintenanceStatusEvents.ToListAsync());
         Assert.DoesNotContain("Secret failed note", string.Join('\n', _app.Logs));
     }
@@ -250,12 +255,13 @@ public sealed class LandlordMaintenanceSqlTests(SqlServerFixture server) : IClas
         var today = DateOnly.FromDateTime(now);
         var property = new Property { Title = "Home", Address = "Test Street", RentAmount = 1000, LandlordId = "OwningLandlord" };
         var tenancy = new Tenancy { Property = property, TenantId = tenant, StartDate = today.AddDays(-60),
-            Status = scenario is "pending" or "expired-invitation" ? TenancyStatus.Pending
+            Status = scenario is "pending" or "expired-invitation" or "unaccepted" ? TenancyStatus.Pending
                 : scenario is "ended" or "declined" ? TenancyStatus.Ended : TenancyStatus.Active,
             InvitedByUserId = "OwningLandlord", InvitedUtc = now.AddDays(-7),
+            AcceptedByUserId = scenario is "accepted" or "expired" or "ended" or "future" ? tenant : null,
             AcceptedUtc = scenario is "accepted" or "expired" or "ended" or "future" ? now.AddDays(-6) : null,
             InvitationExpiresUtc = scenario == "expired-invitation" ? now.AddDays(-1) : now.AddDays(1),
-            InvitationTokenHash = scenario is "pending" or "expired-invitation" ? new string('A', 64) : null,
+            InvitationTokenHash = scenario is "pending" or "expired-invitation" or "unaccepted" ? new string('A', 64) : null,
             EndReason = scenario == "declined" ? "Cancelled" : null };
         if (scenario == "expired") tenancy.EndDate = today.AddDays(-1);
         if (scenario == "future") tenancy.StartDate = today.AddDays(1);

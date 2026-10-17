@@ -154,7 +154,7 @@ public sealed class MaintenanceCommandService(
                 clock.UtcNow,
                 cancellationToken,
                 new MaintenanceMutation(command.ExpectedRevision.Value, priority, userId, isAdministrator,
-                    string.IsNullOrWhiteSpace(command.Note) ? null : command.Note.Trim()));
+                    string.IsNullOrWhiteSpace(command.Note) ? null : command.Note.Trim(), request.RowVersion));
             return updated
                 ? UpdateMaintenanceRequestStatusOutcome.Success(request.Id)
                 : UpdateMaintenanceRequestStatusOutcome.Conflict();

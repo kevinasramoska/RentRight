@@ -260,6 +260,12 @@ namespace RentRight.Migrations
                         .HasColumnType("bigint")
                         .HasDefaultValue(0L);
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -281,10 +287,16 @@ namespace RentRight.Migrations
 
                     b.ToTable("MaintenanceRequests", t =>
                         {
+                            t.HasCheckConstraint("CK_MaintenanceRequests_Dates", "[LastUpdatedUtc] >= [DateSubmitted]");
+
                             t.HasCheckConstraint("CK_MaintenanceRequests_Priority", "[Priority] IN (N'Low', N'Normal', N'High', N'Urgent')");
+
+                            t.HasCheckConstraint("CK_MaintenanceRequests_Revision", "[Revision] >= 0");
 
                             t.HasCheckConstraint("CK_MaintenanceRequests_Status", "[Status] IN (N'Submitted', N'InProgress', N'Resolved', N'Closed')");
                         });
+
+                    b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
                 });
 
             modelBuilder.Entity("RentRight.Models.MaintenanceStatusEvent", b =>
@@ -323,12 +335,18 @@ namespace RentRight.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ActorUserId");
+
                     b.HasIndex("MaintenanceRequestId", "OccurredUtc", "Id");
 
                     b.ToTable("MaintenanceStatusEvents", t =>
                         {
+                            t.HasCheckConstraint("CK_MaintenanceStatusEvents_Facts", "([PreviousStatus] IS NULL OR ([ActorUserId] IS NOT NULL AND (([PreviousStatus] = N'Submitted' AND [Status] = N'InProgress') OR ([PreviousStatus] = N'InProgress' AND [Status] = N'Resolved') OR ([PreviousStatus] = N'Resolved' AND [Status] IN (N'InProgress', N'Closed'))))) AND ([IsLegacyBaseline] = 0 OR ([PreviousStatus] IS NULL AND [ActorUserId] IS NULL AND [Note] IS NULL))");
+
                             t.HasCheckConstraint("CK_MaintenanceStatusEvents_Status", "[Status] IN (N'Submitted', N'InProgress', N'Resolved', N'Closed')");
                         });
+
+                    b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
                 });
 
             modelBuilder.Entity("RentRight.Models.Property", b =>
@@ -356,6 +374,12 @@ namespace RentRight.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -369,7 +393,10 @@ namespace RentRight.Migrations
 
                     SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("Title", "Address", "Id"), new[] { "RentAmount", "Description", "LandlordId" });
 
-                    b.ToTable("Properties");
+                    b.ToTable("Properties", t =>
+                        {
+                            t.HasCheckConstraint("CK_Properties_RentAmount", "[RentAmount] >= 0");
+                        });
                 });
 
             modelBuilder.Entity("RentRight.Models.Tenancy", b =>
@@ -438,9 +465,15 @@ namespace RentRight.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AcceptedByUserId");
+
+                    b.HasIndex("EndedByUserId");
+
                     b.HasIndex("InvitationTokenHash")
                         .IsUnique()
                         .HasFilter("[InvitationTokenHash] IS NOT NULL");
+
+                    b.HasIndex("InvitedByUserId");
 
                     b.HasIndex("PropertyId")
                         .IsUnique()
@@ -452,12 +485,22 @@ namespace RentRight.Migrations
                         {
                             t.HasCheckConstraint("CK_Tenancies_ActiveTenant", "[Status] <> N'Active' OR [TenantId] IS NOT NULL");
 
+                            t.HasCheckConstraint("CK_Tenancies_Consent", "([AcceptedUtc] IS NULL AND [AcceptedByUserId] IS NULL) OR ([AcceptedUtc] IS NOT NULL AND [AcceptedByUserId] IS NOT NULL AND [TenantId] IS NOT NULL AND [AcceptedByUserId] = [TenantId] AND [InvitedUtc] IS NOT NULL AND [AcceptedUtc] >= [InvitedUtc])");
+
                             t.HasCheckConstraint("CK_Tenancies_EndDate", "[EndDate] IS NULL OR [EndDate] >= [StartDate]");
 
                             t.HasCheckConstraint("CK_Tenancies_Invitation", "[Status] <> N'Pending' OR ([InvitationTokenHash] IS NOT NULL AND [InvitedUtc] IS NOT NULL AND [InvitationExpiresUtc] IS NOT NULL AND [InvitationExpiresUtc] > [InvitedUtc] AND [InvitedByUserId] IS NOT NULL)");
 
+                            t.HasCheckConstraint("CK_Tenancies_InvitedActiveConsent", "[Status] <> N'Active' OR [InvitedUtc] IS NULL OR [AcceptedUtc] IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_Tenancies_PendingConsent", "[Status] <> N'Pending' OR ([AcceptedUtc] IS NULL AND [AcceptedByUserId] IS NULL)");
+
                             t.HasCheckConstraint("CK_Tenancies_Status", "[Status] IN (N'Active', N'Ended', N'Pending')");
+
+                            t.HasCheckConstraint("CK_Tenancies_TokenState", "[Status] = N'Pending' OR [InvitationTokenHash] IS NULL");
                         });
+
+                    b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -524,6 +567,11 @@ namespace RentRight.Migrations
 
             modelBuilder.Entity("RentRight.Models.MaintenanceStatusEvent", b =>
                 {
+                    b.HasOne("RentRight.Models.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("RentRight.Models.MaintenanceRequest", null)
                         .WithMany("StatusHistory")
                         .HasForeignKey("MaintenanceRequestId")
@@ -544,6 +592,21 @@ namespace RentRight.Migrations
 
             modelBuilder.Entity("RentRight.Models.Tenancy", b =>
                 {
+                    b.HasOne("RentRight.Models.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("AcceptedByUserId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("RentRight.Models.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("EndedByUserId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("RentRight.Models.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("InvitedByUserId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("RentRight.Models.Property", "Property")
                         .WithMany("Tenancies")
                         .HasForeignKey("PropertyId")

@@ -107,7 +107,8 @@ public sealed class EfPropertyStore(ApplicationDbContext context) : IPropertySto
                 property.Address,
                 property.RentAmount,
                 property.Description,
-                property.LandlordId))
+                property.LandlordId,
+                Convert.ToBase64String(property.RowVersion)))
             .SingleOrDefaultAsync(cancellationToken);
 
     public async Task<int> CreateAsync(
@@ -134,25 +135,21 @@ public sealed class EfPropertyStore(ApplicationDbContext context) : IPropertySto
         PropertyValues values,
         CancellationToken cancellationToken)
     {
-        var property = await context.Properties
-            .SingleOrDefaultAsync(item => item.Id == propertyId, cancellationToken);
-        if (property is null)
-        {
-            return false;
-        }
-
-        property.Title = values.Title;
-        property.Address = values.Address;
-        property.RentAmount = values.RentAmount;
-        property.Description = values.Description;
-
-        await context.SaveChangesAsync(cancellationToken);
-        return true;
+        return await context.Properties
+            .Where(property => property.Id == propertyId && property.LandlordId == values.ExpectedLandlordId
+                && property.RowVersion == values.ExpectedVersion)
+            .ExecuteUpdateAsync(updates => updates
+                .SetProperty(property => property.Title, values.Title)
+                .SetProperty(property => property.Address, values.Address)
+                .SetProperty(property => property.RentAmount, values.RentAmount)
+                .SetProperty(property => property.Description, values.Description), cancellationToken) == 1;
     }
 
     public async Task<PropertyDeleteStoreStatus> DeleteAsync(
         int propertyId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        byte[] expectedVersion,
+        string expectedLandlordId)
     {
         var property = await context.Properties
             .SingleOrDefaultAsync(item => item.Id == propertyId, cancellationToken);
@@ -160,6 +157,9 @@ public sealed class EfPropertyStore(ApplicationDbContext context) : IPropertySto
         {
             return PropertyDeleteStoreStatus.NotFound;
         }
+
+        if (property.LandlordId != expectedLandlordId || !property.RowVersion.SequenceEqual(expectedVersion))
+            return PropertyDeleteStoreStatus.Conflict;
 
         if (await context.Tenancies
                 .AsNoTracking()

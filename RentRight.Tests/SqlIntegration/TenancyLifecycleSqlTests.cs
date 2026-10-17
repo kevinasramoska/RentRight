@@ -115,6 +115,7 @@ public sealed class TenancyLifecycleSqlTests(SqlServerFixture server) : IClassFi
     {
         var id = await ActiveAsync();
         using var client = await ClientAsync(actor);
+        client.DefaultRequestHeaders.Add("X-Expected-Version", await VersionAsync(id));
         using var response = await client.PostAsync($"{Route}/{id}/end", null);
         Assert.Equal(expected, (int)response.StatusCode);
         await using var db = _app.CreateContext();
@@ -130,6 +131,8 @@ public sealed class TenancyLifecycleSqlTests(SqlServerFixture server) : IClassFi
             using var tenant = await ClientAsync(Actor.Tenant);
             using var detail = await tenant.GetAsync($"{Route}/{id}");
             Assert.Equal(HttpStatusCode.NotFound, detail.StatusCode);
+            client.DefaultRequestHeaders.Remove("X-Expected-Version");
+            client.DefaultRequestHeaders.Add("X-Expected-Version", Convert.ToBase64String((await db.Properties.SingleAsync()).RowVersion));
             using var delete = await client.DeleteAsync("/api/v1/properties/" + row.PropertyId);
             Assert.Equal(HttpStatusCode.Conflict, delete.StatusCode);
         }
@@ -218,6 +221,7 @@ public sealed class TenancyLifecycleSqlTests(SqlServerFixture server) : IClassFi
         using var missingCsrfEndClient = await _app.CreateActorClientAsync(Actor.Admin);
         using var noCsrfEnd = await missingCsrfEndClient.PostAsync($"{Route}/{id}/end", null);
         Assert.Equal(HttpStatusCode.BadRequest, noCsrfEnd.StatusCode);
+        owner.DefaultRequestHeaders.Add("X-Expected-Version", await VersionAsync(id));
         using var end = await owner.PostAsync($"{Route}/{id}/end", null);
         Assert.Equal(HttpStatusCode.NoContent, end.StatusCode);
         await using var history = _app.CreateContext();
@@ -295,6 +299,12 @@ public sealed class TenancyLifecycleSqlTests(SqlServerFixture server) : IClassFi
             using var accepted = await tenant1.PostAsJsonAsync(Route + "/accept", new { receipt!.Token });
             Assert.Equal(HttpStatusCode.NoContent, accepted.StatusCode);
         }
+        if (id != 0)
+        {
+            var version = await VersionAsync(id);
+            owner1.DefaultRequestHeaders.Add("X-Expected-Version", version);
+            owner2.DefaultRequestHeaders.Add("X-Expected-Version", version);
+        }
         var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         async Task<HttpResponseMessage> Run(Func<Task<HttpResponseMessage>> action) { await gate.Task; return await action(); }
         var first = Run(() => scenario.StartsWith("invite") ? owner1.PostAsJsonAsync(Route, Input(property))
@@ -317,7 +327,19 @@ public sealed class TenancyLifecycleSqlTests(SqlServerFixture server) : IClassFi
         Assert.InRange(await verification.Tenancies.CountAsync(t => t.Status == TenancyStatus.Active || t.Status == TenancyStatus.Pending), 0, 1);
         var original = await verification.Tenancies.OrderBy(t => t.Id).FirstAsync();
         Assert.NotNull(original.InvitedUtc);
-        if (scenario.Contains("end")) { Assert.Equal(TenancyStatus.Ended, original.Status); Assert.NotNull(original.EndedUtc); Assert.NotNull(original.EndedByUserId); }
+        if (scenario is "end-end" or "invite-end" || (scenario == "accept-end" && b.IsSuccessStatusCode))
+        {
+            Assert.Equal(TenancyStatus.Ended, original.Status);
+            Assert.NotNull(original.EndedUtc);
+            Assert.NotNull(original.EndedByUserId);
+        }
+        if (scenario == "accept-end" && !b.IsSuccessStatusCode)
+        {
+            Assert.Equal(HttpStatusCode.NoContent, a.StatusCode);
+            Assert.Equal(HttpStatusCode.Conflict, b.StatusCode);
+            Assert.Equal(TenancyStatus.Active, original.Status);
+            Assert.Null(original.EndedUtc);
+        }
         if (original.AcceptedUtc is not null) Assert.Equal("Tenant", original.AcceptedByUserId);
     }
 
@@ -366,8 +388,8 @@ public sealed class TenancyLifecycleSqlTests(SqlServerFixture server) : IClassFi
         await using var db = _app.CreateContext();
         // Exercise this migration's own downgrade boundary. Newer migrations can
         // legitimately commit their Down before the tenancy guard is reached.
-        await db.GetService<IMigrator>().MigrateAsync("20261016115250_TenancyInvitationLifecycle");
         await InviteAsync(await PropertyAsync());
+        await db.GetService<IMigrator>().MigrateAsync("20261016115250_TenancyInvitationLifecycle");
         var appliedBefore = (await db.Database.GetAppliedMigrationsAsync()).ToArray();
         var exception = await Assert.ThrowsAsync<SqlException>(() => db.GetService<IMigrator>().MigrateAsync("20260811163855_CompleteCoreRentalDomain"));
         Assert.Equal(51000, exception.Number);
@@ -402,7 +424,8 @@ public sealed class TenancyLifecycleSqlTests(SqlServerFixture server) : IClassFi
         await using var db = _app.CreateContext();
         var row = await db.Tenancies.SingleAsync();
         Assert.Equal(TenancyStatus.Active, row.Status);
-        using var end = await admin.PostAsync("/Tenancies/End/" + row.Id, null);
+        using var end = await admin.PostAsync("/Tenancies/End/" + row.Id, new FormUrlEncodedContent(
+            new Dictionary<string, string> { ["ExpectedVersion"] = Convert.ToBase64String(row.RowVersion) }));
         Assert.Equal(HttpStatusCode.Redirect, end.StatusCode);
     }
 
@@ -461,10 +484,17 @@ public sealed class TenancyLifecycleSqlTests(SqlServerFixture server) : IClassFi
         Assert.Equal(HttpStatusCode.NotFound, detail.StatusCode);
         using var duplicate = await owner.PostAsJsonAsync(Route, Input(property));
         Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
+        owner.DefaultRequestHeaders.Add("X-Expected-Version", Convert.ToBase64String(row.RowVersion));
         using var ended = await owner.PostAsync($"{Route}/{row.Id}/end", null);
         Assert.Equal(HttpStatusCode.NoContent, ended.StatusCode);
         await db.Entry(row).ReloadAsync();
         Assert.Equal(start, row.EndDate);
+    }
+
+    private async Task<string> VersionAsync(int id)
+    {
+        await using var db = _app.CreateContext();
+        return Convert.ToBase64String((await db.Tenancies.SingleAsync(t => t.Id == id)).RowVersion);
     }
 
     private async Task<HttpClient> ClientAsync(Actor actor)

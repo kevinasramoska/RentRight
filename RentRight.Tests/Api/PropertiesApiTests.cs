@@ -273,6 +273,7 @@ public class PropertiesApiTests
             PropertiesRoute + "/1",
             new
             {
+                expectedVersion = "AAAAAAAAAAE=",
                 title = "After",
                 address = "Updated address",
                 rentAmount = 1_500m,
@@ -362,6 +363,7 @@ public class PropertiesApiTests
         AddIdentityCookie(client, factory, "landlord-1", "Landlord");
         await AddAntiforgeryTokenAsync(client);
 
+        client.DefaultRequestHeaders.Add("X-Expected-Version", "AAAAAAAAAAE=");
         using var response = await client.DeleteAsync(PropertiesRoute + "/1");
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
@@ -383,6 +385,7 @@ public class PropertiesApiTests
         AddIdentityCookie(client, factory, "landlord-1", "Landlord");
         await AddAntiforgeryTokenAsync(client);
 
+        client.DefaultRequestHeaders.Add("X-Expected-Version", "AAAAAAAAAAE=");
         using var response = await client.DeleteAsync(PropertiesRoute + "/1");
         using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
 
@@ -403,6 +406,7 @@ public class PropertiesApiTests
         AddIdentityCookie(client, factory, "landlord-1", "Landlord");
         await AddAntiforgeryTokenAsync(client);
 
+        client.DefaultRequestHeaders.Add("X-Expected-Version", "AAAAAAAAAAE=");
         using var response = await client.DeleteAsync(PropertiesRoute + "/1");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -541,7 +545,8 @@ public class PropertiesApiTests
             title,
             address = "1 Main Street",
             rentAmount = 1_250m,
-            description = "Description"
+            description = "Description",
+            expectedVersion = "AAAAAAAAAAE="
         };
 
     private static StoredProperty Property(
@@ -675,7 +680,7 @@ public class PropertiesApiTests
                     property.Address,
                     property.RentAmount,
                     property.Description,
-                    property.LandlordId));
+                    property.LandlordId, "AAAAAAAAAAE="));
         }
 
         public Task<int> CreateAsync(
@@ -718,7 +723,7 @@ public class PropertiesApiTests
 
         public Task<PropertyDeleteStoreStatus> DeleteAsync(
             int propertyId,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken, byte[] expectedVersion, string expectedLandlordId)
         {
             if (!_properties.TryGetValue(propertyId, out var property))
             {

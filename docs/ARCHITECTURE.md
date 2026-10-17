@@ -544,11 +544,13 @@ reading or mutating lifecycle state, serializing create/accept/end and property
 ownership/deletion changes. The combined filtered unique index prevents reservation
 collisions even outside the service. SQL rowversion rejects stale tracked writes;
 deadlocks, unique collisions and EF concurrency failures map to conflict, without
-blind retries. The command API does not expose rowversion: there are no editable
-lifecycle fields, state transitions are checked after locking, and each invitation
-has an immutable token target. End-after-accept is a valid sequential outcome;
-second acceptance/ending never rewrites original audit values.
+blind retries. P07-02 adds an opaque expected version to end/cancel so a form
+read before acceptance cannot end the newly accepted tenancy without review.
+Acceptance retains its one-use immutable invitation token and locked Pending
+precondition. Second acceptance/ending never rewrites original audit values.
 
 All existing properties are treated as lifecycle-available subject to reservations:
 archive/publication state does not exist yet. Historical rows are never deleted.
-Maintenance status/history and broad property concurrency work remain separate tasks.
+Maintenance status/history is implemented in P05-02/P05-03. P07-02 extends
+rowversion to properties and maintenance and defines retained-history SQL guards;
+see [CONCURRENCY_RETENTION.md](CONCURRENCY_RETENTION.md).

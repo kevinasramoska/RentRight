@@ -58,6 +58,8 @@ namespace RentRight.Data
 
             builder.Entity<Property>(entity =>
             {
+                entity.Property(property => property.RowVersion).IsRowVersion();
+                entity.ToTable(table => table.HasCheckConstraint("CK_Properties_RentAmount", "[RentAmount] >= 0"));
                 entity.Property(property => property.Title).HasMaxLength(200);
                 entity.Property(property => property.Address).HasMaxLength(500);
                 entity.Property(property => property.Description).HasMaxLength(2000);
@@ -87,6 +89,10 @@ namespace RentRight.Data
                 entity.Property(tenancy => tenancy.EndedByUserId).HasMaxLength(450);
                 entity.Property(tenancy => tenancy.EndReason).HasMaxLength(20);
                 entity.Property(tenancy => tenancy.RowVersion).IsRowVersion();
+                entity.ToTable(table => table.UseSqlOutputClause(false));
+                entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(t => t.InvitedByUserId).OnDelete(DeleteBehavior.NoAction);
+                entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(t => t.AcceptedByUserId).OnDelete(DeleteBehavior.NoAction);
+                entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(t => t.EndedByUserId).OnDelete(DeleteBehavior.NoAction);
                 entity.HasIndex(tenancy => tenancy.InvitationTokenHash).IsUnique()
                     .HasFilter("[InvitationTokenHash] IS NOT NULL");
 
@@ -107,6 +113,14 @@ namespace RentRight.Data
 
                 entity.ToTable(table =>
                 {
+                    table.HasCheckConstraint("CK_Tenancies_Consent",
+                        "([AcceptedUtc] IS NULL AND [AcceptedByUserId] IS NULL) OR ([AcceptedUtc] IS NOT NULL AND [AcceptedByUserId] IS NOT NULL AND [TenantId] IS NOT NULL AND [AcceptedByUserId] = [TenantId] AND [InvitedUtc] IS NOT NULL AND [AcceptedUtc] >= [InvitedUtc])");
+                    table.HasCheckConstraint("CK_Tenancies_InvitedActiveConsent",
+                        "[Status] <> N'Active' OR [InvitedUtc] IS NULL OR [AcceptedUtc] IS NOT NULL");
+                    table.HasCheckConstraint("CK_Tenancies_TokenState",
+                        "[Status] = N'Pending' OR [InvitationTokenHash] IS NULL");
+                    table.HasCheckConstraint("CK_Tenancies_PendingConsent",
+                        "[Status] <> N'Pending' OR ([AcceptedUtc] IS NULL AND [AcceptedByUserId] IS NULL)");
                     table.HasCheckConstraint(
                         "CK_Tenancies_EndDate",
                         "[EndDate] IS NULL OR [EndDate] >= [StartDate]");
@@ -122,6 +136,13 @@ namespace RentRight.Data
 
             builder.Entity<MaintenanceStatusEvent>(entity =>
             {
+                entity.ToTable(table => table.UseSqlOutputClause(false));
+                entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(e => e.ActorUserId).OnDelete(DeleteBehavior.NoAction);
+                entity.ToTable(table =>
+                {
+                    table.HasCheckConstraint("CK_MaintenanceStatusEvents_Facts",
+                        "([PreviousStatus] IS NULL OR ([ActorUserId] IS NOT NULL AND (([PreviousStatus] = N'Submitted' AND [Status] = N'InProgress') OR ([PreviousStatus] = N'InProgress' AND [Status] = N'Resolved') OR ([PreviousStatus] = N'Resolved' AND [Status] IN (N'InProgress', N'Closed'))))) AND ([IsLegacyBaseline] = 0 OR ([PreviousStatus] IS NULL AND [ActorUserId] IS NULL AND [Note] IS NULL))");
+                });
                 entity.Property(e => e.PreviousStatus).HasConversion<string>().HasMaxLength(20);
                 entity.Property(e => e.ActorUserId).HasMaxLength(450);
                 entity.Property(e => e.Note).HasMaxLength(1000);
@@ -135,6 +156,13 @@ namespace RentRight.Data
 
             builder.Entity<MaintenanceRequest>(entity =>
             {
+                entity.Property(request => request.RowVersion).IsRowVersion();
+                entity.ToTable(table =>
+                {
+                    table.UseSqlOutputClause(false);
+                    table.HasCheckConstraint("CK_MaintenanceRequests_Revision", "[Revision] >= 0");
+                    table.HasCheckConstraint("CK_MaintenanceRequests_Dates", "[LastUpdatedUtc] >= [DateSubmitted]");
+                });
                 entity.Property(request => request.Priority).HasConversion<string>().HasMaxLength(20)
                     .HasSentinel((MaintenancePriority)0)
                     .HasDefaultValue(MaintenancePriority.Normal);

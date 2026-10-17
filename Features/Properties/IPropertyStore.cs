@@ -36,7 +36,9 @@ public interface IPropertyStore
 
     Task<PropertyDeleteStoreStatus> DeleteAsync(
         int propertyId,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        byte[] expectedVersion,
+        string expectedLandlordId);
 }
 
 public sealed record PropertyListRecord(
@@ -52,13 +54,16 @@ public sealed record PropertyRecord(
     string Address,
     decimal RentAmount,
     string? Description,
-    string LandlordId);
+    string LandlordId,
+    string? Version = null);
 
 public sealed record PropertyValues(
     string Title,
     string Address,
     decimal RentAmount,
-    string? Description);
+    string? Description,
+    byte[]? ExpectedVersion = null,
+    string? ExpectedLandlordId = null);
 
 public sealed record PublishedPropertyPageRecord(
     IReadOnlyList<PublishedPropertyListItem> Items,
