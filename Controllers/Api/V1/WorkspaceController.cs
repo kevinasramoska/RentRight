@@ -59,12 +59,15 @@ public sealed class WorkspaceController(IAdminDashboardQueryService adminDashboa
     }
 
     [HttpGet("tenancies")]
-    [ProducesResponseType<ApiPage<TenancyAdminRow>>(200)]
+    [ProducesResponseType<ApiPage<WorkspaceTenancy>>(200)]
     public async Task<IActionResult> Tenancies([FromQuery] ApiPageRequest query, CancellationToken cancellationToken)
     {
         var result = await tenancies.ListAsync(query.Page, query.PageSize, cancellationToken);
         return result.Status == TenancyQueryStatus.Success
-            ? Ok(new ApiPage<TenancyAdminRow>(result.Page!.Items, query.Page, query.PageSize, result.Page.TotalCount))
+            ? Ok(new ApiPage<WorkspaceTenancy>(result.Page!.Items.Select(row => new WorkspaceTenancy(
+                row.Id, row.PropertyTitle, row.PropertyAddress, row.TenantName, row.TenantEmail,
+                row.StartDate, row.EndDate, row.Status.ToString(), row.Version)).ToArray(),
+                query.Page, query.PageSize, result.Page.TotalCount))
             : ApiProblem(403, ApiErrorCodes.AccessDenied);
     }
 
@@ -98,6 +101,8 @@ public sealed record WorkspaceSummary(int? TotalUsers, int? TotalProperties,
     IReadOnlyList<LandlordPropertySummary> Properties, bool LocationLookupEnabled);
 public sealed record WorkspacePublishedProperty(int Id, string Title, string Address, decimal RentAmount,
     string? Description, Features.Properties.Contracts.PropertyLocation? Location, bool CanManage);
+public sealed record WorkspaceTenancy(int Id, string PropertyTitle, string PropertyAddress,
+    string TenantName, string TenantEmail, DateOnly StartDate, DateOnly? EndDate, string Status, string? Version);
 public sealed class RefreshLocationRequest
 {
     [Required, StringLength(24)] public string ExpectedVersion { get; init; } = string.Empty;

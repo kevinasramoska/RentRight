@@ -81,13 +81,18 @@ OpenStreetMap navigation with attribution and `noopener noreferrer`.
 
 ## Verification
 
-Verified on 2026-10-18: Release solution build had zero warnings/errors; **580
+Verified on 2026-10-18: Release solution build had zero warnings/errors; **583
 backend tests** passed, **54 SQL cases** passed (`WorkspaceSqlTests`: 18,
 `AccountSecuritySqlTests`: 36), and EF reported no pending model changes. Node 24
 lint, type checking, all **85 frontend tests** and production build passed. No
 live provider or developer database was used. Initial verification caught an old
 tenant-only test expectation, a test-only unsupported option and a concurrent
 build-cache collision; corrected tests and sequential .NET checks all pass.
+
+PR review caught numeric serialization of tenancy statuses in the manager list.
+A dedicated API response now supplies status names, preserving End/Cancel actions.
+Three HTTP regressions cover Active/Pending/Ended and the SQL ownership test also
+asserts the real serialized status and version.
 
 Checks include frontend lint, strict TypeScript, production build, API transport
 tests and real-cookie SQL role/resource tests. SQL tests own random disposable
@@ -144,6 +149,7 @@ build the shared .NET project from concurrent commands in the same checkout.
 | `Controllers/DashboardController.cs` | Existing role chooser selects React workspaces. |
 | `Views/Shared/_Layout.cshtml` | Identity/legacy navigation points to the React public entry. |
 | `RentRight.Tests/Api/WorkspaceApiTests.cs` | API role matrix, DTO outcomes, antiforgery, step-up, logout and OpenAPI. |
+| `RentRight.Tests/Api/TenanciesApiTests.cs` | Manager tenancy status-name serialization and retained contact/version contract. |
 | `RentRight.Tests/SqlIntegration/WorkspaceSqlTests.cs` | Real-cookie/SQL ownership, contact isolation, last-admin, disabled lookup and logout regressions. |
 | `RentRight.Tests/Dashboards/DashboardControllerTests.cs` | Verify intentional React destination changes and preserve legacy action tests. |
 | `RentRight.Tests/Properties/HomeControllerTests.cs` | Root redirect needs no property query; legacy latest-list test retained. |

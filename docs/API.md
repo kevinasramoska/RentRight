@@ -9,7 +9,7 @@ endpoints remain roadmap work; test-only probe controllers are not production AP
 
 F01-01 adds `/workspace` (manager overview), `/workspace/properties/{id}` (owned or
 Admin details/version), `/workspace/tenancies` (paged manager-scoped contact
-projection), `/workspace/invitation-form`, and a versioned POST to
+projection with `status` names `Active`, `Pending`, or `Ended`), `/workspace/invitation-form`, and a versioned POST to
 `/workspace/properties/{id}/location`. The anonymous
 `/workspace/published-properties/{id}` supplies public fields/location and a
 server-derived `canManage` hint, never an owner ID, version or provider reference.

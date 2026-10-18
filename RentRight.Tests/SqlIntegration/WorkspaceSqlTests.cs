@@ -97,6 +97,10 @@ public sealed class WorkspaceSqlTests(SqlServerFixture server) : IClassFixture<S
         using var ownerPage = await owner.GetAsync("/api/v1/workspace/tenancies");
         ownerPage.EnsureSuccessStatusCode();
         Assert.Contains("Tenant@example.test", await ownerPage.Content.ReadAsStringAsync());
+        using var json = JsonDocument.Parse(await ownerPage.Content.ReadAsStringAsync());
+        var row = json.RootElement.GetProperty("items")[0];
+        Assert.Equal("Active", row.GetProperty("status").GetString());
+        Assert.Equal(8, Convert.FromBase64String(row.GetProperty("version").GetString()!).Length);
         using var other = await _app.CreateActorClientAsync(Actor.OtherLandlord);
         using var hidden = await other.GetAsync("/api/v1/workspace/tenancies");
         hidden.EnsureSuccessStatusCode();
