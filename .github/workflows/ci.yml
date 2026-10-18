@@ -30,3 +30,6 @@ jobs:
       - run: dotnet restore RentRight.slnx
       - run: dotnet build RentRight.slnx --no-restore --configuration Release
       - run: dotnet test RentRight.slnx --no-restore --configuration Release
+      - name: Verify isolated Compose lifecycle
+        run: node scripts/verify-compose.mjs
+        timeout-minutes: 12

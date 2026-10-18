@@ -13,7 +13,8 @@ using RentRight.Models;
 using RentRight.Security;
 using RentRight.Integrations.Geocoding;
 
-var builder = WebApplication.CreateBuilder(args);
+var initializeLocal = args.Contains("--initialize-local", StringComparer.Ordinal);
+var builder = WebApplication.CreateBuilder(args.Where(argument => argument != "--initialize-local").ToArray());
 
 // -----------------
 // Database setup
@@ -51,6 +52,15 @@ builder.Services.AddBrowserSecurity(builder.Configuration, builder.Environment);
 builder.Services.AddRazorPages(); // ✅ needed for Identity UI
 
 var app = builder.Build();
+
+// Only the explicit, Development-only Compose job may migrate its dedicated database.
+if (initializeLocal)
+{
+    LocalDatabaseInitializer.ValidateTarget(app.Environment, app.Configuration);
+    await using var initializationScope = app.Services.CreateAsyncScope();
+    await initializationScope.ServiceProvider.GetRequiredService<ApplicationDbContext>()
+        .Database.MigrateAsync(app.Lifetime.ApplicationStopping);
+}
 
 // Seed roles and, in development, an optional administrator configured outside source control.
 using (var scope = app.Services.CreateScope())
@@ -97,6 +107,9 @@ using (var scope = app.Services.CreateScope())
         }
     }
 }
+
+// The one-shot job reuses the existing role/development-admin seed and never serves HTTP.
+if (initializeLocal) return;
 
 // -----------------
 // Middleware pipeline

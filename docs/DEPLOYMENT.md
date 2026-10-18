@@ -9,6 +9,10 @@ SQL Server containers; it does not verify the application Dockerfile or deployme
 
 ## Container and configuration
 
+For local development, use [LOCAL_COMPOSE.md](LOCAL_COMPOSE.md). Its separate
+Development-only initialization job migrates only the dedicated Compose database;
+it is not a production migration job or a reason to run public hosting in Development.
+
 Build from the repository root:
 
 ```bash
@@ -76,7 +80,10 @@ compilation errors in historical DDL/backfill batches. Generating a script is no
 proof it can execute: do not use those scripts as a verified bootstrap or replay
 mechanism. Applied migration history was not rewritten to hide this limitation.
 SQL command-line sessions also need quoted identifiers (`sqlcmd -I`) for existing
-filtered indexes. The application image does not migrate on startup.
+filtered indexes. Normal web startup does not migrate. The explicit
+`--initialize-local` process mode requires Development, an opt-in permission and
+the exact Compose SQL/database target; it exits after migrations and the existing
+role/development-admin seed, without opening an HTTP listener.
 Never copy a real tenancy database into the public demo.
 
 ## Identity and proxy requirements

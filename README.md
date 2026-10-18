@@ -43,11 +43,31 @@ The application uses ASP.NET Core Identity for authentication and role managemen
 ## Current Gaps
 
 The main business screens are available in React; Identity and compatibility
-views remain server-rendered. The combined Docker image is implemented;
-Compose, release/deployment and
+views remain server-rendered. The combined Docker image and local Compose
+environment are implemented; release/deployment and
 operational work remain on the roadmap. External OIDC is independently deferred.
 See [React business workspaces](docs/REACT_BUSINESS_WORKSPACES.md) for exact routes,
 retained Razor boundaries, security and verification.
+
+## Local Compose environment
+
+With Docker Desktop/Linux containers, the repository .NET SDK, OpenSSL and curl:
+
+```bash
+bash scripts/local-dev.sh init   # Once: private credentials and local HTTPS certificate
+bash scripts/local-dev.sh up     # Build, wait for SQL, initialize, and start HTTPS
+```
+
+Open the printed localhost HTTPS URL (default port 7443). Open the generated
+private `.local/compose/rentright-local/.env` file locally for the development
+admin login; credentials are never printed or committed. If your browser does
+not trust the development certificate, run `dotnet dev-certs https --trust`
+yourself. SQL has no host port. Normal stop/restart preserves database and login
+keys; deletion requires explicit project confirmation.
+
+See [the local runbook](docs/LOCAL_COMPOSE.md) for stop/logs/migrate/reset commands,
+parallel worktrees, prerequisites, verification and production boundaries. This
+environment uses only synthetic local data and is not a public demo deployment.
 
 ## Application container
 
