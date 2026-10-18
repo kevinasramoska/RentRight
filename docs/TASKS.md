@@ -436,6 +436,7 @@ Implementation checkpoint (2026-08-11): the focused core-domain request is imple
 
 ### P10-01 — Create a secure multi-stage application image
 
+- **Implementation status:** Complete locally: digest-pinned Node 24/.NET SDK stages and .NET 10.0.13 runtime, explicit prebuilt frontend publication, expanded secret/output exclusions and OCI metadata. Non-root/read-only SQL/HTTP smoke and actual public browser flow pass; Release build/583 backend tests/model check pass; patched image scan reports zero HIGH/CRITICAL findings. Raw historical SQL scripts failed bootstrap compilation; the disposable smoke uses EF's migrator instead, without changing migration history. See [CONTAINER_VERIFICATION.md](CONTAINER_VERIFICATION.md) for evidence and deployment boundaries; Compose is separate P10-02.
 - **Why it matters:** A reproducible image proves the combined .NET/React application can be built and run consistently outside a developer IDE.
 - **Files/components likely affected:** new `Dockerfile`, `.dockerignore`, project/client build configuration, runtime configuration documentation, health endpoint dependency from Phase 13 if available later.
 - **Implementation steps:**

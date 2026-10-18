@@ -43,10 +43,28 @@ The application uses ASP.NET Core Identity for authentication and role managemen
 ## Current Gaps
 
 The main business screens are available in React; Identity and compatibility
-views remain server-rendered. Docker packaging, Compose, release/deployment and
+views remain server-rendered. The combined Docker image is implemented;
+Compose, release/deployment and
 operational work remain on the roadmap. External OIDC is independently deferred.
 See [React business workspaces](docs/REACT_BUSINESS_WORKSPACES.md) for exact routes,
 retained Razor boundaries, security and verification.
+
+## Application container
+
+Build the combined React/.NET image with Docker from the repository root:
+
+```bash
+docker build --build-arg VERSION=local --build-arg REVISION="$(git rev-parse HEAD)" -t rentright-demo .
+bash scripts/verify-container.sh rentright-demo
+```
+
+The optional smoke requires the repository SDK/EF CLI, curl and OpenSSL. It uses
+only disposable SQL/app containers with fictional data; it does not use your
+configured database. The app image needs an already-migrated external SQL database
+at runtime. It runs non-root on port 8080 and contains neither Node nor the SDK.
+See [deployment configuration](docs/DEPLOYMENT.md) and
+[image verification and limitations](docs/CONTAINER_VERIFICATION.md). No hosting
+account or live deployment is configured by these commands.
 
 ## Tenant maintenance API
 
