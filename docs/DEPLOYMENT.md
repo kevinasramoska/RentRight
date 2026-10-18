@@ -2,7 +2,8 @@
 
 The demo needs a backend host that runs .NET 10/Linux containers and a managed
 SQL Server database. No hosting account, database, or public demo URL is currently
-configured. Application-container execution has not been verified locally.
+configured. The application image is built locally; the image smoke procedure
+and its exact verification boundary are recorded in [Container verification](CONTAINER_VERIFICATION.md).
 The separate [SQL integration suite](SQL_INTEGRATION_TESTS.md) exercises disposable
 SQL Server containers; it does not verify the application Dockerfile or deployment.
 
@@ -11,24 +12,71 @@ SQL Server containers; it does not verify the application Dockerfile or deployme
 Build from the repository root:
 
 ```bash
-docker build -t rentright-demo .
+docker build --build-arg VERSION=local --build-arg REVISION="$(git rev-parse HEAD)" -t rentright-demo .
 ```
 
 The container runs as the built-in non-root app user and listens on HTTP 8080.
+Its Node 24 stage builds React, its repository-matched .NET SDK stage publishes
+Release, and only the published output enters the ASP.NET runtime stage. All
+three base manifests are digest-pinned. The runtime uses .NET 10.0.13; this does
+not change the SDK or NuGet versions installed on a developer machine.
+
+Normal `dotnet publish` still installs/builds React. Only a pipeline that already
+built `wwwroot/app` may use `/p:BuildReactOnPublish=false`; missing `index.html`
+fails publication. Never bypass the build with unreviewed or stale assets.
+
+Build arguments are public image metadata, not secret inputs. Supply runtime
+configuration through the host's private settings, mounted secret files or
+`docker run --env VARIABLE_NAME` after privately exporting that variable. Never
+put credentials in build arguments, the Dockerfile, an image layer or a committed
+environment file. The build context excludes local environment files, keys,
+databases, test/build output and frontend dependencies.
+
+To refresh a base image, inspect its supported tag in the upstream registry,
+replace the tag/digest together, rebuild and repeat the smoke and vulnerability
+scan. A digest intentionally does not auto-update. Keep the SDK matched to
+`global.json`; runtime security patches can move within the .NET 10 line.
+
+For disposable local verification (Docker, the repository SDK/EF CLI, curl and
+OpenSSL required):
+
+```bash
+bash scripts/verify-container.sh rentright-demo
+```
+
+This creates and migrates only a fresh private SQL container, seeds one fictional
+listing without a usable login, then checks the read-only application. It cleans
+up its containers/network/temp files on exit, including failure. It never uses
+the configured local database, a shared database, or an existing Docker volume.
+SQL Server's amd64 Linux image requires Docker emulation on Apple Silicon.
+
+The image needs a reachable, already-migrated SQL database at startup because
+normal role seeding reads Identity tables. A container build alone is not a
+readiness check. No database or migration-on-start behavior is baked into it.
+
+Read-only execution needs writable temporary storage and a writable external key
+ring owned by UID/GID 1654. The smoke uses `/tmp` and an ephemeral
+`/home/app/.aspnet` tmpfs only. Do not use ephemeral, unencrypted keys for a public
+deployment; provision the encrypted persistent key ring below. The runtime has
+no Node, npm, .NET SDK or Git. No health endpoint/HEALTHCHECK is invented here;
+operational health remains a later phase.
+
 Configure TLS at the host, and set `ASPNETCORE_ENVIRONMENT=Production` and
 `ConnectionStrings__DefaultConnection` in the host's secret settings. Use an
 encrypted SQL connection with certificate validation; do not enable
 `TrustServerCertificate` in production or commit credentials.
 
-Before starting, apply reviewed EF migrations to an isolated demo database.
-For a reviewed SQL script, use the repository-matched EF CLI:
+Before starting, apply reviewed EF migrations to an isolated demo database using
+a separately reviewed migration job and a backup. A deployment migration job is
+not supplied by P10-01. The disposable smoke uses EF's migrator, like the SQL
+integration tests, against only its newly created container database.
 
-```bash
-dotnet ef migrations script --idempotent --output deployment-migrations.sql
-```
-
-Apply the script through the provider's authenticated database tooling after
-reviewing it and making a backup. The application does not migrate on startup.
+Both raw SQL script variants failed fresh-database execution with invalid-column
+compilation errors in historical DDL/backfill batches. Generating a script is not
+proof it can execute: do not use those scripts as a verified bootstrap or replay
+mechanism. Applied migration history was not rewritten to hide this limitation.
+SQL command-line sessions also need quoted identifiers (`sqlcmd -I`) for existing
+filtered indexes. The application image does not migrate on startup.
 Never copy a real tenancy database into the public demo.
 
 ## Identity and proxy requirements
@@ -57,8 +105,9 @@ Never copy a real tenancy database into the public demo.
 ## Verification and promotion
 
 Run the Release build and all tests. Verify a public property page, login,
-Admin/Landlord/Tenant resource boundaries, and create a property through the Razor
-form. It must submit to `/Properties/Create`; JSON clients continue using
+Admin/Landlord/Tenant resource boundaries, and create a property through React.
+It must submit to `/api/v1/properties`; the retained Razor form must still submit
+to `/Properties/Create`. JSON clients continue using
 `/api/v1/properties` with the existing CSRF and authorization requirements.
 The API area separates route values so MVC link generation cannot choose the API
 controller just because both controllers are called `PropertiesController`.

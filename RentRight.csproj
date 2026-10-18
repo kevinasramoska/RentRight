@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>RentRight-Local-Development</UserSecretsId>
+    <BuildReactOnPublish Condition="'$(BuildReactOnPublish)' == ''">true</BuildReactOnPublish>
   </PropertyGroup>
 
   <ItemGroup>
@@ -29,8 +30,10 @@
   </ItemGroup>
 
   <Target Name="BuildReactForPublish" BeforeTargets="_HandleFileConflictsForPublish">
-    <Exec WorkingDirectory="ClientApp" Command="npm ci" />
-    <Exec WorkingDirectory="ClientApp" Command="npm run build" />
+    <Exec WorkingDirectory="ClientApp" Command="npm ci" Condition="'$(BuildReactOnPublish)' != 'false'" />
+    <Exec WorkingDirectory="ClientApp" Command="npm run build" Condition="'$(BuildReactOnPublish)' != 'false'" />
+    <Error Condition="!Exists('wwwroot/app/index.html')"
+      Text="React assets are missing. Build ClientApp before publishing with BuildReactOnPublish=false." />
     <ItemGroup>
       <!-- Replace any frontend entries discovered from a previous local build. -->
       <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
