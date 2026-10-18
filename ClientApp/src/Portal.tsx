@@ -13,7 +13,7 @@ export function errorMessage(error: unknown): string {
   switch (error.status) {
     case 400: return 'Check the form and try again.';
     case 401: return 'Your session has ended. Sign in again.';
-    case 403: return 'You don’t have access to this tenant resource.';
+    case 403: return 'You don’t have access to this resource.';
     case 404: return 'This request is unavailable or no longer accessible.';
     case 409: return error.problem.code === 'no_active_tenancy' ? 'You need a currently active tenancy to submit a request.' : 'Your tenancy or request has changed. Review the overview before trying again.';
     case 429: return 'Too many requests. Please wait before trying again.';
@@ -34,7 +34,7 @@ function StatusBadge({ value }: { value: string }) {
   const tone = value === 'InProgress' ? 'progress' : value === 'Submitted' ? 'submitted' : ['Resolved', 'Closed'].includes(value) ? 'complete' : 'neutral';
   return <span className={`status-badge status-${tone}`}><span />{status(value)}</span>;
 }
-function NoTenancy() { return <div className="empty-state"><Icon name="home" /><h3>A home is waiting for you.</h3><p>You do not have a currently active tenancy. <a href="/Tenancies/Accept">Accept a valid invitation</a> or contact your landlord.</p></div>; }
+function NoTenancy() { return <div className="empty-state"><Icon name="home" /><h3>A home is waiting for you.</h3><p>You do not have a currently active tenancy. <a href="/app/tenancies/accept">Accept a valid invitation</a> or contact your landlord.</p></div>; }
 
 function RequestList({ items, basePath, compact = false }: { items: RecentRequest[]; basePath: string; compact?: boolean }) {
   return items.length === 0 ? <div className="empty-state"><Icon name="requests" /><p>No maintenance requests to show.</p><span>When you report an issue, you can follow its progress here.</span></div> : <ul className={`requests ${compact ? 'requests-compact' : ''}`}>{items.map(item => {

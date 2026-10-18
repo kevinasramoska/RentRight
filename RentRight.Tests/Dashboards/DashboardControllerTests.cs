@@ -11,10 +11,10 @@ namespace RentRight.Tests.Dashboards;
 public class DashboardControllerTests
 {
     [Theory]
-    [InlineData(DashboardDestination.Admin, nameof(DashboardController.AdminDashboard))]
-    [InlineData(DashboardDestination.Landlord, nameof(DashboardController.LandlordDashboard))]
-    [InlineData(DashboardDestination.Tenant, nameof(DashboardController.TenantDashboard))]
-    public void Index_RoleDestination_RedirectsToExpectedAction(
+    [InlineData(DashboardDestination.Admin, "/app/manage")]
+    [InlineData(DashboardDestination.Landlord, "/app/manage")]
+    [InlineData(DashboardDestination.Tenant, "/app/")]
+    public void Index_RoleDestination_RedirectsToExpectedReactWorkspace(
         DashboardDestination destination,
         string expectedAction)
     {
@@ -22,20 +22,20 @@ public class DashboardControllerTests
 
         var result = controller.Index();
 
-        var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(expectedAction, redirect.ActionName);
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal(expectedAction, redirect.Url);
     }
 
     [Fact]
-    public void Index_GenericDestination_ReturnsGenericView()
+    public void Index_GenericDestination_RedirectsToReactAccountEntry()
     {
         var controller = CreateController(
             routeOutcome: DashboardRouteOutcome.Success(DashboardDestination.Generic));
 
         var result = controller.Index();
 
-        var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal("GenericDashboard", view.ViewName);
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/app/", redirect.Url);
     }
 
     [Fact]

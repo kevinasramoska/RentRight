@@ -126,6 +126,13 @@ public sealed class RecentAuthenticationFilter(TimeProvider time) : IAsyncAuthor
                 time.GetUtcNow(), AccountSecurity.RecentAuthenticationAge)) return;
 
         // Never replay a sensitive POST automatically after reauthentication.
+        if (context.HttpContext.Request.Path.StartsWithSegments("/api"))
+        {
+            var problem = new ProblemDetails { Status = 403, Title = "Verify your password before changing roles." };
+            RentRight.Api.ApiProblemDetailsDefaults.Apply(problem, context.HttpContext, "reauthentication_required");
+            context.Result = new ObjectResult(problem) { StatusCode = 403, ContentTypes = { "application/problem+json" } };
+            return;
+        }
         var returnUrl = context.ActionDescriptor is PageActionDescriptor ? "/Identity/Account/Manage" : "/Admin";
         context.Result = new RedirectToPageResult("/Account/Reauthenticate", new { area = "Identity", returnUrl });
     }

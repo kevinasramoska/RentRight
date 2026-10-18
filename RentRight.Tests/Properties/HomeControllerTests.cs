@@ -9,6 +9,18 @@ namespace RentRight.Tests.Properties;
 public class HomeControllerTests
 {
     [Fact]
+    public async Task Index_RootEntry_RedirectsToReactWithoutQueryingDatabase()
+    {
+        var service = new FakePropertyService([]);
+        var controller = new HomeController(service) { ControllerContext = new ControllerContext
+        { HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext() } };
+        controller.HttpContext.Request.Path = "/";
+        var result = Assert.IsType<RedirectResult>(await controller.Index(default));
+        Assert.Equal("/app/properties", result.Url);
+        Assert.Null(service.Query);
+    }
+
+    [Fact]
     public async Task Index_Success_MapsBoundedLatestPropertyQueryToView()
     {
         IReadOnlyList<LatestPropertyListItem> properties =

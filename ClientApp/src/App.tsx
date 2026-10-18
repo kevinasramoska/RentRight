@@ -3,12 +3,17 @@ import { apiRequest } from './api/client';
 import { Portal, Failure } from './Portal';
 import { Workspace } from './components/Workspace';
 import { createDemoRequest } from './demo/demo';
+import { PublicProperties, ManagedProperties } from './business/Properties';
+import { Tenancies, AcceptInvitation } from './business/Tenancies';
+import { Overview, Maintenance, Administration } from './business/Management';
+import { PageHeading } from './business/ui';
 export interface Session { isAuthenticated: boolean; roles: ('Admin' | 'Landlord' | 'Tenant')[] }
 export default function App() {
   const [session, setSession] = useState<Session>();
   const [error, setError] = useState<unknown>();
   const [attempt, setAttempt] = useState(0);
   const [route, setRoute] = useState(location.pathname + location.search);
+  const [signingOut, setSigningOut] = useState(false);
   const demo = route.split('?')[0] === '/app/demo' || route.startsWith('/app/demo/');
   const demoRequest = useMemo(createDemoRequest, []);
   const clearSession = useCallback(() => { document.title = 'Tenant portal · RentRight'; setSession(undefined); }, []);
@@ -40,12 +45,36 @@ export default function App() {
     return () => controller.abort();
   }, [attempt, demo]);
   const tenant = session?.isAuthenticated === true && session.roles.includes('Tenant');
-  return <Workspace route={route} navigate={navigate} demo={demo} showTenantNavigation={demo || tenant}>
+  const manager = session?.isAuthenticated === true && session.roles.some(role => role === 'Admin' || role === 'Landlord');
+  const admin = session?.isAuthenticated === true && session.roles.includes('Admin');
+  const path = route.split('?')[0]?.replace(/\/$/, '') ?? '';
+  const publicPage = /^\/app\/properties(?:\/[1-9]\d*)?$/.test(path);
+  const business = /^\/app\/(manage|admin)(\/|$)/.test(path);
+  const pageProps = { route, navigate, onAccessLost: accessLost };
+  async function signOut() {
+    if (signingOut) return;
+    setSigningOut(true); clearSession();
+    try { await apiRequest('/api/v1/session/logout', { method: 'POST' }); refresh(); }
+    catch (reason) { setError(reason); }
+    finally { setSigningOut(false); }
+  }
+  function managerPage() {
+    if (path === '/app/manage' || path === '/app') return <Overview admin={admin} onAccessLost={accessLost} />;
+    if (/^\/app\/manage\/properties(?:\/new|\/[1-9]\d*(?:\/(?:edit|delete))?)?$/.test(path)) return <ManagedProperties {...pageProps} admin={admin} />;
+    if (/^\/app\/manage\/tenancies(?:\/new|\/[1-9]\d*\/end)?$/.test(path)) return <Tenancies {...pageProps} />;
+    if (/^\/app\/manage\/maintenance(?:\/[1-9]\d*)?$/.test(path)) return <Maintenance {...pageProps} />;
+    if (path === '/app/admin/users' && admin) return <Administration {...pageProps} />;
+    return <><PageHeading title="Page unavailable" /><p>This page is missing or not available for your role.</p></>;
+  }
+  return <Workspace route={route} navigate={navigate} demo={demo} showTenantNavigation={demo || tenant} manager={manager} admin={admin} authenticated={session?.isAuthenticated === true} onSignOut={() => void signOut()} signingOut={signingOut}>
     {demo ? <Portal key={`${route}:${attempt}`} route={route} navigate={navigate} onAccessLost={accessLost} request={demoRequest} basePath="/app/demo" demo />
+      : publicPage ? <PublicProperties key={`${route}:${attempt}`} {...pageProps} manager={manager} />
       : error ? <div className="welcome-state"><p className="eyebrow">LET’S GET YOU HOME</p><h1>Tenant portal</h1><Failure error={error} retry={refresh} /></div>
         : !session ? <div className="loading-state" role="status"><span className="loading-ring" />Loading your session…</div>
           : !session.isAuthenticated ? <div className="welcome-state"><p className="eyebrow">WELCOME TO RENTRIGHT</p><h1>A little more at home.</h1><p>Sign in to access your RentRight account.</p><a className="button button-primary" href="/Identity/Account/Login?returnUrl=%2Fapp%2F">Sign in</a><a className="text-link" href="/app/demo/">Explore the interactive demo →</a></div>
-            : !tenant ? <div className="welcome-state"><h1>Tenant access required</h1><p>This portal is available to tenants. Use your dashboard to manage your account.</p><a className="button button-primary" href="/Dashboard">Open dashboard</a></div>
-              : <Portal key={`${route}:${attempt}`} route={route} navigate={navigate} onAccessLost={accessLost} />}
+            : business || (manager && !tenant && path === '/app') ? manager ? <div key={`${route}:${attempt}`}>{managerPage()}</div> : <><PageHeading title="Manager access required" /><p>Only landlords and administrators may use this workspace.</p></>
+              : path === '/app/tenancies/accept' && tenant ? <AcceptInvitation key={`${route}:${attempt}`} {...pageProps} />
+                : !tenant ? <div className="welcome-state"><h1>Tenant access required</h1><p>This portal is available to tenants. Use your dashboard to manage your account.</p><a className="button button-primary" href="/app/properties">Browse properties</a></div>
+                  : <Portal key={`${route}:${attempt}`} route={route} navigate={navigate} onAccessLost={accessLost} />}
   </Workspace>;
 }

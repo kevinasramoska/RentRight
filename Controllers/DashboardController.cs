@@ -24,10 +24,8 @@ public class DashboardController(
 
         return outcome.Destination switch
         {
-            DashboardDestination.Admin => RedirectToAction(nameof(AdminDashboard)),
-            DashboardDestination.Landlord => RedirectToAction(nameof(LandlordDashboard)),
-            DashboardDestination.Tenant => RedirectToAction(nameof(TenantDashboard)),
-            DashboardDestination.Generic => View("GenericDashboard"),
+            DashboardDestination.Admin or DashboardDestination.Landlord => Redirect("/app/manage"),
+            DashboardDestination.Tenant or DashboardDestination.Generic => Redirect("/app/"),
             _ => throw new InvalidOperationException("Unknown dashboard destination.")
         };
     }

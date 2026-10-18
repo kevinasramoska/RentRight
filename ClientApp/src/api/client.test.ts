@@ -31,6 +31,13 @@ describe('apiRequest', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(problem), { status: 400, headers: { 'Content-Type': 'application/problem+json' } })));
     await expect(apiRequest('/api/v1/items')).rejects.toMatchObject({ status: 400, problem });
   });
+  it('sends a version precondition only on the mutation, not the token bootstrap', async () => {
+    const fetcher = vi.fn().mockResolvedValueOnce(json({ requestToken: 'test-token' })).mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetcher);
+    await apiRequest('/api/v1/properties/7', { method: 'DELETE', expectedVersion: 'AAAAAAAAAAE=' });
+    expect(new Headers(fetcher.mock.calls[0]![1].headers).has('X-Expected-Version')).toBe(false);
+    expect(new Headers(fetcher.mock.calls[1]![1].headers).get('X-Expected-Version')).toBe('AAAAAAAAAAE=');
+  });
   it.each(['<html>Private server error</html>', '{broken'])('uses a safe error for non-JSON or malformed failures', async body => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body, { status: 500, headers: { 'Content-Type': body.startsWith('{') ? 'application/json' : 'text/html' } })));
     await expect(apiRequest('/api/v1/items')).rejects.toMatchObject({ message: 'Request failed (500).', problem: {} });

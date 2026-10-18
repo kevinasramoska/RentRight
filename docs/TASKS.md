@@ -421,6 +421,17 @@ Implementation checkpoint (2026-08-11): the focused core-domain request is imple
 - **Dependencies:** P08-02 and P07-02.
 - **Resume/portfolio value:** Strong external-integration story covering HTTP resilience, options, caching, privacy, and degraded operation.
 
+## Phase 9A — React business-workspace migration
+
+### F01-01 — Unify business screens in the existing React application
+
+- **Priority:** User requested this before Docker on 2026-10-18.
+- **Implementation status:** Implemented with clean Release build, 580 backend tests, 85 frontend tests, 54 focused SQL/security cases and no model drift. Browser checks use fictional isolated fixtures, not a claimed live-browser database journey. See the report below for retained compatibility boundaries.
+- **Scope:** Public property catalog/details, landlord/Admin overview, owned/all property management, tenancy invitation/ending/acceptance, maintenance queue/triage, and Admin role management. Retain the .NET backend, SQL model, Identity pages and MVC compatibility routes.
+- **Implementation:** React business modules and role-aware shared navigation; focused workspace/admin API projections delegating to existing services; explicit CSRF-protected logout; versioned writes; API-safe recent-password response. Root entry and dashboard chooser select React; existing explicit MVC routes remain functional.
+- **Acceptance:** No frontend-only authorization; no direct EF/Identity entity binding; stale data clears on role/session changes; writes are not retried automatically; concurrency, last-admin, consent and retention rules stay intact. No schema or package change.
+- **Verification:** See [REACT_BUSINESS_WORKSPACES.md](REACT_BUSINESS_WORKSPACES.md) for the current run scope, retained Razor boundary and every changed file.
+
 ## Phase 10 — Docker and local development
 
 ### P10-01 — Create a secure multi-stage application image

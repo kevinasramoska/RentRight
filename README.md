@@ -1,6 +1,6 @@
 # RentRight
 
-RentRight is an ASP.NET Core MVC property management application for three user roles:
+RentRight is a property management application with a React/TypeScript business interface and an ASP.NET Core backend for three user roles:
 
 - `Admin` manages users and roles.
 - `Landlord` creates and manages property listings.
@@ -15,16 +15,17 @@ The application uses ASP.NET Core Identity for authentication and role managemen
 - `ASP.NET Core Identity`
 - `Entity Framework Core`
 - `SQL Server`
-- `Razor Views`
+- `React + TypeScript + Vite`
+- `Razor Pages` for Identity; retained MVC compatibility views
 - Built-in ASP.NET Core OpenAPI generation
 
 ## Current Features
 
-- Public home page with latest property listings
+- Searchable public property catalog in React
 - Public property list and property details pages
 - Authentication with Identity UI and focused account-security overrides
 - Automatic seeding of roles: `Admin`, `Landlord`, `Tenant`
-- Automatic seeding of a default admin user on startup
+- Optional development-only admin seeding from private configuration
 - Admin dashboard with total user and property counts
 - Admin user role management screen
 - Landlord dashboard showing the landlord's own properties
@@ -41,10 +42,11 @@ The application uses ASP.NET Core Identity for authentication and role managemen
 
 ## Current Gaps
 
-The core MVC workflow is implemented. The larger roadmap still includes:
-
-- Landlord maintenance API queue/filtering and React client
-- Landlord transition/concurrency UI and admin triage (P05-03)
+The main business screens are available in React; Identity and compatibility
+views remain server-rendered. Docker packaging, Compose, release/deployment and
+operational work remain on the roadmap. External OIDC is independently deferred.
+See [React business workspaces](docs/REACT_BUSINESS_WORKSPACES.md) for exact routes,
+retained Razor boundaries, security and verification.
 
 ## Tenant maintenance API
 
