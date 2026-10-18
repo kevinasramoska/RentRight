@@ -366,9 +366,24 @@ namespace RentRight.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
+                    b.Property<DateTime?>("GeocodedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("GeocodingPlaceId")
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
                     b.Property<string>("LandlordId")
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
+
+                    b.Property<decimal?>("Latitude")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("decimal(9,6)");
+
+                    b.Property<decimal?>("Longitude")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("decimal(9,6)");
 
                     b.Property<decimal>("RentAmount")
                         .HasPrecision(18, 2)
@@ -395,6 +410,8 @@ namespace RentRight.Migrations
 
                     b.ToTable("Properties", t =>
                         {
+                            t.HasCheckConstraint("CK_Properties_Location", "([Latitude] IS NULL AND [Longitude] IS NULL AND [GeocodingPlaceId] IS NULL AND [GeocodedUtc] IS NULL) OR ([Latitude] IS NOT NULL AND [Longitude] IS NOT NULL AND [GeocodingPlaceId] IS NOT NULL AND LEN([GeocodingPlaceId]) > 0 AND [GeocodedUtc] IS NOT NULL AND [Latitude] BETWEEN -90 AND 90 AND [Longitude] BETWEEN -180 AND 180)");
+
                             t.HasCheckConstraint("CK_Properties_RentAmount", "[RentAmount] >= 0");
                         });
                 });

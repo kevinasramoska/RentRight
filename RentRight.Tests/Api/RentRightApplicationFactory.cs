@@ -19,6 +19,7 @@ public sealed class RentRightApplicationFactory(
         builder.UseEnvironment(environmentName);
         builder.UseSetting("SeedAdmin:Email", string.Empty);
         builder.UseSetting("SeedAdmin:Password", string.Empty);
+        builder.UseSetting("Geocoding:Enabled", "false"); // Never inherit an operator's live provider settings.
         builder.ConfigureServices(services =>
         {
             // These HTTP contract tests use protected synthetic cookies, not persisted accounts.

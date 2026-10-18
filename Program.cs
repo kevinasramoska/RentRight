@@ -11,6 +11,7 @@ using RentRight.Features.Properties;
 using RentRight.Features.Tenancies;
 using RentRight.Models;
 using RentRight.Security;
+using RentRight.Integrations.Geocoding;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,6 +38,7 @@ builder.Services.AddRentalAuthorization();
 builder.Services.AddAccountSecurity();
 builder.Services.AddAdministrationFeature();
 builder.Services.AddPropertiesFeature();
+builder.Services.AddGeocoding(builder.Configuration);
 builder.Services.AddTenanciesAndDashboardsFeature();
 builder.Services.AddMaintenanceFeature();
 builder.Services.AddControllersWithViews(options =>

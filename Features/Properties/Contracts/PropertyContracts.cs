@@ -67,7 +67,11 @@ public sealed record PropertyDetails(
     decimal RentAmount,
     string? Description,
     bool CanManage,
-    string? Version = null);
+    string? Version = null,
+    PropertyLocation? Location = null,
+    bool LocationLookupEnabled = false);
+
+public sealed record PropertyLocation(decimal Latitude, decimal Longitude, DateTime GeocodedUtc);
 
 public sealed class PropertyCreateInput
 {

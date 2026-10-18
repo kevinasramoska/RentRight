@@ -8,7 +8,8 @@ namespace RentRight.Features.Properties;
 
 public sealed class PropertyService(
     IPropertyStore propertyStore,
-    ICurrentUser currentUser) : IPropertyService
+    ICurrentUser currentUser,
+    IPropertyLocationService locations) : IPropertyService
 {
     private const string AdministratorRole = AppRoles.Admin;
     private const string LandlordRole = AppRoles.Landlord;
@@ -123,6 +124,7 @@ public sealed class PropertyService(
                 ToValues(input.Title, input.Address, input.RentAmount, input.Description),
                 currentUser.UserId!,
                 cancellationToken);
+            await locations.EnrichAfterWriteAsync(propertyId, cancellationToken);
             return PropertyMutationOutcome.Success(propertyId);
         }
         catch (DbUpdateException)
@@ -186,8 +188,11 @@ public sealed class PropertyService(
             var updated = await propertyStore.UpdateAsync(
                 propertyId,
                 ToValues(input.Title, input.Address, input.RentAmount, input.Description) with
-                { ExpectedVersion = version, ExpectedLandlordId = property.Value!.LandlordId },
+                { ExpectedVersion = version, ExpectedLandlordId = property.Value!.LandlordId,
+                    AddressChanged = !string.Equals(input.Address, property.Value.Address, StringComparison.Ordinal) },
                 cancellationToken);
+            if (updated && !string.Equals(input.Address, property.Value!.Address, StringComparison.Ordinal))
+                await locations.EnrichAfterWriteAsync(propertyId, cancellationToken);
             return updated
                 ? PropertyMutationOutcome.Success(propertyId)
                 : PropertyMutationOutcome.Conflict();
@@ -309,7 +314,9 @@ public sealed class PropertyService(
             property.RentAmount,
             property.Description,
             CanManage(property.LandlordId),
-            property.Version);
+            property.Version,
+            property.Location,
+            locations.IsEnabled);
 
     private static PropertyValues ToValues(
         string title,

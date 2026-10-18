@@ -498,3 +498,21 @@ or managed Azure key store has been provisioned. Explicit persistent keys outsid
 Development/Testing require certificate encryption. See [Browser security](docs/BROWSER_SECURITY.md)
 for configuration, key/certificate lifecycle limits, remaining deployment gates,
 verification and an explanation of every changed file.
+
+## Optional property map locations (P09-01)
+
+Geoapify address enrichment is implemented but **disabled by default**. No account
+or live provider request is needed for normal property management. After a reviewed
+nullable-column migration, an operator may configure a private server-side key and
+enable bounded lookups after successful creates/address edits. Lookup failure does
+not undo a property save. Address edits clear old coordinates; stale responses cannot
+overwrite a newer property version. Owners/Admins can explicitly retry with CSRF and
+the current version. Reads never call the provider.
+
+Razor details show an approximate location card with attribution and an explicit
+OpenStreetMap link when coordinates exist; no map iframe/tiles or browser key are
+added. The public REST contracts and tenant portal remain unchanged. Enabled create/
+edit forms explain third-party address sharing. Apply the migration before deploying
+this code even if lookup stays off. No shared database was migrated by this task.
+See [Geocoding setup and file-by-file report](docs/GEOCODING.md) and the linked ADR
+for activation, privacy/terms, per-process quota limits and verification evidence.

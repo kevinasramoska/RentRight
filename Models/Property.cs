@@ -14,6 +14,11 @@ public class Property
     [StringLength(500)]
     public string Address { get; set; } = string.Empty;
 
+    public decimal? Latitude { get; set; }
+    public decimal? Longitude { get; set; }
+    public string? GeocodingPlaceId { get; set; }
+    public DateTime? GeocodedUtc { get; set; }
+
     [Range(0, double.MaxValue)] public decimal RentAmount { get; set; }
 
     [StringLength(2000)]
