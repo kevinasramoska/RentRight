@@ -476,6 +476,8 @@ Implementation checkpoint (2026-08-11): the focused core-domain request is imple
 
 ### P11-01 — Turn CI into a complete pull-request quality gate
 
+- **Implementation status:** Implemented; verification in progress — pinned read-only actions, parallel frontend/backend/container jobs, locked NuGet dependencies, CI warnings policy, full disposable SQL suite, coverage/TRX/JUnit artifacts, local pinned EF drift check, image scan and existing HTTPS Compose lifecycle. A fail-closed aggregate is available for branch protection; protection itself remains an owner action. Patch whitespace is enforced without reformatting the legacy C# baseline. See [CI.md](CI.md) for exact scope and evidence.
+
 - **Why it matters:** The current uncommitted workflow proves intent but only restores/builds/tests .NET. A full-stack project needs deterministic backend, frontend, migration, and container checks.
 - **Files/components likely affected:** `.github/workflows/ci.yml`, solution/build settings, package and npm lockfiles, formatter/linter configuration, test coverage/reporting, integration-test container settings, branch-protection documentation.
 - **Implementation steps:**

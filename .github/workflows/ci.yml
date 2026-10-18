@@ -3,33 +3,140 @@ name: Continuous Integration
 on:
   pull_request:
   push:
-    branches:
-      - main
+    branches: [main]
 
 permissions:
   contents: read
 
-jobs:
-  build-and-test:
-    runs-on: ubuntu-latest
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
+jobs:
+  frontend:
+    name: React quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          global-json-file: global.json
-      - uses: actions/setup-node@v4
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Verify patch whitespace
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [[ -n "$BASE_SHA" && "$BASE_SHA" != 0000000000000000000000000000000000000000 ]]; then
+            git diff --check "$BASE_SHA" HEAD
+          else
+            git show --check --format= HEAD
+          fi
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: ClientApp/package-lock.json
       - run: npm ci
         working-directory: ClientApp
-      - run: npm run lint && npm run type-check && npm test && npm run build
+      - name: Audit all frontend dependencies
+        run: npm audit --audit-level=high
         working-directory: ClientApp
-      - run: dotnet restore RentRight.slnx
-      - run: dotnet build RentRight.slnx --no-restore --configuration Release
-      - run: dotnet test RentRight.slnx --no-restore --configuration Release
-      - name: Verify isolated Compose lifecycle
+      - run: npm run lint && npm run type-check
+        working-directory: ClientApp
+      - name: Test React with JUnit report
+        run: npm test -- --reporter=default --reporter=junit --outputFile=../TestResults/frontend.xml
+        working-directory: ClientApp
+      - run: npm run build
+        working-directory: ClientApp
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: ${{ always() }}
+        with:
+          name: frontend-test-results
+          path: TestResults/frontend.xml
+          if-no-files-found: warn
+          retention-days: 7
+
+  backend:
+    name: .NET and SQL quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      ContinuousIntegrationBuild: 'true'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          global-json-file: global.json
+      - name: Restore all three projects with locked dependencies and audit
+        run: dotnet restore RentRight.CI.slnx --locked-mode
+      - name: Build once with warnings as errors
+        run: dotnet build RentRight.CI.slnx --no-restore --configuration Release
+      - name: Restore pinned EF tool and reject model drift
+        run: |
+          dotnet tool restore
+          dotnet ef migrations has-pending-model-changes --project RentRight.csproj --configuration Release --no-build
+      - name: Fast tests and production-assembly coverage
+        run: >-
+          dotnet test RentRight.Tests/RentRight.Tests.csproj --no-build --no-restore --configuration Release
+          --logger "trx;LogFileName=fast.trx" --results-directory TestResults/fast
+          --settings coverage.runsettings --collect:"Code Coverage;Format=Cobertura"
+      - name: Full disposable SQL Server suite
+        run: >-
+          dotnet test RentRight.Tests/SqlIntegration/RentRight.SqlIntegration.Tests.csproj
+          --no-build --no-restore --configuration Release
+          --logger "trx;LogFileName=sql.trx" --results-directory TestResults/sql
+          --blame-hang-timeout 5m
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: ${{ always() }}
+        with:
+          name: backend-test-results
+          path: |
+            TestResults/**/*.trx
+            TestResults/**/*.cobertura.xml
+          if-no-files-found: warn
+          retention-days: 7
+
+  container:
+    name: Container quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Build and scan the production image
+        run: |
+          docker build --build-arg VERSION=ci --build-arg REVISION="$GITHUB_SHA" --tag rentright:ci .
+          bash scripts/scan-image.sh rentright:ci
+      - name: Verify isolated HTTPS Compose lifecycle
         run: node scripts/verify-compose.mjs
         timeout-minutes: 12
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: ${{ always() }}
+        with:
+          name: container-vulnerability-report
+          path: TestResults/container-vulnerabilities.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  quality-gate:
+    name: Required quality gate
+    if: ${{ always() }}
+    needs: [frontend, backend, container]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    steps:
+      - name: Require every quality job to succeed
+        env:
+          FRONTEND: ${{ needs.frontend.result }}
+          BACKEND: ${{ needs.backend.result }}
+          CONTAINER: ${{ needs.container.result }}
+        run: '[[ "$FRONTEND" == success && "$BACKEND" == success && "$CONTAINER" == success ]]'

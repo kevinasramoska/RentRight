@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="RentRight.csproj" />
+  <Project Path="RentRight.Tests/RentRight.Tests.csproj" />
+  <Project Path="RentRight.Tests/SqlIntegration/RentRight.SqlIntegration.Tests.csproj" />
+</Solution>

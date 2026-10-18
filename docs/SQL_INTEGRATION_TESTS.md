@@ -10,8 +10,9 @@ No tests silently skip when Docker is unavailable. The test-only dependency is
 the [Testcontainers SQL Server module](https://dotnet.testcontainers.org/modules/mssql/),
 using its built-in readiness checks and resource lifecycle rather than custom
 Docker orchestration. Direct package versions are pinned, following the existing
-projects; the repository does not use NuGet lock files. Audit both the solution
-and this separate project when changing dependencies.
+projects. All three projects now have committed NuGet lock files; CI uses
+`RentRight.CI.slnx` to restore/build them together with locked mode and transitive
+auditing. The normal solution remains Docker-independent. See [CI quality gate](CI.md).
 
 ## Local execution
 
@@ -36,7 +37,7 @@ a developer database, local secrets, EF InMemory or SQLite as a fallback.
 
 ## Isolation and lifecycle
 
-Each suite run creates a SQL Server 2022 CU14 container with a random password and
+Each suite run creates a digest-pinned SQL Server 2022 CU14 container with a random password and
 random mapped port. Each test case creates a randomly named database and applies
 all real migrations before starting `WebApplicationFactory<Program>`; normal role
 seeding therefore uses SQL Server too. There is no production migration startup
