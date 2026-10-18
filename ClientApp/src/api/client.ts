@@ -26,7 +26,7 @@ export function parseProblem(value: unknown): ProblemDetails {
   }
   return result;
 }
-interface RequestOptions {
+export interface RequestOptions {
   method?: 'GET' | 'HEAD' | 'OPTIONS' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
   signal?: AbortSignal;
