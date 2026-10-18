@@ -40,7 +40,7 @@ export MSSQL_SA_PASSWORD="T!$(openssl rand -hex 24)a9"
 # SQL Server's Linux image is amd64; emulation must be enabled on Apple Silicon.
 docker run -d --name "$sql" --platform linux/amd64 --network "$network" --publish 127.0.0.1::1433 \
   --env ACCEPT_EULA=Y --env MSSQL_PID=Developer --env MSSQL_SA_PASSWORD \
-  mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04 >/dev/null
+  mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04@sha256:c1aa8afe9b06eab64c9774a4802dcd032205d1be785b1fd51e1c0151e7586b74 >/dev/null
 sqlcmd() {
   docker exec "$sql" sh -c 'SQLCMDPASSWORD="$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -I -b -l 2 -t 10 "$@"' sh "$@"
 }

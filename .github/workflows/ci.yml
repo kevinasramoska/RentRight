@@ -38,6 +38,8 @@ jobs:
           cache-dependency-path: ClientApp/package-lock.json
       - run: npm ci
         working-directory: ClientApp
+      - name: Verify release authorization and metadata rules
+        run: node --test scripts/release.test.mjs
       - name: Audit all frontend dependencies
         run: npm audit --audit-level=high
         working-directory: ClientApp
@@ -128,6 +130,11 @@ jobs:
         run: |
           docker build --build-arg VERSION=ci --build-arg REVISION="$GITHUB_SHA" --tag rentright:ci .
           bash scripts/scan-image.sh rentright:ci
+      - name: Rehearse release push, digest pull and Production smoke locally
+        run: |
+          dotnet tool restore
+          node scripts/verify-release.mjs rentright:ci
+        timeout-minutes: 12
       - name: Verify isolated HTTPS Compose lifecycle
         run: node scripts/verify-compose.mjs
         timeout-minutes: 12
