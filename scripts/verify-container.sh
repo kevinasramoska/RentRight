@@ -54,7 +54,7 @@ sqlcmd -Q 'CREATE DATABASE [RentRightImageSmoke]' >/dev/null
 sql_port="$(docker port "$sql" 1433/tcp)"
 export ConnectionStrings__DefaultConnection="Server=${sql_port/:/,};Database=RentRightImageSmoke;User ID=sa;Password=$MSSQL_SA_PASSWORD;Encrypt=True;TrustServerCertificate=True"
 echo "Applying EF migrations only to the SQL container created by this smoke."
-env Logging__LogLevel__Microsoft=Warning dotnet ef database update --project RentRight.csproj --configuration Release
+env ContinuousIntegrationBuild=true Logging__LogLevel__Microsoft=Warning dotnet ef database update --project RentRight.csproj --configuration Release
 echo "Disposable SQL database migrated. Seeding one fictional listing."
 # Synthetic public listing only. No password or usable login is seeded.
 sqlcmd -d RentRightImageSmoke -Q "INSERT INTO AspNetUsers (Id, FullName, EmailConfirmed, PhoneNumberConfirmed, TwoFactorEnabled, LockoutEnabled, AccessFailedCount) VALUES ('image-smoke-owner', 'Fictional owner', 0, 0, 0, 0, 0); INSERT INTO Properties (Title, Address, RentAmount, Description, LandlordId) VALUES ('Container smoke home', 'Synthetic street', 1200, 'Disposable verification listing', 'image-smoke-owner');" >/dev/null

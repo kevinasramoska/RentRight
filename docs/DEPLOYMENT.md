@@ -9,6 +9,14 @@ SQL Server containers; it does not verify the application Dockerfile or deployme
 
 ## Container and configuration
 
+For a registry release, follow [RELEASES.md](RELEASES.md). Private GHCR publication
+is manual, tied to passing protected-main CI and environment approval. Deployment
+must select a `verified` release's `ghcr.io/kevinasramoska/rentright@sha256:...`
+reference and separately authorize an environment/migration job. The metadata/SBOM
+is not deployment approval; no cloud host or database is provisioned by the release
+workflow. First live publication/visibility verification requires the merged
+workflow and owner approval; the local-registry rehearsal does not establish it.
+
 For local development, use [LOCAL_COMPOSE.md](LOCAL_COMPOSE.md). Its separate
 Development-only initialization job migrates only the dedicated Compose database;
 it is not a production migration job or a reason to run public hosting in Development.

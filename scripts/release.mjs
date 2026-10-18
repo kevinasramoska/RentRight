@@ -8,7 +8,6 @@ import { fileURLToPath } from 'node:url';
 
 export const repository = 'kevinasramoska/RentRight';
 export const imageRepository = 'ghcr.io/kevinasramoska/rentright';
-export const scanner = 'aquasec/trivy:0.76.0@sha256:2416d1f74045b57274df1a340eee6b510cacd73c66a6ccb8da092b117eb7d222';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const output = resolve(root, 'artifacts/release');
 const shaPattern = /^[a-f0-9]{40}$/;
@@ -68,15 +67,25 @@ async function api(path, { missing = false } = {}) {
   });
   if (missing && response.status === 404) return null;
   assert.ok(response.ok, `GitHub API request failed (${response.status}); no response body or credential is logged.`);
-  return response.json();
+  try { return await response.json(); }
+  catch { throw new Error('GitHub API returned invalid JSON; the response body is not logged.'); }
+}
+
+export function validateApprovalEnvironment(environment, ownerId) {
+  assert.equal(environment.name, 'ghcr-release');
+  assert.equal(environment.deployment_branch_policy?.protected_branches, true, 'Publication approval must remain restricted to protected branches.');
+  assert.ok(environment.protection_rules?.some(rule => rule.type === 'required_reviewers' &&
+    rule.reviewers.some(value => value.type === 'User' && value.reviewer.id === ownerId)), 'The owner approval rule must remain configured.');
 }
 
 export async function eligibility(runId, get = api, environment = process.env) {
   assert.match(String(runId), numberPattern, 'Select a numeric successful main CI run ID.');
   const prefix = `/repos/${repository}`;
-  const [repo, workflow, branch, run] = await Promise.all([
+  const [repo, workflow, branch, run, approval] = await Promise.all([
     get(prefix), get(`${prefix}/actions/workflows/ci.yml`), get(`${prefix}/branches/main`), get(`${prefix}/actions/runs/${runId}`),
+    get(`${prefix}/environments/ghcr-release`),
   ]);
+  validateApprovalEnvironment(approval, repo.owner.id);
   assert.ok(Number.isSafeInteger(run.run_attempt) && run.run_attempt > 0);
   const jobs = [];
   for (let page = 1; ; page++) {
@@ -119,11 +128,11 @@ export function pushAndPull(imageId, name, tag, sha) {
   assert.match(imageId, digestPattern);
   const target = `${name}:${tag}`;
   execute('docker', ['tag', imageId, target]);
-  execute('docker', ['push', target]);
+  execute('docker', ['push', '--quiet', target]);
   const pushed = JSON.parse(capture('docker', ['image', 'inspect', target]))[0];
   const digest = registryDigest(pushed.RepoDigests ?? [], name);
   const reference = `${name}@${digest}`;
-  execute('docker', ['pull', reference]);
+  execute('docker', ['pull', '--quiet', reference]);
   const pulled = JSON.parse(capture('docker', ['image', 'inspect', reference]))[0];
   assert.equal(verifyImage(pulled, sha), imageId, 'The pulled image must be the exact image tested before pushing.');
   return { digest, reference };
@@ -151,16 +160,17 @@ async function prepare(imageName, verifiedCi = null) {
   writeFileSync(resolve(output, 'vulnerabilities.json'), readFileSync(resolve(root, 'TestResults/container-vulnerabilities.json')));
   // Image bytes remain local. Only explicit metadata/report patterns are uploaded.
   execute('bash', ['scripts/release-sbom.sh', imageId]);
-  const migrations = readdirSync(resolve(root, 'Migrations')).filter(name => /^\d+_.+\.cs$/.test(name) && !name.endsWith('.Designer.cs')).sort();
+  const migrations = readdirSync(resolve(root, 'Migrations')).filter(name => name.endsWith('.cs')).sort();
   const manifest = { schemaVersion: 1, state: 'prepared', source: verifiedCi ?? { repository, commit, ciRunId: null },
     publicationEligible: Boolean(verifiedCi), build: { runId, attempt, platform: 'linux/amd64', imageConfigDigest: imageId },
     image: { repository: imageRepository, tag, digest: null, pullReference: null, visibility: 'private' },
-    inputs: Object.fromEntries(['Dockerfile', 'global.json', 'Directory.Build.props', 'packages.lock.json', 'ClientApp/package-lock.json'].map(path => [path, hash(resolve(root, path))])),
+    inputs: Object.fromEntries(['Dockerfile', 'global.json', 'Directory.Build.props', 'RentRight.csproj', 'packages.lock.json', 'ClientApp/package.json', 'ClientApp/package-lock.json'].map(path => [path, hash(resolve(root, path))])),
     migrations: { strategy: 'separate-reviewed-ef-job-required', applied: false, sourceCommit: commit,
+      latestMigration: migrations.filter(name => /^\d+_.+\.cs$/.test(name) && !name.endsWith('.Designer.cs')).at(-1)?.slice(0, -3),
       files: migrations.map(file => ({ file, sha256: hash(resolve(root, 'Migrations', file)) })) },
     deployment: { environment: null, authorized: false },
     rollback: { method: 'select-previous-verified-image-digest', databaseRollbackIncluded: false },
-    approval: { environment: 'ghcr-release', recordUrl: process.env.GITHUB_RUN_ID ? `https://github.com/${repository}/actions/runs/${runId}` : null },
+    approval: { requiredForPublication: true, environment: 'ghcr-release', recordUrl: process.env.GITHUB_RUN_ID ? `https://github.com/${repository}/actions/runs/${runId}` : null },
   };
   save('release.json', manifest); checksums();
   console.log(`Prepared ${commit}; publication eligible: ${manifest.publicationEligible}. No database deployment was performed.`);
@@ -189,6 +199,7 @@ async function publish() {
   }
   execute('docker', ['login', 'ghcr.io', '--username', process.env.GITHUB_ACTOR, '--password-stdin'], { input: process.env.GH_TOKEN, stdio: ['pipe', 'inherit', 'inherit'] });
   try {
+    manifest.state = 'publishing'; save('release.json', manifest); checksums();
     const { digest, reference } = pushAndPull(manifest.build.imageConfigDigest, imageRepository, manifest.image.tag, manifest.source.commit);
     Object.assign(manifest.image, { digest, pullReference: reference });
     manifest.state = 'published-unverified'; save('release.json', manifest); checksums();

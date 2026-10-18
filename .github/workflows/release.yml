@@ -89,8 +89,6 @@ jobs:
       contents: read
       actions: read
       packages: write
-    env:
-      DOCKER_CONFIG: ${{ runner.temp }}/rentright-ghcr
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -101,9 +99,12 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: global.json
+      - name: Create private temporary registry configuration
+        run: |
+          release_docker_config="$(mktemp -d "$RUNNER_TEMP/rentright-ghcr.XXXXXX")"
+          echo "DOCKER_CONFIG=$release_docker_config" >> "$GITHUB_ENV"
       - name: Build the exact source before login
         run: |
-          mkdir -m 700 -p "$DOCKER_CONFIG"
           dotnet tool restore
           docker build --build-arg VERSION="$GITHUB_SHA" --build-arg REVISION="$GITHUB_SHA" --tag rentright:release .
       - name: Smoke and scan without exposing the token to child processes
@@ -118,7 +119,7 @@ jobs:
           RENTRIGHT_PUBLISH_APPROVED: 'true'
         run: node scripts/release.mjs publish
       - name: Remove temporary registry login
-        if: ${{ always() }}
+        if: ${{ always() && env.DOCKER_CONFIG != '' }}
         run: docker logout ghcr.io
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ always() }}

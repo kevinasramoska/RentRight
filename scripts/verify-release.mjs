@@ -14,8 +14,11 @@ const name = `rentright-registry-${randomBytes(8).toString('hex')}`;
 let container;
 try {
   const image = process.argv[2]; assert.ok(image, 'Pass the already-built CI image.');
-  run(process.execPath, ['scripts/release.mjs', 'prepare', image]);
+  run(process.execPath, ['scripts/release.mjs', 'prepare', image], { env: { ...process.env, RENTRIGHT_CI_RUN_ID: '' } });
   const manifest = JSON.parse(readFileSync(resolve(root, 'artifacts/release/release.json'), 'utf8'));
+  const publishInputs = JSON.parse(capture('dotnet', ['msbuild', 'RentRight.csproj', '-getItem:Content']));
+  assert.ok(!publishInputs.Items.Content.some(item => /^(artifacts|TestResults)\//i.test(item.Identity.replaceAll('\\', '/'))),
+    'Normal dotnet publish must not copy diagnostic/release reports into the application.');
   assert.equal(manifest.publicationEligible, false);
   const denied = spawnSync(process.execPath, ['scripts/release.mjs', 'publish'], {
     cwd: root, encoding: 'utf8', env: { ...process.env, RENTRIGHT_PUBLISH_APPROVED: 'true' }, timeout: 10_000,
@@ -29,13 +32,21 @@ try {
     const [expected, file] = line.split('  ');
     assert.equal(createHash('sha256').update(readFileSync(resolve(root, 'artifacts/release', file))).digest('hex'), expected);
   }
-  container = capture('docker', ['run', '--detach', '--name', name, '--publish', '127.0.0.1::5000',
+  // Daemon-local loopback works both on Linux and inside Docker Desktop's VM.
+  // Kernel-assigned ports avoid adopting another process; debug also stays loopback-only.
+  container = capture('docker', ['run', '--detach', '--name', name, '--network', 'host',
+    '--env', 'REGISTRY_HTTP_ADDR=127.0.0.1:0', '--env', 'REGISTRY_HTTP_DEBUG_ADDR=127.0.0.1:0',
     'registry:3@sha256:ddf754342cfc8acc51a56d5d0ab6af06826461864460636d8bd5c546dab2a7b8']);
-  const address = capture('docker', ['port', container, '5000/tcp']);
-  assert.match(address, /^127\.0\.0\.1:\d+$/);
+  let address;
   let ready = false;
   for (let attempt = 0; attempt < 30; attempt++) {
-    try { ready = (await fetch(`http://${address}/v2/`, { signal: AbortSignal.timeout(2000) })).ok; } catch { /* bounded startup */ }
+    const logResult = spawnSync('docker', ['logs', container], { encoding: 'utf8', timeout: 3000 });
+    const logs = `${logResult.stdout ?? ''}${logResult.stderr ?? ''}`;
+    address = /msg="listening on (127\.0\.0\.1:\d+)"/.exec(logs)?.[1];
+    if (address) {
+      const probe = spawnSync('docker', ['exec', container, 'wget', '-q', '-O', '-', `http://${address}/v2/`], { encoding: 'utf8', timeout: 3000 });
+      ready = probe.status === 0;
+    }
     if (ready) break;
     await new Promise(done => setTimeout(done, 1000));
   }
