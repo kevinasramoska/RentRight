@@ -27,6 +27,7 @@ public static class ApiErrorCodes
     public const string ResourceNotFound = "resource_not_found";
     public const string ResourceConflict = "resource_conflict";
     public const string InternalError = "internal_error";
+    public const string RateLimited = "rate_limited";
 }
 
 public sealed class ApiPageRequest
@@ -91,6 +92,7 @@ internal static class ApiProblemDetailsDefaults
         StatusCodes.Status403Forbidden => ApiErrorCodes.AccessDenied,
         StatusCodes.Status404NotFound => ApiErrorCodes.ResourceNotFound,
         StatusCodes.Status409Conflict => ApiErrorCodes.ResourceConflict,
+        StatusCodes.Status429TooManyRequests => ApiErrorCodes.RateLimited,
         _ when statusCode >= StatusCodes.Status500InternalServerError =>
             ApiErrorCodes.InternalError,
         _ => ApiErrorCodes.InvalidRequest

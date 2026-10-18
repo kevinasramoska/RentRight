@@ -67,6 +67,7 @@ returning transport-neutral outcomes; the API maps representative outcomes as fo
 | 403 | `access_denied` | Authenticated caller is not permitted |
 | 404 | `resource_not_found` | Missing or deliberately concealed resource |
 | 409 | `resource_conflict` | State, history, or concurrency conflict |
+| 429 | `rate_limited` | Write budget exceeded; wait for `Retry-After` before an explicit retry |
 | 500 | `internal_error` | Unexpected server failure |
 
 Problem responses do not include exception messages, stack traces, provider/SQL
@@ -77,7 +78,7 @@ is the support/correlation handle. A controller must deliberately choose conceal
 ## Identity cookie and antiforgery behavior
 
 The React client is hosted on the same origin and uses the existing ASP.NET
-Core Identity application cookie with `credentials: "include"`. The API does not issue
+Core Identity application cookie with `credentials: "same-origin"`. The API does not issue
 or accept a custom JWT.
 
 Known `/api/v1` endpoints return Problem Details with 401 or 403 instead of redirecting
@@ -90,6 +91,20 @@ the `X-CSRF-TOKEN` header while also including the Identity cookie. The antiforg
 cookie alone is insufficient. The endpoint is no-store and issues a request token
 for the current session (including anonymous bootstrap); it does not weaken write
 authorization or antiforgery validation.
+
+The antiforgery cookie is explicitly Secure Always, HttpOnly and SameSite Strict.
+Tokens are tied to the current identity: an anonymous/previous-user request token
+must be replaced after sign-in/account changes. The client holds it in memory only,
+rejects external/traversal/ambiguous API paths and refuses redirects. No production
+CORS policy grants foreign origins access. CORS alone is not CSRF protection.
+
+Unsafe MVC/API writes now have per-process budgets (by default 60/minute per local
+user, anonymous by connection IP). Identity account POSTs separately share an IP
+budget of 20/minute. Rejections return no-store 429 with a positive `Retry-After`
+delta in seconds; APIs retain the Problem Details/trace contract. Reads and CSRF
+bootstrap remain available. Never automatically retry mutations; wait, review
+current state and explicitly retry. See [BROWSER_SECURITY.md](BROWSER_SECURITY.md)
+for configuration, baseline headers, proxy/NAT limits and external key persistence.
 
 P08-01 cookies are Secure/HttpOnly/SameSite=Lax, with a 30-minute sliding idle
 lifetime and an eight-hour absolute cap. Every authenticated request validates the

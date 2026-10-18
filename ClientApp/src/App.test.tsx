@@ -92,7 +92,7 @@ it('maps server field validation safely and preserves the entered description', 
   expect(document.body.textContent).not.toContain('private trace');
   expect((input as HTMLTextAreaElement).value).toBe('Kitchen tap leaking');
 });
-it.each([401, 403, 404, 409, 503])('handles %s without exposing server details or stale data', async code => {
+it.each([401, 403, 404, 409, 429, 503])('handles %s without exposing server details or stale data', async code => {
   handler = () => json({ title: 'private failure', detail: 'secret trace' }, code);
   open('/app/requests/7');
   expect(await screen.findByRole('alert')).toBeTruthy();
@@ -134,6 +134,7 @@ it('aborts a pending read on session refresh and ignores its late result', async
 });
 it('maps no-active-tenancy conflict and ignores raw problem text', () => {
   expect(errorMessage(new ApiError(409, { code: 'no_active_tenancy', detail: 'private' }))).toContain('currently active tenancy');
+  expect(errorMessage(new ApiError(429, { detail: 'private' }))).toContain('Please wait');
 });
 it('handles missing client routes without requesting tenant data', async () => {
   open('/app/unknown');

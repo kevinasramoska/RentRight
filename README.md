@@ -479,4 +479,22 @@ Sensitive account actions and role mutations require a password verified within
 and committing role/stamp changes together. Legitimate self-service stamp changes
 refresh only the current session without extending those security times.
 See [Authorization](docs/AUTHORIZATION.md) for policies, operational limits,
-verification and every changed file. OIDC/browser-boundary work remains P08-02.
+verification and every changed file.
+
+## Browser security (P08-02, external sign-in deferred)
+
+Local email/password login remains the only sign-in method; Google/Microsoft/Auth0
+integration is deferred, so the original P08-02 scope is not fully complete. The
+browser-security portion adds Secure/HttpOnly/Strict antiforgery cookies, baseline
+response headers, same-origin API path validation and configurable rate limits.
+Account POSTs default to 20/minute per connection IP; other writes to 60/minute per
+authenticated user (IP for anonymous). Reads/navigation remain available. Excess
+requests return 429 with Retry-After; React asks the user to wait without replaying
+writes. Limits are per process, not distributed/edge protection.
+
+An opt-in external key directory, stable application name and RSA PFX configuration
+support encrypted key persistence across restarts. No deployment volume, certificate
+or managed Azure key store has been provisioned. Explicit persistent keys outside
+Development/Testing require certificate encryption. See [Browser security](docs/BROWSER_SECURITY.md)
+for configuration, key/certificate lifecycle limits, remaining deployment gates,
+verification and an explanation of every changed file.

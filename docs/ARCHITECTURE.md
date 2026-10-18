@@ -572,3 +572,20 @@ persisted actor, preserve a usable local Admin and atomically rotate the target'
 stamp. Self-deletion cannot bypass retention/last-admin protection. No new schema
 or dependency was needed. Operational limits and verification are documented in
 the authorization report; P08-02/OIDC and deployment configuration remain separate.
+
+## P08-02 browser-security checkpoint (OIDC deferred)
+
+External sign-in/provider selection and account linking are deferred by user choice;
+local Identity remains the only sign-in method. The browser-boundary portion adds
+Secure/HttpOnly/Strict antiforgery cookies, baseline headers before static/MVC/API
+responses, same-origin client path validation and the framework's per-process
+account-IP/write-user rate limiter. Reads are not limited; rejected writes return
+no-store 429 with Retry-After and safe feedback. No permissive CORS is introduced.
+
+Opt-in persistent filesystem keys use an explicit stable application name and
+external certificate encryption, mandatory outside Development/Testing. No Azure
+resource/certificate/volume is provisioned. Proxy trust, actual persistent-volume
+verification, multi-certificate rotation and managed key storage remain deployment
+gates. This does not fulfill the original OIDC acceptance criteria. See
+[BROWSER_SECURITY.md](BROWSER_SECURITY.md) for the current boundary, configuration,
+testing and operational limitations.
