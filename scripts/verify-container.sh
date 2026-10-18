@@ -35,6 +35,10 @@ docker run --rm --entrypoint sh "$image" -ec '
 [[ "$(docker image inspect "$image" --format '{{.Config.User}}')" == 1654 ]]
 [[ "$(docker image inspect "$image" --format '{{json .Config.ExposedPorts}}')" == '{"8080/tcp":{}}' ]]
 
+# EF reads project metadata before its own build. A fresh runner has no assets file.
+env ContinuousIntegrationBuild=true dotnet restore RentRight.csproj --locked-mode
+env ContinuousIntegrationBuild=true dotnet build RentRight.csproj --configuration Release --no-restore
+
 docker network create "$network" >/dev/null
 export MSSQL_SA_PASSWORD="T!$(openssl rand -hex 24)a9"
 # SQL Server's Linux image is amd64; emulation must be enabled on Apple Silicon.
@@ -54,7 +58,7 @@ sqlcmd -Q 'CREATE DATABASE [RentRightImageSmoke]' >/dev/null
 sql_port="$(docker port "$sql" 1433/tcp)"
 export ConnectionStrings__DefaultConnection="Server=${sql_port/:/,};Database=RentRightImageSmoke;User ID=sa;Password=$MSSQL_SA_PASSWORD;Encrypt=True;TrustServerCertificate=True"
 echo "Applying EF migrations only to the SQL container created by this smoke."
-env ContinuousIntegrationBuild=true Logging__LogLevel__Microsoft=Warning dotnet ef database update --project RentRight.csproj --configuration Release
+env ContinuousIntegrationBuild=true Logging__LogLevel__Microsoft=Warning dotnet ef database update --project RentRight.csproj --configuration Release --no-build
 echo "Disposable SQL database migrated. Seeding one fictional listing."
 # Synthetic public listing only. No password or usable login is seeded.
 sqlcmd -d RentRightImageSmoke -Q "INSERT INTO AspNetUsers (Id, FullName, EmailConfirmed, PhoneNumberConfirmed, TwoFactorEnabled, LockoutEnabled, AccessFailedCount) VALUES ('image-smoke-owner', 'Fictional owner', 0, 0, 0, 0, 0); INSERT INTO Properties (Title, Address, RentAmount, Description, LandlordId) VALUES ('Container smoke home', 'Synthetic street', 1200, 'Disposable verification listing', 'image-smoke-owner');" >/dev/null

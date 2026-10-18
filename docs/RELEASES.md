@@ -159,6 +159,9 @@ Production SQL/HTTP smokes passed. The initial Docker Desktop published-port
 failure was resolved with daemon-local loopback listeners; no daemon settings
 were changed. Generated-report exclusion was checked against actual MSBuild
 publish inputs, not just project-file text. No live GHCR image is claimed.
+Fresh hosted verification also exposed EF's metadata evaluation requiring an
+existing assets file. The smoke now performs an explicit locked restore/build
+before EF's `--no-build` migration command, without relying on a developer cache.
 
 Release-rule tests cover source/repository/ref/workflow isolation, exact CI attempts,
 failed/pending/cancelled CI, missing/failed/skipped aggregate checks, input redaction,
