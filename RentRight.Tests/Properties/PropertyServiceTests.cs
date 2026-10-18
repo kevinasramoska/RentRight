@@ -408,7 +408,51 @@ public class PropertyServiceTests
         FakePropertyStore store,
         string? userId,
         params string[] roles) =>
-        new(store, new FakeCurrentUser(userId, roles));
+        new(store, new FakeCurrentUser(userId, roles), new NoLocationLookup());
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task UpdateAsync_AddressChangeOnly_EnrichesAfterSuccessfulSaveAndMarksLocationInvalidation(bool changed)
+    {
+        var store = new FakePropertyStore(Property("Original", "landlord-1", 1));
+        var locations = new NoLocationLookup();
+        var service = new PropertyService(store, new FakeCurrentUser("landlord-1", ["Landlord"]), locations);
+        var input = EditInput(1, "New title");
+        input.Address = changed ? "New address" : "1 Main Street";
+        locations.OnEnrich = id => Assert.Equal(input.Address, store.Properties.Single(property => property.Id == id).Address);
+
+        var result = await service.UpdateAsync(1, input, default);
+
+        Assert.Equal(PropertyOperationStatus.Success, result.Status);
+        Assert.Equal(changed ? 1 : 0, locations.Calls);
+        Assert.Equal(changed, store.LastValues!.AddressChanged);
+    }
+
+    [Fact]
+    public async Task CreateAsync_ValidatedPersistedProperty_EnrichesOnlyAfterSave()
+    {
+        var store = new FakePropertyStore();
+        var locations = new NoLocationLookup
+        { OnEnrich = id => Assert.Equal("Synthetic", store.Properties.Single(property => property.Id == id).Title) };
+        var service = new PropertyService(store, new FakeCurrentUser("owner", ["Landlord"]), locations);
+        var result = await service.CreateAsync(new PropertyCreateInput { Title = "Synthetic", Address = "Address" }, default);
+        Assert.Equal(PropertyOperationStatus.Success, result.Status);
+        Assert.Equal(1, locations.Calls);
+        await service.CreateAsync(new PropertyCreateInput(), default);
+        Assert.Equal(1, locations.Calls);
+    }
+
+    private sealed class NoLocationLookup : IPropertyLocationService
+    {
+        public bool IsEnabled => false;
+        public int Calls { get; private set; }
+        public Action<int>? OnEnrich { get; set; }
+        public Task EnrichAfterWriteAsync(int propertyId, CancellationToken cancellationToken)
+        { Calls++; OnEnrich?.Invoke(propertyId); return Task.CompletedTask; }
+        public Task<LocationRefreshStatus> RefreshAsync(int propertyId, string? expectedVersion, CancellationToken cancellationToken) =>
+            Task.FromResult(LocationRefreshStatus.Unavailable);
+    }
 
     private static PropertyEditInput EditInput(int id, string title) =>
         new()
@@ -452,6 +496,7 @@ public class PropertyServiceTests
         public PublishedPropertyQuery? LastPublishedQuery { get; private set; }
         public int CreateCount { get; private set; }
         public int UpdateCount { get; private set; }
+        public PropertyValues? LastValues { get; private set; }
         public int DeleteCount { get; private set; }
         public CancellationToken LastFindCancellationToken { get; private set; }
         public CancellationToken LastUpdateCancellationToken { get; private set; }
@@ -579,6 +624,7 @@ public class PropertyServiceTests
             CancellationToken cancellationToken)
         {
             UpdateCount++;
+            LastValues = values;
             LastUpdateCancellationToken = cancellationToken;
             if (!_properties.TryGetValue(propertyId, out var property))
             {

@@ -108,7 +108,9 @@ public sealed class EfPropertyStore(ApplicationDbContext context) : IPropertySto
                 property.RentAmount,
                 property.Description,
                 property.LandlordId,
-                Convert.ToBase64String(property.RowVersion)))
+                Convert.ToBase64String(property.RowVersion),
+                property.Latitude != null && property.Longitude != null && property.GeocodedUtc != null
+                    ? new PropertyLocation(property.Latitude.Value, property.Longitude.Value, property.GeocodedUtc.Value) : null))
             .SingleOrDefaultAsync(cancellationToken);
 
     public async Task<int> CreateAsync(
@@ -142,7 +144,12 @@ public sealed class EfPropertyStore(ApplicationDbContext context) : IPropertySto
                 .SetProperty(property => property.Title, values.Title)
                 .SetProperty(property => property.Address, values.Address)
                 .SetProperty(property => property.RentAmount, values.RentAmount)
-                .SetProperty(property => property.Description, values.Description), cancellationToken) == 1;
+                .SetProperty(property => property.Description, values.Description)
+                // Derived from the version-checked snapshot, not a posted flag or SQL's padded string equality.
+                .SetProperty(property => property.Latitude, property => values.AddressChanged ? null : property.Latitude)
+                .SetProperty(property => property.Longitude, property => values.AddressChanged ? null : property.Longitude)
+                .SetProperty(property => property.GeocodingPlaceId, property => values.AddressChanged ? null : property.GeocodingPlaceId)
+                .SetProperty(property => property.GeocodedUtc, property => values.AddressChanged ? null : property.GeocodedUtc), cancellationToken) == 1;
     }
 
     public async Task<PropertyDeleteStoreStatus> DeleteAsync(

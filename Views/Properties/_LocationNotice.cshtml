@@ -1,0 +1,7 @@
+@inject Microsoft.Extensions.Options.IOptions<RentRight.Integrations.Geocoding.GeocodingOptions> Geocoding
+@if (Geocoding.Value.Enabled)
+{
+    <p class="alert alert-info">Optional location lookup is enabled. After a successful save, new or changed addresses are sent to Geoapify
+        to estimate a map location. Do not include tenant names or other private information in the address.
+        A lookup failure will not undo your property save.</p>
+}

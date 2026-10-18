@@ -183,6 +183,15 @@ a fresh GET for another mutation. Public property list/detail contracts are unch
 Razor edit/delete forms carry the persisted version in hidden inputs. Values are
 concurrency preconditions, never access credentials; all ownership checks still apply.
 
+P09-01 preserves these request/response contracts. Optional server-side Geoapify
+enrichment can follow successful creates/address changes, but is off by default;
+provider failure does not undo the core save. Changing an address clears old
+location facts atomically. A successful enrichment/manager refresh advances the
+property rowversion, so obtain a current edit version before another mutation.
+Coordinates/provider references are not added to the REST DTOs; the optional
+location card and protected retry are currently Razor-only. No geocoding occurs
+on API reads. See [GEOCODING.md](GEOCODING.md) for schema/activation and safeguards.
+
 POST, PUT, and DELETE use the existing Identity cookie and require the
 `X-CSRF-TOKEN` antiforgery header. OpenAPI declares their cookie security requirement,
 request/response schemas, query filters, and documented status responses.

@@ -6,6 +6,8 @@ public static class PropertiesServiceCollectionExtensions
     {
         services.AddScoped<IPropertyStore, EfPropertyStore>();
         services.AddScoped<IPropertyService, PropertyService>();
+        services.AddScoped<IPropertyLocationWriter, EfPropertyLocationWriter>();
+        services.AddScoped<IPropertyLocationService, PropertyLocationService>();
 
         return services;
     }

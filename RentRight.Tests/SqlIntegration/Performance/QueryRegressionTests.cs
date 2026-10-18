@@ -59,7 +59,9 @@ public sealed class QueryRegressionTests(SqlServerFixture server) : IClassFixtur
     public async Task PublicProperties_TiesRentBoundariesAndOversizePage_PreserveResultsWithoutTracking()
     {
         await using var db = _app.CreateContext();
-        var service = new PropertyService(new EfPropertyStore(db), new QueryUser("anonymous"));
+        using var scope = _app.Services.CreateScope();
+        var service = new PropertyService(new EfPropertyStore(db), new QueryUser("anonymous"),
+            scope.ServiceProvider.GetRequiredService<IPropertyLocationService>());
         var large = (await service.SearchPublishedAsync(new(1, 500), default)).Value!;
         Assert.Equal(100, large.Items.Count);
         var first = (await service.SearchPublishedAsync(new(1, 7), default)).Value!;

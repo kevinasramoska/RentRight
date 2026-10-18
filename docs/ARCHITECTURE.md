@@ -589,3 +589,21 @@ verification, multi-certificate rotation and managed key storage remain deployme
 gates. This does not fulfill the original OIDC acceptance criteria. See
 [BROWSER_SECURITY.md](BROWSER_SECURITY.md) for the current boundary, configuration,
 testing and operational limitations.
+
+## P09-01 optional property location enrichment
+
+The selected Geoapify adapter is registered but disabled by default. It adds no
+package or separate deployable. Successful creates/address edits may invoke a
+bounded after-save lookup; public reads and unrelated edits never do. The existing
+property store invalidates old location facts atomically on address changes. A
+focused location service checks local manager/resource permissions, and its EF
+writer conditionally persists only against the observed owner/address/rowversion.
+
+Nullable coordinate/reference/UTC fields and a SQL consistency/range check require
+an incremental migration, with no backfill. Public REST DTOs and input contracts
+stay unchanged. The Razor location enhancement opens an external map only on an
+explicit click and includes source attribution; no embedded map SDK/browser key is
+introduced. The HTTP boundary has fixed TLS endpoint, bounded payload/cache/budget,
+two-attempt timeout, process-wide pacing/cooldown and no sensitive query logging.
+Activation, production privacy/quotas and live provider accuracy are not claimed
+by fake-response tests. See [GEOCODING.md](GEOCODING.md) and its provider ADR.

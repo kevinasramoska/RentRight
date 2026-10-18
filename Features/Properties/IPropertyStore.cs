@@ -55,7 +55,8 @@ public sealed record PropertyRecord(
     decimal RentAmount,
     string? Description,
     string LandlordId,
-    string? Version = null);
+    string? Version = null,
+    PropertyLocation? Location = null);
 
 public sealed record PropertyValues(
     string Title,
@@ -63,7 +64,8 @@ public sealed record PropertyValues(
     decimal RentAmount,
     string? Description,
     byte[]? ExpectedVersion = null,
-    string? ExpectedLandlordId = null);
+    string? ExpectedLandlordId = null,
+    bool AddressChanged = true);
 
 public sealed record PublishedPropertyPageRecord(
     IReadOnlyList<PublishedPropertyListItem> Items,

@@ -62,6 +62,12 @@ namespace RentRight.Data
                 entity.ToTable(table => table.HasCheckConstraint("CK_Properties_RentAmount", "[RentAmount] >= 0"));
                 entity.Property(property => property.Title).HasMaxLength(200);
                 entity.Property(property => property.Address).HasMaxLength(500);
+                entity.Property(property => property.Latitude).HasPrecision(9, 6);
+                entity.Property(property => property.Longitude).HasPrecision(9, 6);
+                entity.Property(property => property.GeocodingPlaceId).HasMaxLength(RentRight.Integrations.Geocoding.GeocodedLocation.MaximumPlaceIdLength);
+                entity.ToTable(table => table.HasCheckConstraint("CK_Properties_Location",
+                    "([Latitude] IS NULL AND [Longitude] IS NULL AND [GeocodingPlaceId] IS NULL AND [GeocodedUtc] IS NULL) OR " +
+                    "([Latitude] IS NOT NULL AND [Longitude] IS NOT NULL AND [GeocodingPlaceId] IS NOT NULL AND LEN([GeocodingPlaceId]) > 0 AND [GeocodedUtc] IS NOT NULL AND [Latitude] BETWEEN -90 AND 90 AND [Longitude] BETWEEN -180 AND 180)"));
                 entity.Property(property => property.Description).HasMaxLength(2000);
                 entity.Property(property => property.RentAmount).HasPrecision(18, 2);
 

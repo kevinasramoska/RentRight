@@ -31,6 +31,7 @@ public sealed class SqlApplication : WebApplicationFactory<Program>
     private readonly string _password = $"T!{Guid.NewGuid():N}a9";
     public string EnvironmentName { get; init; } = "Testing";
     public TimeProvider? Clock { get; init; }
+    public Action<IServiceCollection>? ConfigureTestServices { get; init; }
 
     public SqlApplication(string serverConnectionString, params IInterceptor[] interceptors)
     {
@@ -50,6 +51,7 @@ public sealed class SqlApplication : WebApplicationFactory<Program>
         builder.UseEnvironment(EnvironmentName);
         builder.UseSetting("SeedAdmin:Email", string.Empty);
         builder.UseSetting("SeedAdmin:Password", string.Empty);
+        builder.UseSetting("Geocoding:Enabled", "false"); // Enabled adapter tests explicitly install a fake transport.
         builder.ConfigureServices(services =>
         {
             services.AddLogging(logging => logging.AddProvider(new CaptureLogs(Logs)));
@@ -60,6 +62,7 @@ public sealed class SqlApplication : WebApplicationFactory<Program>
                 services.RemoveAll<TimeProvider>();
                 services.AddSingleton(Clock);
             }
+            ConfigureTestServices?.Invoke(services);
         });
     }
 

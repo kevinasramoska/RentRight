@@ -1,0 +1,30 @@
+@model RentRight.Features.Properties.Contracts.PropertyDetails
+@using System.Globalization
+
+@if (TempData["LocationMessage"] is string message)
+{
+    <p role="status" class="alert alert-info">@message</p>
+}
+@if (Model.Location is { } location)
+{
+    var latitude = location.Latitude.ToString("F6", CultureInfo.InvariantCulture);
+    var longitude = location.Longitude.ToString("F6", CultureInfo.InvariantCulture);
+    <section class="card mb-3" aria-label="Property location">
+        <div class="card-body">
+            <h3 class="h5">Approximate location</h3>
+            <p>@latitude, @longitude — an estimated address match, not a verified boundary.</p>
+            <p><a href="https://www.openstreetmap.org/?mlat=@latitude&amp;mlon=@longitude#map=16/@latitude/@longitude" target="_blank" rel="noopener noreferrer">Open location on OpenStreetMap (new tab)</a></p>
+            <p class="small">Updated @location.GeocodedUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) UTC.
+                Powered by <a href="https://www.geoapify.com/">Geoapify</a> ·
+                <a href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a>.</p>
+        </div>
+    </section>
+}
+@if (Model.CanManage && Model.LocationLookupEnabled)
+{
+    <form asp-controller="PropertyLocations" asp-action="Refresh" asp-route-id="@Model.Id" method="post" class="mb-3">
+        <input type="hidden" name="ExpectedVersion" value="@Model.Version" />
+        <button type="submit" class="btn btn-outline-secondary">Find or refresh map location</button>
+        <p class="small">Sends the saved address to Geoapify. Cached results may be reused. No property details are changed.</p>
+    </form>
+}

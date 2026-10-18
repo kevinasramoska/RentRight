@@ -23,6 +23,8 @@
     </dl>
 </div>
 
+<partial name="_Location" model="Model" />
+
 @if (Model.CanManage)
 {
     <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-warning">Edit</a>
