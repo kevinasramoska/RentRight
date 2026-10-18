@@ -145,7 +145,7 @@ public sealed class GeoapifyGeocodingClientTests
     {
         foreach (var value in new[] { "not JSON", "[]", "{}", "{\"results\":null}", "{\"results\":[null]}",
             Valid.Replace("53.349805", "91"), Valid.Replace("-6.26031", "-181"), Valid.Replace("53.349805", "1e999"),
-            Valid.Replace("53.349805", "\"53\""), Valid.Replace("synthetic-place", new string('x', 513)) })
+            Valid.Replace("53.349805", "\"53\""), Valid.Replace("synthetic-place", new string('x', 2049)) })
             yield return [value, GeocodingStatus.InvalidResponse];
         foreach (var value in new[] { Valid.Replace("building", "country"), Valid.Replace("0.95", "0.2"),
             Valid.Replace("openstreetmap", "unsupported-source"), Valid.Replace("0.95", "null") })
@@ -160,6 +160,18 @@ public sealed class GeoapifyGeocodingClientTests
         Assert.Equal(expected, result.Status);
         Assert.Null(result.Location);
         Assert.Single(fixture.Handler.Requests);
+    }
+
+    [Theory]
+    [InlineData(513)]
+    [InlineData(2048)]
+    public async Task Lookup_ValidLongProviderReference_PreservesEntireIdentifier(int length)
+    {
+        var placeId = new string('x', length);
+        using var fixture = new Fixture(_ => Json(Valid.Replace("synthetic-place", placeId)));
+        var result = await fixture.Client.LookupAsync("Synthetic", default);
+        Assert.Equal(GeocodingStatus.Found, result.Status);
+        Assert.Equal(placeId, result.Location!.PlaceId);
     }
 
     [Theory]

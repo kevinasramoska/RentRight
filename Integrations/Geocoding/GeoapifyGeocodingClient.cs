@@ -110,7 +110,7 @@ public sealed class GeoapifyGeocodingClient(HttpClient http, IOptions<GeocodingO
                 longitude.ValueKind != JsonValueKind.Number || !latitude.TryGetDecimal(out var lat) ||
                 !longitude.TryGetDecimal(out var lon) || lat is < -90 or > 90 || lon is < -180 or > 180 ||
                 !item.TryGetProperty("place_id", out var place) || place.ValueKind != JsonValueKind.String ||
-                string.IsNullOrWhiteSpace(place.GetString()) || place.GetString()!.Length > 512)
+                string.IsNullOrWhiteSpace(place.GetString()) || place.GetString()!.Length > GeocodedLocation.MaximumPlaceIdLength)
                 return new(GeocodingStatus.InvalidResponse);
             // Do not display a city/country centroid or a low-confidence guess as a home.
             // Limit this adapter to OSM-backed results so static source attribution is correct.

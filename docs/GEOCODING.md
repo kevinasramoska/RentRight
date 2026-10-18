@@ -34,12 +34,17 @@ The user-approved provider decision and source/terms review are in
 
 ## Configuration — later, outside source
 
-First apply the reviewed `20261018071947_OptionalPropertyGeocoding` migration to a
+First apply the reviewed `20261018071947_OptionalPropertyGeocoding` and
+`20261018080827_ExpandGeocodingPlaceId` migrations to a
 confirmed safe target using the existing deployment workflow. It adds nullable
 `Latitude`/`Longitude` (`decimal(9,6)`), a bounded `GeocodingPlaceId` and UTC
 `GeocodedUtc`, with an all-or-none/range constraint. Existing rows retain nulls;
 no external calls, data backfill, new index or rental/Identity relationship change
-is included. Down drops optional location data only; export it first if needed.
+is included. The follow-up migration widens the provider reference from 512 to
+2048 characters without rewriting the original migration. Reverting that widening
+requires exporting/removing references longer than 512 before narrowing; do not
+truncate them silently. Reverting the initial migration drops optional location
+data only; export it first if needed.
 The application never migrates or enables this feature automatically.
 
 Then create/configure your own provider project and review privacy/terms/quotas.
@@ -90,7 +95,7 @@ multiply budgets, other uses of the same key consume credits, and provider accou
 may differ. Set provider-side quota controls/alerts and reassess before scaling.
 
 Responses are limited to 64 KiB, including unknown-length streams, and JSON depth
-16. Coordinates must be numeric/in range, the reference bounded, the result an
+16. Coordinates must be numeric/in range, the reference bounded to 2048 characters, the result an
 OSM-backed building/amenity/street and confidence at least 0.8. Coarse centroids,
 unsupported sources and uncertain results remain address-only. Coordinates are
 rounded to six decimal places, never treated as verified boundaries.
@@ -112,15 +117,16 @@ the enabled-adapter test overrides every factory-created transport with a fake.
 | Check | Result |
 | --- | --- |
 | Release solution build | 0 warnings/errors. |
-| Final fast backend suite | 556 passed, 0 failed/skipped. |
-| New SQL/HTTP geocoding suite | 22 passed, 0 failed/skipped, approximately three minutes. |
+| Final fast backend suite | 560 passed, 0 failed/skipped, including the pre-merge provider-reference boundary cases. |
+| Focused geocoding/property service tests | 87 passed, 0 failed/skipped. |
+| New SQL/HTTP geocoding suite | 23 passed, 0 failed/skipped, including 2048-character reference persistence. |
 | Existing SQL regression selection | 83 passed, 0 failed/skipped, 6m56s: `SqlPipelineTests`, `IntegrityConcurrencyRetentionSqlTests`, `QueryRegressionTests`, `QueryIndexMigrationTests`. |
 | Final fake-HTTP adapter journey after test-host configuration guard | 1 passed; a rerun of an existing case, not an additional distinct case. |
 | Node 24 frontend | Lint, type check/build and all 53 tests passed. No frontend dependency/source changes. |
 | EF/model/migration | No pending model drift; reviewed Up/Down, incremental SQL and snapshot; real SQL migration rehearsal passed. |
-| Scope | 35 files, exactly matching the inventory below; no shared database, account, key or live lookup used. |
+| Scope | 37 files, including the pre-merge reference-length fix, matching the inventory below; no shared database, account, key or live lookup used. |
 
-There are 105 distinct passing SQL cases across these runs, not a claim that every
+There are 106 distinct passing SQL cases across these runs, not a claim that every
 SQL test was rerun. The first builds caught two test constructor/helper updates;
 those were corrected without changing behavioral assertions. No live provider
 accuracy, production deployment or real-browser/assistive-technology audit is claimed.
@@ -138,6 +144,8 @@ remain part of regression verification. Do not point tests at a shared database.
 | `Data/ApplicationDbContext.cs` | Precision, bounded reference and location consistency/range constraint. |
 | `Migrations/20261018071947_OptionalPropertyGeocoding.cs` | Incremental nullable-column/check migration and optional-data rollback. |
 | `Migrations/20261018071947_OptionalPropertyGeocoding.Designer.cs` | Generated target model for the new migration. |
+| `Migrations/20261018080827_ExpandGeocodingPlaceId.cs` | Preserve valid provider references up to 2048 characters; narrowing rollback requires checking existing lengths. |
+| `Migrations/20261018080827_ExpandGeocodingPlaceId.Designer.cs` | Generated target model for the widening migration. |
 | `Migrations/ApplicationDbContextModelSnapshot.cs` | Updated current model only. |
 | `Integrations/Geocoding/GeocodingContracts.cs` | Focused provider contract/results and disabled-by-default options. |
 | `Integrations/Geocoding/GeoapifyGeocodingClient.cs` | Fixed HTTPS protocol, bounds, quality, cancellation, retries and outcome metrics. |

@@ -73,7 +73,7 @@ public sealed class PropertyLocationService(IPropertyStore store, IPropertyLocat
             var result = await geocoding.LookupAsync(property.Address, cancellationToken);
             if (result.Status != GeocodingStatus.Found || result.Location is not { } point) return LocationRefreshStatus.Unavailable;
             if (point.Latitude is < -90 or > 90 || point.Longitude is < -180 or > 180 ||
-                string.IsNullOrWhiteSpace(point.PlaceId) || point.PlaceId.Length > 512) return LocationRefreshStatus.Unavailable;
+                string.IsNullOrWhiteSpace(point.PlaceId) || point.PlaceId.Length > GeocodedLocation.MaximumPlaceIdLength) return LocationRefreshStatus.Unavailable;
             return await writer.SaveAsync(property, point, clock.GetUtcNow().UtcDateTime, cancellationToken)
                 ? LocationRefreshStatus.Updated : LocationRefreshStatus.Conflict;
         }

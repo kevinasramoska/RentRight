@@ -370,8 +370,8 @@ namespace RentRight.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("GeocodingPlaceId")
-                        .HasMaxLength(512)
-                        .HasColumnType("nvarchar(512)");
+                        .HasMaxLength(2048)
+                        .HasColumnType("nvarchar(2048)");
 
                     b.Property<string>("LandlordId")
                         .IsRequired()

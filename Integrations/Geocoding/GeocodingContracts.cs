@@ -2,7 +2,10 @@ namespace RentRight.Integrations.Geocoding;
 
 public enum GeocodingStatus { Disabled, Found, NoResult, Unavailable, RateLimited, InvalidResponse }
 
-public sealed record GeocodedLocation(decimal Latitude, decimal Longitude, string PlaceId);
+public sealed record GeocodedLocation(decimal Latitude, decimal Longitude, string PlaceId)
+{
+    public const int MaximumPlaceIdLength = 2048;
+}
 public sealed record GeocodingResult(GeocodingStatus Status, GeocodedLocation? Location = null);
 
 public interface IGeocodingClient

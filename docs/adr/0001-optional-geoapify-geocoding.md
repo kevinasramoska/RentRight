@@ -31,6 +31,11 @@ Provider facts checked against primary sources on the date above:
   one result and country bias disabled. Only bounded coordinates/reference are
   retained, never the response address/profile payload.
   [Protocol](https://apidocs.geoapify.com/docs/geocoding/)
+- Pre-merge review aligned reference storage and both validation boundaries to
+  2048 characters. The provider documents place IDs returned by its APIs as
+  accepted through that length. A separate widening migration preserves the
+  original migration and existing values.
+  [Place-ID range](https://apidocs.geoapify.com/docs/places/index.html#structured-filters)
 
 ## Alternatives and tradeoffs
 

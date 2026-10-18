@@ -217,6 +217,20 @@ public sealed class PropertyGeocodingSqlTests : IClassFixture<SqlServerFixture>,
     }
 
     [Fact]
+    public async Task Refresh_LongProviderReference_PersistsWithoutTruncation()
+    {
+        var id = await SeedAsync();
+        var placeId = new string('x', 2048);
+        _geo.Result = new(GeocodingStatus.Found, new(53.349805m, -6.26031m, placeId));
+        using var client = await _app.CreateActorClientAsync(Actor.OwningLandlord);
+        await SqlApplication.AddAntiforgeryAsync(client);
+        using var response = await client.PostAsync($"/PropertyLocations/Refresh/{id}", Form(await VersionAsync(id)));
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        await using var db = _app.CreateContext();
+        Assert.Equal(placeId, (await db.Properties.SingleAsync()).GeocodingPlaceId);
+    }
+
+    [Fact]
     public async Task Migration_ExistingProperty_UpDownAndReapplyPreserveAddressAndOwnership()
     {
         await using var legacy = new SqlApplication(_server.ConnectionString);
@@ -225,9 +239,13 @@ public sealed class PropertyGeocodingSqlTests : IClassFixture<SqlServerFixture>,
         await using var db = legacy.CreateContext();
         await db.Database.ExecuteSqlRawAsync("INSERT INTO Properties (Title, Address, RentAmount, LandlordId) VALUES (N'Synthetic', N'Existing address', 1000, N'OwningLandlord')");
         var migrator = db.GetService<IMigrator>();
+        await migrator.MigrateAsync("20261018071947_OptionalPropertyGeocoding");
+        var originalReference = new string('x', 512);
+        await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE Properties SET Latitude = 53.3, Longitude = -6.2, GeocodedUtc = SYSUTCDATETIME(), GeocodingPlaceId = {originalReference}");
         await migrator.MigrateAsync();
         var property = await db.Properties.AsNoTracking().SingleAsync();
-        Assert.Null(property.Latitude);
+        Assert.Equal(53.3m, property.Latitude);
+        Assert.Equal(originalReference, property.GeocodingPlaceId);
         Assert.Equal("Existing address", property.Address);
         Assert.Equal("OwningLandlord", property.LandlordId);
         await migrator.MigrateAsync(previous);

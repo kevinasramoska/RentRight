@@ -71,6 +71,17 @@ public sealed class PropertyLocationServiceTests
         Assert.Equal(Version, writer.Snapshot!.Version);
     }
 
+    [Theory]
+    [InlineData(2048, LocationRefreshStatus.Updated)]
+    [InlineData(2049, LocationRefreshStatus.Unavailable)]
+    public async Task Refresh_ProviderReferenceBoundary_AcceptsOnlySupportedLength(int length, LocationRefreshStatus expected)
+    {
+        var writer = new Writer();
+        var client = new Client { Result = new(GeocodingStatus.Found, new(53.3m, -6.2m, new string('x', length))) };
+        Assert.Equal(expected, await Service(new Store(), writer, client).RefreshAsync(1, Version, default));
+        Assert.Equal(expected == LocationRefreshStatus.Updated ? 1 : 0, writer.Calls);
+    }
+
     [Fact]
     public async Task EnrichAfterWrite_DatabaseErrorOrCancellation_DoesNotUndoCoreSave()
     {
