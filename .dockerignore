@@ -1,5 +1,6 @@
 .git
 .github
+.local
 **/.git
 **/.vs
 **/.vscode
@@ -12,6 +13,7 @@ ClientApp/dist
 wwwroot/app
 RentRight.Tests
 scripts
+compose.yml
 **/TestResults
 **/coverage
 artifacts

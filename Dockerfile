@@ -24,6 +24,7 @@ LABEL org.opencontainers.image.title="RentRight" \
       org.opencontainers.image.version=$VERSION \
       org.opencontainers.image.revision=$REVISION
 WORKDIR /app
+RUN mkdir -p /var/lib/rentright/keys && chown "$APP_UID:$APP_UID" /var/lib/rentright/keys
 ENV ASPNETCORE_ENVIRONMENT=Production
 ENV ASPNETCORE_HTTP_PORTS=8080
 COPY --from=build /app/publish .

@@ -455,6 +455,7 @@ Implementation checkpoint (2026-08-11): the focused core-domain request is imple
 
 ### P10-02 — Add a one-command Docker Compose development environment
 
+- **Implementation status:** Implemented locally: private setup, loopback HTTPS, private SQL, explicit guarded migration/admin job, persistent SQL/key volumes, scoped confirmed reset and a CI lifecycle smoke. Release build/596 backend tests/model check pass; real HTTPS login/API/SQL save, restart/down-up cookie/data persistence, repeatable initialization, graceful shutdown and reset tests pass. Real browser sign-in and React property creation also pass without fixtures. See [LOCAL_COMPOSE.md](LOCAL_COMPOSE.md) for commands, verification and every changed file. Production hosting/health and full CI expansion remain separate phases.
 - **Why it matters:** Local SQL Server setup is currently machine-specific. Compose makes onboarding and integration testing predictable while retaining SQL Server fidelity.
 - **Files/components likely affected:** new `compose.yml` and optional development override, `.env.example`, app settings/options, migration/seed helper command or profile, README/runbook.
 - **Implementation steps:**
