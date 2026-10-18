@@ -1,0 +1,134 @@
+name: Manual private GHCR release
+
+on:
+  workflow_dispatch:
+    inputs:
+      ci_run_id:
+        description: Successful main push CI run ID for the current main commit
+        required: true
+        type: string
+      publish:
+        description: Publish privately after environment approval (false is a metadata-only rehearsal)
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rentright-private-release
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: ${{ github.repository == 'kevinasramoska/RentRight' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Require exact successful protected-main CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_RUN_ID: ${{ inputs.ci_run_id }}
+        run: node scripts/release.mjs validate "$CI_RUN_ID"
+
+  rehearsal:
+    needs: validate
+    if: ${{ !inputs.publish }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+      - name: Build without registry credentials
+        run: |
+          dotnet tool restore
+          docker build --build-arg VERSION="$GITHUB_SHA" --build-arg REVISION="$GITHUB_SHA" --tag rentright:release .
+      - name: Verify and prepare release metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RENTRIGHT_CI_RUN_ID: ${{ inputs.ci_run_id }}
+        run: |
+          node scripts/release.mjs prepare rentright:release
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-rehearsal-metadata
+          path: |
+            artifacts/release/release.json
+            artifacts/release/sbom.cdx.json
+            artifacts/release/vulnerabilities.json
+            artifacts/release/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    needs: validate
+    if: ${{ inputs.publish }}
+    environment: ghcr-release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      actions: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+      - name: Create private temporary registry configuration
+        run: |
+          release_docker_config="$(mktemp -d "$RUNNER_TEMP/rentright-ghcr.XXXXXX")"
+          echo "DOCKER_CONFIG=$release_docker_config" >> "$GITHUB_ENV"
+      - name: Build the exact source before login
+        run: |
+          dotnet tool restore
+          docker build --build-arg VERSION="$GITHUB_SHA" --build-arg REVISION="$GITHUB_SHA" --tag rentright:release .
+      - name: Smoke and scan without exposing the token to child processes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RENTRIGHT_CI_RUN_ID: ${{ inputs.ci_run_id }}
+        run: |
+          node scripts/release.mjs prepare rentright:release
+      - name: Recheck CI, publish privately and smoke the digest pull
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RENTRIGHT_PUBLISH_APPROVED: 'true'
+        run: node scripts/release.mjs publish
+      - name: Remove temporary registry login
+        if: ${{ always() && env.DOCKER_CONFIG != '' }}
+        run: docker logout ghcr.io
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ always() }}
+        with:
+          name: private-release-metadata
+          path: |
+            artifacts/release/release.json
+            artifacts/release/sbom.cdx.json
+            artifacts/release/vulnerabilities.json
+            artifacts/release/SHA256SUMS
+          if-no-files-found: warn
+          retention-days: 90

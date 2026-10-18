@@ -11,6 +11,8 @@
   <ItemGroup>
     <Compile Remove="RentRight.Tests/**" />
     <Content Remove="ClientApp/**" />
+    <Content Remove="artifacts/**" />
+    <Content Remove="TestResults/**" />
     <Content Remove="wwwroot/app/**" />
     <None Remove="ClientApp/node_modules/**" />
     <Content Remove="RentRight.Tests/**" />

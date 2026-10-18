@@ -7,9 +7,9 @@ produce a green aggregate. Superseded runs for the same PR/ref are cancelled.
 
 | Job | Blocking checks |
 | --- | --- |
-| React quality | Patch whitespace, `npm ci`, all-dependency high/critical audit, ESLint, TypeScript, all Vitest tests, production build |
+| React quality | Patch whitespace, pinned workflow syntax/context lint, release-authorization unit tests, `npm ci`, all-dependency high/critical audit, ESLint, TypeScript, all Vitest tests, production build |
 | .NET and SQL quality | Locked restore and audit of all three projects, warnings-as-errors Release build, pinned EF model-drift check, fast tests with production-assembly coverage, complete SQL Server integration suite |
-| Container quality | Locked production Docker build, high/critical vulnerability scan, actual isolated HTTPS Compose lifecycle |
+| Container quality | Locked production Docker build, high/critical vulnerability scan, real local-registry push/digest-pull/Production smoke/SBOM rehearsal, actual isolated HTTPS Compose lifecycle |
 
 `RentRight.CI.slnx` includes the SQL project that the ordinary `RentRight.slnx`
 intentionally excludes. The backend restores/builds all three projects once;
@@ -58,6 +58,10 @@ run. Wall-clock/plan collection is not a stable PR gate.
 Reports uploaded even after failure, when present, are frontend JUnit, backend
 TRX/Cobertura, and the container vulnerability JSON. Retention is seven days.
 The public React asset transfer is kept for one day; it is not a release artifact.
+Release rehearsals upload only the explicit `release.json`, CycloneDX SBOM,
+vulnerability JSON and checksum metadata (seven days), never private image archives.
+PR/local manifests cannot publish. See [RELEASES.md](RELEASES.md) for the separately
+approved private GHCR publisher, deployment contract and live-activation boundary.
 Only explicit report patterns are uploaded, not environment files, certificate
 exports, whole workspaces, database backups, core dumps or application logs.
 Reports contain test names, source paths and synthetic test output; review them

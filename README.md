@@ -145,6 +145,11 @@ RentRight/
 
 ## Tests and Coverage
 
+Manual private GHCR release tooling is described in [Release images](docs/RELEASES.md).
+Only a successful protected-main CI run can authorize a release, and publication
+requires explicit environment approval. Image release is separate from hosting
+the website or applying database migrations; first live activation follows merge.
+
 Pull requests run React checks, the fast and full disposable SQL Server suites,
 coverage reporting, migration-drift detection, and a scanned application image
 with HTTPS Compose lifecycle checks. See [CI quality gate](docs/CI.md) for local

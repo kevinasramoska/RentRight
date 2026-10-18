@@ -35,12 +35,16 @@ docker run --rm --entrypoint sh "$image" -ec '
 [[ "$(docker image inspect "$image" --format '{{.Config.User}}')" == 1654 ]]
 [[ "$(docker image inspect "$image" --format '{{json .Config.ExposedPorts}}')" == '{"8080/tcp":{}}' ]]
 
+# EF reads project metadata before its own build. A fresh runner has no assets file.
+env ContinuousIntegrationBuild=true dotnet restore RentRight.csproj --locked-mode
+env ContinuousIntegrationBuild=true dotnet build RentRight.csproj --configuration Release --no-restore
+
 docker network create "$network" >/dev/null
 export MSSQL_SA_PASSWORD="T!$(openssl rand -hex 24)a9"
 # SQL Server's Linux image is amd64; emulation must be enabled on Apple Silicon.
 docker run -d --name "$sql" --platform linux/amd64 --network "$network" --publish 127.0.0.1::1433 \
   --env ACCEPT_EULA=Y --env MSSQL_PID=Developer --env MSSQL_SA_PASSWORD \
-  mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04 >/dev/null
+  mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04@sha256:c1aa8afe9b06eab64c9774a4802dcd032205d1be785b1fd51e1c0151e7586b74 >/dev/null
 sqlcmd() {
   docker exec "$sql" sh -c 'SQLCMDPASSWORD="$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -I -b -l 2 -t 10 "$@"' sh "$@"
 }
@@ -54,7 +58,7 @@ sqlcmd -Q 'CREATE DATABASE [RentRightImageSmoke]' >/dev/null
 sql_port="$(docker port "$sql" 1433/tcp)"
 export ConnectionStrings__DefaultConnection="Server=${sql_port/:/,};Database=RentRightImageSmoke;User ID=sa;Password=$MSSQL_SA_PASSWORD;Encrypt=True;TrustServerCertificate=True"
 echo "Applying EF migrations only to the SQL container created by this smoke."
-env Logging__LogLevel__Microsoft=Warning dotnet ef database update --project RentRight.csproj --configuration Release
+env ContinuousIntegrationBuild=true Logging__LogLevel__Microsoft=Warning dotnet ef database update --project RentRight.csproj --configuration Release --no-build
 echo "Disposable SQL database migrated. Seeding one fictional listing."
 # Synthetic public listing only. No password or usable login is seeded.
 sqlcmd -d RentRightImageSmoke -Q "INSERT INTO AspNetUsers (Id, FullName, EmailConfirmed, PhoneNumberConfirmed, TwoFactorEnabled, LockoutEnabled, AccessFailedCount) VALUES ('image-smoke-owner', 'Fictional owner', 0, 0, 0, 0, 0); INSERT INTO Properties (Title, Address, RentAmount, Description, LandlordId) VALUES ('Container smoke home', 'Synthetic street', 1200, 'Disposable verification listing', 'image-smoke-owner');" >/dev/null

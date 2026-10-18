@@ -31,6 +31,13 @@ jobs:
           else
             git show --check --format= HEAD
           fi
+      - name: Validate workflow syntax and expression contexts
+        run: >-
+          docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges
+          --mount "type=bind,src=$GITHUB_WORKSPACE/.github,dst=/repo/.github,readonly"
+          --workdir /repo
+          rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+          -shellcheck= .github/workflows/ci.yml .github/workflows/release.yml
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
@@ -38,6 +45,8 @@ jobs:
           cache-dependency-path: ClientApp/package-lock.json
       - run: npm ci
         working-directory: ClientApp
+      - name: Verify release authorization and metadata rules
+        run: node --test scripts/release.test.mjs
       - name: Audit all frontend dependencies
         run: npm audit --audit-level=high
         working-directory: ClientApp
@@ -124,10 +133,14 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
-      - name: Build and scan the production image
+      - name: Build the production image
         run: |
           docker build --build-arg VERSION=ci --build-arg REVISION="$GITHUB_SHA" --tag rentright:ci .
-          bash scripts/scan-image.sh rentright:ci
+      - name: Rehearse release push, digest pull and Production smoke locally
+        run: |
+          dotnet tool restore
+          node scripts/verify-release.mjs rentright:ci
+        timeout-minutes: 12
       - name: Verify isolated HTTPS Compose lifecycle
         run: node scripts/verify-compose.mjs
         timeout-minutes: 12
@@ -136,6 +149,17 @@ jobs:
         with:
           name: container-vulnerability-report
           path: TestResults/container-vulnerabilities.json
+          if-no-files-found: warn
+          retention-days: 7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ always() }}
+        with:
+          name: release-dry-run-metadata
+          path: |
+            artifacts/release/release.json
+            artifacts/release/sbom.cdx.json
+            artifacts/release/vulnerabilities.json
+            artifacts/release/SHA256SUMS
           if-no-files-found: warn
           retention-days: 7
 

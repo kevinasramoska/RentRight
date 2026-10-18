@@ -497,6 +497,8 @@ Implementation checkpoint (2026-08-11): the focused core-domain request is imple
 
 ### P11-02 — Produce immutable, traceable release artifacts
 
+- **Implementation status:** Implemented for review; live activation pending merge/owner approval — chosen private GHCR, manual dispatch only, exact protected-main push CI/attempt guard, isolated package-write job with configured owner approval, unique source/run/attempt tags, tested-image digest pull and Production smoke, CycloneDX SBOM/checksums and explicit image/migration/deployment/rollback metadata. PR CI rehearses against a disposable loopback registry without GHCR write credentials. No shared database migration, executable migration bundle, signed provenance, cloud deployment or live GHCR publication is claimed. See [RELEASES.md](RELEASES.md) for activation, scope and verification.
+
 - **Why it matters:** Continuous delivery starts with a repeatable artifact tied to tested source; rebuilding differently during deployment undermines confidence.
 - **Files/components likely affected:** new release workflow, container registry settings, version/label generation, changelog/release notes automation, SBOM/provenance configuration, deployment interface documentation.
 - **Implementation steps:**
