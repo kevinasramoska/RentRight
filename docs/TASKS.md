@@ -476,6 +476,8 @@ Implementation checkpoint (2026-08-11): the focused core-domain request is imple
 
 ### P11-01 — Turn CI into a complete pull-request quality gate
 
+- **Implementation status:** Implemented — pinned read-only actions, frontend/backend/container quality jobs, locked NuGet dependencies, CI warnings policy, full disposable SQL suite, coverage/TRX/JUnit artifacts, local pinned EF drift check, image scan and existing HTTPS Compose lifecycle. The actual React build crosses into backend HTTP tests. After explicit owner authorization, `main` requires a PR and an up-to-date passing aggregate from GitHub Actions, including for admins; force pushes/deletion are blocked. Patch whitespace is enforced without reformatting the legacy C# baseline. See [CI.md](CI.md) and the linked PR checks for exact scope and verification.
+
 - **Why it matters:** The current uncommitted workflow proves intent but only restores/builds/tests .NET. A full-stack project needs deterministic backend, frontend, migration, and container checks.
 - **Files/components likely affected:** `.github/workflows/ci.yml`, solution/build settings, package and npm lockfiles, formatter/linter configuration, test coverage/reporting, integration-test container settings, branch-protection documentation.
 - **Implementation steps:**

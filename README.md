@@ -145,6 +145,11 @@ RentRight/
 
 ## Tests and Coverage
 
+Pull requests run React checks, the fast and full disposable SQL Server suites,
+coverage reporting, migration-drift detection, and a scanned application image
+with HTTPS Compose lifecycle checks. See [CI quality gate](docs/CI.md) for local
+commands, dependency updates, report retention, and the required protection check.
+
 The deterministic xUnit suite exercises domain rules, application-service outcomes,
 authorization decisions, boundary validation, and cancellation-token forwarding. It
 does not require SQL Server, Docker, or network access:

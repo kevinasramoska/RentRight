@@ -8,12 +8,12 @@ RUN npm run build
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0.302@sha256:72dd743782f2ae7e5476fd64f6a460045e3998dc862218b80e6944cba79a01b0 AS build
 WORKDIR /source
-COPY global.json RentRight.csproj ./
-RUN dotnet restore RentRight.csproj
+COPY global.json Directory.Build.props RentRight.csproj packages.lock.json ./
+RUN dotnet restore RentRight.csproj --locked-mode /p:ContinuousIntegrationBuild=true
 COPY . .
 COPY --from=client /source/wwwroot/app/ ./wwwroot/app/
 RUN dotnet publish RentRight.csproj --configuration Release --no-restore --output /app/publish \
-    /p:UseAppHost=false /p:BuildReactOnPublish=false
+    /p:UseAppHost=false /p:BuildReactOnPublish=false /p:ContinuousIntegrationBuild=true
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0.13@sha256:d5633778c754e89a386882eddf8dbee6942447a8a4b8267c19cf1e1158d0b0ac AS runtime
 ARG VERSION=dev
