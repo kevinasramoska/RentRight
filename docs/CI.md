@@ -1,7 +1,7 @@
 # Pull-request quality gate (P11-01)
 
 `Continuous Integration` runs on every pull request and push to `main`.
-Three independent jobs run on Ubuntu 24.04; `Required quality gate` succeeds
+Three quality jobs run on Ubuntu 24.04; `Required quality gate` succeeds
 only when every job succeeds. Failed, skipped and cancelled dependencies cannot
 produce a green aggregate. Superseded runs for the same PR/ref are cancelled.
 
@@ -13,7 +13,10 @@ produce a green aggregate. Superseded runs for the same PR/ref are cancelled.
 
 `RentRight.CI.slnx` includes the SQL project that the ordinary `RentRight.slnx`
 intentionally excludes. The backend restores/builds all three projects once;
-test runs use `--no-build --no-restore`. Container builds run on a separate runner
+test runs use `--no-build --no-restore`. The frontend publishes its real React host
+assets; the backend downloads that same-run artifact **before** building so the
+HTTP/static-host tests exercise real assets, not fixtures or a missing frontend.
+Frontend and container jobs run concurrently; backend follows frontend. Container builds run on a separate runner
 and intentionally reproduce publication from source. Compose rebuilds reuse that
 runner's Docker layer cache. No shared database or SQL credential is configured.
 The SQL fixture and Compose use the same digest-pinned SQL Server image. Every
@@ -53,6 +56,7 @@ run. Wall-clock/plan collection is not a stable PR gate.
 
 Reports uploaded even after failure, when present, are frontend JUnit, backend
 TRX/Cobertura, and the container vulnerability JSON. Retention is seven days.
+The public React asset transfer is kept for one day; it is not a release artifact.
 Only explicit report patterns are uploaded, not environment files, certificate
 exports, whole workspaces, database backups, core dumps or application logs.
 Reports contain test names, source paths and synthetic test output; review them
@@ -117,8 +121,13 @@ protection is a separate repository-owner action, not claimed complete here.
 
 ## Verification record
 
-Local and hosted evidence will be recorded here after the gate has run. An
-intentional failing-test PR run is required before treating it as a protected gate.
+The initial hosted run [39150743815](https://github.com/kevinasramoska/RentRight/actions/runs/39150743815)
+included one explicitly temporary failing React test: React failed and `Required
+quality gate` failed; Container quality passed. That run also exposed three real
+HTTP-test failures because React assets had not crossed the new job boundary.
+The workflow now transfers the actual built frontend before backend build/tests;
+no behavioral assertion was removed or weakened. The deliberate probe was removed
+after confirming failure, and a clean rerun is required before marking ready.
 
 ## Changed files
 
