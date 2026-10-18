@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 export const repository = 'kevinasramoska/RentRight';
 export const imageRepository = 'ghcr.io/kevinasramoska/rentright';
+const packagePath = '/user/packages/container/rentright';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const output = resolve(root, 'artifacts/release');
 const shaPattern = /^[a-f0-9]{40}$/;
@@ -122,6 +123,25 @@ export function validatePackage(existing, tag, versions = []) {
   assert.ok(!versions.some(version => version.metadata.container.tags.includes(tag)), 'Refusing to overwrite an existing release tag.');
 }
 
+export async function validateRegistryPackage(tag, get = api) {
+  // The /users/{username} endpoints only expose public packages. Use the
+  // authenticated endpoint for both visibility and tag-collision checks.
+  const existing = await get(packagePath, { missing: true });
+  validatePackage(existing, tag);
+  if (existing) {
+    for (let page = 1; ; page++) {
+      assert.ok(page <= 100, 'Review package retention before publishing more versions.');
+      const versions = await get(`${packagePath}/versions?per_page=100&page=${page}`);
+      validatePackage(existing, tag, versions);
+      if (versions.length < 100) break;
+    }
+  }
+}
+
+export async function verifyPrivatePackage(get = api) {
+  assert.equal((await get(packagePath)).visibility, 'private', 'Package must remain private.');
+}
+
 // Shared by the private publisher and a loopback-only disposable-registry test.
 // The CLI publisher never accepts a registry destination from user input.
 export function pushAndPull(imageId, name, tag, sha) {
@@ -186,24 +206,14 @@ async function publish() {
   assert.equal(manifest.image.tag, releaseTag(process.env.GITHUB_SHA, process.env.GITHUB_RUN_ID, process.env.GITHUB_RUN_ATTEMPT));
   const fresh = await eligibility(String(manifest.source.ciRunId));
   assert.deepEqual(fresh, manifest.source, 'CI must still be successful on the same attempt/source after approval and build.');
-  const packagePath = '/users/kevinasramoska/packages/container/rentright';
-  const existing = await api(packagePath, { missing: true });
-  validatePackage(existing, manifest.image.tag);
-  if (existing) {
-    for (let page = 1; ; page++) {
-      assert.ok(page <= 100, 'Review package retention before publishing more versions.');
-      const versions = await api(`${packagePath}/versions?per_page=100&page=${page}`);
-      validatePackage(existing, manifest.image.tag, versions);
-      if (versions.length < 100) break;
-    }
-  }
+  await validateRegistryPackage(manifest.image.tag);
   execute('docker', ['login', 'ghcr.io', '--username', process.env.GITHUB_ACTOR, '--password-stdin'], { input: process.env.GH_TOKEN, stdio: ['pipe', 'inherit', 'inherit'] });
   try {
     manifest.state = 'publishing'; save('release.json', manifest); checksums();
     const { digest, reference } = pushAndPull(manifest.build.imageConfigDigest, imageRepository, manifest.image.tag, manifest.source.commit);
     Object.assign(manifest.image, { digest, pullReference: reference });
     manifest.state = 'published-unverified'; save('release.json', manifest); checksums();
-    assert.equal((await api(packagePath)).visibility, 'private', 'Package must remain private.');
+    await verifyPrivatePackage();
     execute('bash', ['scripts/verify-container.sh', reference]);
     manifest.state = 'verified'; save('release.json', manifest); checksums();
     console.log(`Verified private release: ${reference}`);

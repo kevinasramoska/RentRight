@@ -64,6 +64,8 @@ or package visibility has already been verified in GitHub Actions.
   `ghcr.io/kevinasramoska/rentright@sha256:...`, not a tag, for immutable selection.
 - New GHCR packages default to private. An existing non-private package is refused;
   visibility is checked again after publishing. No visibility change is automated.
+  Package metadata and version checks use the authenticated `/user/packages`
+  endpoints, not the public-only `/users/{username}/packages` endpoints.
   Repository/namespace ownership and the existing OCI source label link the image
   to the repository. If a pre-existing package is not linked/permitted, fix its
   Actions access rather than creating a broad PAT or making it public.
@@ -149,7 +151,7 @@ as proof of live GHCR authentication, private visibility or environment approval
 
 ## Verification and files
 
-Local checks on 2026-10-18: 29 release-policy tests passed, locked Release build
+Local checks on 2026-10-18: 32 release-policy tests passed, locked Release build
 passed with zero warnings/errors, all 596 fast backend tests passed and EF reported
 no model changes. Both workflows pass Actionlint 1.7.12 (upstream archive checksum
 verified; no global tool installation). Actual current-main CI evidence and the
@@ -165,7 +167,8 @@ before EF's `--no-build` migration command, without relying on a developer cache
 
 Release-rule tests cover source/repository/ref/workflow isolation, exact CI attempts,
 failed/pending/cancelled CI, missing/failed/skipped aggregate checks, input redaction,
-private visibility, no tag replacement, config identity and repository-bound digests.
+private visibility, authenticated package lookups and version pagination, no tag
+replacement, config identity and repository-bound digests.
 The PR's immutable tested head, full CI totals and real registry rehearsal results
 are recorded in its checks. Live GHCR verification remains an after-merge manual
 approval step; no website is deployed by this work.

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { eligibility, imageRepository, registryDigest, releaseTag, repository, validateApprovalEnvironment, validateEligibility, validatePackage, verifyImage } from './release.mjs';
+import { eligibility, imageRepository, registryDigest, releaseTag, repository, validateApprovalEnvironment, validateEligibility, validatePackage, validateRegistryPackage, verifyImage, verifyPrivatePackage } from './release.mjs';
 
 const sha = 'a'.repeat(40);
 function fixture() {
@@ -106,6 +106,42 @@ test('private-only publication refuses visibility changes and existing tags', ()
   assert.doesNotThrow(() => validatePackage({ visibility: 'private' }, 'new-tag', [{ metadata: { container: { tags: ['old-tag'] } } }]));
   for (const visibility of ['public', 'internal', undefined]) assert.throws(() => validatePackage({ visibility }, 'new-tag'));
   assert.throws(() => validatePackage({ visibility: 'private' }, 'new-tag', [{ metadata: { container: { tags: ['new-tag'] } } }]));
+});
+
+test('private package preflight uses authenticated metadata and paginated version endpoints', async () => {
+  const paths = [], packagePath = '/user/packages/container/rentright';
+  const version = tag => ({ metadata: { container: { tags: [tag] } } });
+  await assert.rejects(validateRegistryPackage('release-tag', async (path, options) => {
+    paths.push(path);
+    if (path === packagePath) {
+      assert.equal(options.missing, true);
+      return { visibility: 'private' };
+    }
+    if (path === `${packagePath}/versions?per_page=100&page=1`) return Array.from({ length: 100 }, () => version('old-tag'));
+    assert.equal(path, `${packagePath}/versions?per_page=100&page=2`);
+    return [version('release-tag')];
+  }), /overwrite an existing release tag/);
+  assert.equal(paths.length, 3);
+});
+
+test('package preflight permits new packages but fails closed on public visibility and API errors', async () => {
+  await validateRegistryPackage('new-tag', async path => {
+    assert.equal(path, '/user/packages/container/rentright');
+    return null;
+  });
+  await assert.rejects(validateRegistryPackage('new-tag', async () => ({ visibility: 'public' })), /non-private package/);
+  await assert.rejects(validateRegistryPackage('new-tag', async () => { throw new Error('API forbidden'); }), /API forbidden/);
+});
+
+test('post-push visibility verification uses the authenticated endpoint without accepting missing packages', async () => {
+  await verifyPrivatePackage(async (path, options) => {
+    assert.equal(path, '/user/packages/container/rentright');
+    assert.equal(options, undefined);
+    return { visibility: 'private' };
+  });
+  for (const visibility of ['public', 'internal', undefined])
+    await assert.rejects(verifyPrivatePackage(async () => ({ visibility })), /Package must remain private/);
+  await assert.rejects(verifyPrivatePackage(async () => { throw new Error('API not found'); }), /API not found/);
 });
 
 test('invalid CLI inputs are rejected without echoing their contents', () => {
