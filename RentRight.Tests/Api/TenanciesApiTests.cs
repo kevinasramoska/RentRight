@@ -115,6 +115,29 @@ public class TenanciesApiTests
         Assert.False(schemas.GetProperty("TenancyResponse").GetProperty("properties").TryGetProperty("token", out _));
     }
 
+    [Theory]
+    [InlineData(TenancyStatus.Active, "Active")]
+    [InlineData(TenancyStatus.Pending, "Pending")]
+    [InlineData(TenancyStatus.Ended, "Ended")]
+    public async Task WorkspaceList_TenancyStatus_SerializesNameAndPreservesManagerFields(TenancyStatus status, string expected)
+    {
+        await using var factory = Factory(new Service { RowStatus = status });
+        using var client = Client(factory, "Landlord");
+        using var response = await client.GetAsync("/api/v1/workspace/tenancies?page=2&pageSize=1");
+        response.EnsureSuccessStatusCode();
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var page = json.RootElement;
+        Assert.Equal(2, page.GetProperty("page").GetInt32());
+        Assert.Equal(1, page.GetProperty("pageSize").GetInt32());
+        var row = page.GetProperty("items")[0];
+        Assert.Equal(expected, row.GetProperty("status").GetString());
+        Assert.Equal("sensitive name", row.GetProperty("tenantName").GetString());
+        Assert.Equal("sensitive email", row.GetProperty("tenantEmail").GetString());
+        Assert.Equal("AQIDBAUGBwg=", row.GetProperty("version").GetString());
+        Assert.False(row.TryGetProperty("tenantId", out _));
+        Assert.False(row.TryGetProperty("invitationTokenHash", out _));
+    }
+
     private static async Task ProblemAsync(HttpResponseMessage response, int expected)
     {
         Assert.Equal(expected, (int)response.StatusCode);
@@ -153,6 +176,7 @@ public class TenanciesApiTests
         public CreateTenancyStatus InviteStatus = CreateTenancyStatus.Success;
         public AcceptTenancyStatus AcceptStatus = AcceptTenancyStatus.Success;
         public EndTenancyStatus EndStatus = EndTenancyStatus.Success;
+        public TenancyStatus RowStatus = TenancyStatus.Active;
         public CreateTenancyCommand? Command;
         private static readonly TenancyAdminRow Row = new(1, "Home", "Address", "sensitive name", "sensitive email", new(2026, 1, 1), null, TenancyStatus.Active);
         public Task<CreateTenancyOutcome> CreateAsync(CreateTenancyCommand command, CancellationToken cancellationToken)
@@ -164,7 +188,7 @@ public class TenanciesApiTests
         public Task<EndTenancyOutcome> EndAsync(int id, CancellationToken cancellationToken, string? expectedVersion = null) => Task.FromResult(new EndTenancyOutcome(EndStatus));
         public Task<GetTenancyOutcome> GetAsync(int id, CancellationToken cancellationToken) => Task.FromResult(new GetTenancyOutcome(TenancyQueryStatus.Success, id == 1 ? Row : null));
         public Task<ListTenanciesPageOutcome> ListAsync(int page, int pageSize, CancellationToken cancellationToken) =>
-            Task.FromResult(new ListTenanciesPageOutcome(TenancyQueryStatus.Success, new([Row], 1)));
+            Task.FromResult(new ListTenanciesPageOutcome(TenancyQueryStatus.Success, new([Row with { Status = RowStatus, Version = "AQIDBAUGBwg=" }], 1)));
         public Task<ListTenanciesOutcome> ListForAdministrationAsync(CancellationToken cancellationToken) => Task.FromResult(ListTenanciesOutcome.Success([Row]));
         public Task<GetTenancyCreateFormOutcome> GetCreateFormAsync(CancellationToken cancellationToken) => Task.FromResult(GetTenancyCreateFormOutcome.Success(new(new(2026, 1, 1), [])));
     }

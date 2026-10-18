@@ -30,6 +30,7 @@ export interface RequestOptions {
   method?: 'GET' | 'HEAD' | 'OPTIONS' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
   signal?: AbortSignal;
+  expectedVersion?: string;
 }
 // Restrict credentials and request tokens to our API. Tokens live only in a local variable.
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -38,6 +39,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     || new URL(path, 'https://rentright.invalid').pathname !== pathname) throw new Error('Expected a same-origin API path.');
   const method = options.method ?? 'GET';
   const headers = new Headers({ Accept: 'application/json' });
+  if (options.expectedVersion !== undefined) headers.set('X-Expected-Version', options.expectedVersion);
   if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
     const token = await apiRequest<{ requestToken: string }>('/api/v1/session/antiforgery', { signal: options.signal });
     if (!token.requestToken) throw new Error('Unable to prepare the request.');

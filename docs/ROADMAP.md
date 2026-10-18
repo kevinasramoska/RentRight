@@ -67,7 +67,7 @@ These files should be reviewed and committed as an intentional baseline rather t
 3. **Complete tenancy before maintenance UI.** A maintenance request must be authorized through an active tenancy and property ownership, not from a client-supplied tenant/property pair.
 4. **Use explicit request/response contracts.** MVC input models and API DTOs must prevent over-posting and avoid serializing tracked entities or Identity objects.
 5. **Use same-origin cookie authentication.** Host React from ASP.NET Core and call the API on the same origin. Protect unsafe API calls with antiforgery tokens. Do not build a custom token issuer.
-6. **Retain working Razor pages.** Use React for the tenant/maintenance portal first. Public pages, Identity UI, and admin/property Razor screens remain until there is a demonstrated reason to migrate them.
+6. **Migrate presentation without rewriting security.** React started with the tenant portal. The user-approved React business-workspace phase below now moves public/manager/admin presentation before Docker. Identity, error/legal pages and explicit MVC compatibility routes remain Razor; backend authorization and services are retained.
 7. **Make authorization resource-aware.** Roles establish broad capability; handlers/services decide whether the current user owns the property or participates in the tenancy.
 8. **Use migrations as reviewed artifacts.** Never edit an applied migration. Resolve current model drift, generate incremental migrations, inspect SQL, and run migrations as a deployment step rather than blindly on application startup.
 9. **Measure before indexing.** Add indexes for observed query shapes and verify query plans. Avoid speculative indexes on every field.
@@ -178,6 +178,24 @@ Each phase should be delivered as one or more small pull requests. Detailed impl
 
 **Exit gate:** success, timeout, rate-limit, invalid response, caching, and provider-unavailable cases are tested.
 
+### Phase 9A — React business-workspace migration (user-prioritized)
+
+**Task:** F01-01, detailed in [TASKS.md](TASKS.md).
+
+**Outcome:** extend the existing React/TypeScript application to public properties,
+landlord/Admin dashboards, property management, tenancy invitations/ending and
+acceptance, maintenance triage and Admin role management. Reuse the .NET services,
+Identity cookies, resource authorization, antiforgery and concurrency controls.
+
+**Boundary:** this is a presentation migration, not a Node backend, authentication
+rewrite, schema change or removal of every `.cshtml` file. Identity remains Razor;
+existing MVC routes are retained for compatibility. No new frontend dependencies.
+
+**Exit gate:** role-specific React journeys, safe failure/session handling, API
+and SQL authorization regressions, and responsive browser checks pass. See
+[REACT_BUSINESS_WORKSPACES.md](REACT_BUSINESS_WORKSPACES.md) for implemented scope
+and explicit limitations. Docker resumes after this phase.
+
 ### Phase 10 — Docker and local development
 
 **Tasks:** P10-01 through P10-02
@@ -242,7 +260,7 @@ The following would weaken this portfolio at its current scale unless a real req
 - Event sourcing, a generic workflow engine, or full CQRS/MediatR architecture for simple CRUD and maintenance state changes.
 - Generic repository/unit-of-work abstractions over EF Core.
 - A custom OAuth/OIDC authorization server or home-grown JWT issuance for the React client.
-- Replacing all working Razor pages merely to claim a full SPA.
+- Rewriting Identity/security or deleting compatibility views merely to remove every `.cshtml` file.
 - Splitting the codebase into many class-library projects before dependency boundaries require it.
 - Real-time chat, SignalR notifications, rent payment processing, accounting, document signing, and broad CRM features before the core tenancy/maintenance workflow is excellent.
 - Redis, Elasticsearch, sharding, or a data warehouse without measured load and query requirements.

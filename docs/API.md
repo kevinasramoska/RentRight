@@ -2,9 +2,28 @@
 
 ## Current scope
 
-Phase 3 exposes a versioned transport contract under `/api/v1`. P03-01 establishes
-the shared conventions described here, and P03-02 adds the property resource. Tenancy,
-maintenance, health, and test resources are not part of the production API.
+The versioned transport under `/api/v1` includes public property queries,
+authorized property commands, tenancy lifecycle, tenant maintenance/dashboard,
+manager triage, session and React workspace/Admin screen projections. Health
+endpoints remain roadmap work; test-only probe controllers are not production API.
+
+F01-01 adds `/workspace` (manager overview), `/workspace/properties/{id}` (owned or
+Admin details/version), `/workspace/tenancies` (paged manager-scoped contact
+projection with `status` names `Active`, `Pending`, or `Ended`), `/workspace/invitation-form`, and a versioned POST to
+`/workspace/properties/{id}/location`. The anonymous
+`/workspace/published-properties/{id}` supplies public fields/location and a
+server-derived `canManage` hint, never an owner ID, version or provider reference.
+Existing property/tenancy/maintenance contracts are unchanged.
+
+Admin-only `/admin-users` returns a paged user/role projection; PUT
+`/admin-users/roles` accepts only `userId` and `selectedRoles`, uses the existing
+serialized role service and requires recent password verification. Stale
+verification returns 403 `reauthentication_required` instead of redirecting an API
+write. The client links to Identity verification, then requires manual submission.
+POST `/session/logout` is idempotent and antiforgery-protected. No GET signs out.
+All these responses are no-store, and unsafe calls require the existing fresh
+`X-CSRF-TOKEN`. See [React workspaces](REACT_BUSINESS_WORKSPACES.md) for routes and
+limitations.
 
 The runtime-generated OpenAPI document is available at `/openapi/v1.json` only when
 the application runs in `Development`. No interactive documentation UI is installed,

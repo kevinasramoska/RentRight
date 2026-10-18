@@ -17,7 +17,7 @@ let fetchMock: ReturnType<typeof vi.fn>;
 beforeEach(() => {
   history.replaceState(null, '', '/app/');
   session = { isAuthenticated: true, roles: ['Tenant'] };
-  handler = url => url.includes('tenant-dashboard') ? json(dashboard) : url.endsWith('/7') ? json(detail) : json({ items: [item], page: 1, pageSize: 10, totalCount: 11, totalPages: 2 });
+  handler = url => url === '/api/v1/workspace' ? json({ properties: [], locationLookupEnabled: false }) : url.includes('tenant-dashboard') ? json(dashboard) : url.endsWith('/7') ? json(detail) : json({ items: [item], page: 1, pageSize: 10, totalCount: 11, totalPages: 2 });
   fetchMock = vi.fn((url: string, options?: RequestInit) => url === '/api/v1/session' ? Promise.resolve(json(session)) : url.endsWith('/antiforgery') ? Promise.resolve(json({ requestToken: 'csrf' })) : Promise.resolve(handler(url, options)));
   vi.stubGlobal('fetch', fetchMock);
 });
@@ -117,7 +117,7 @@ it.each([{ roles: [] }, { roles: ['Landlord'] }])('clears tenant data when a ses
   expect(screen.queryByRole('heading', { name: 'My home' })).toBeNull();
   await waitFor(() => expect(screen.queryByRole('status')).toBeNull());
   expect(screen.queryByRole('navigation', { name: 'Tenant navigation' })).toBeNull();
-  expect(document.title).toBe('Tenant portal · RentRight');
+  expect(document.title).toBe(roles.includes('Landlord') ? 'Landlord overview · RentRight' : 'Tenant portal · RentRight');
 });
 it('aborts a pending read on session refresh and ignores its late result', async () => {
   let resolve!: (response: Response) => void;

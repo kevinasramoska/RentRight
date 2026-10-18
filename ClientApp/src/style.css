@@ -401,3 +401,38 @@ h1{font-size:29px}
 @media(max-width:720px){.topbar-location>span.mobile-brand{display:block;font-family:'Manrope',sans-serif;font-size:19px;font-weight:800;color:#233f32;letter-spacing:-1px}.topbar-location>.topbar-current{display:none}.page-heading>.button{min-height:44px;min-width:44px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
 }
+
+.business-card{background:#fff;border:1px solid var(--line);border-radius:11px;padding:25px;margin-bottom:22px;min-width:0}
+.business-card>p{margin:12px 0;color:#596e60}
+.business-card>h2{margin-bottom:12px}
+.business-text{white-space:pre-wrap}
+.business-actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:14px}
+.property-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr));gap:20px}
+.property-card{margin:0 0 20px;display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+.property-card p{margin:0}
+.property-card h2 a:hover{text-decoration:underline}
+.property-rent{display:block;font-size:20px;color:#345b48;margin:15px 0}
+.business-form{margin-top:20px}
+.business-form fieldset{border:0;padding:0;margin:0;min-width:0}
+.business-form label{margin-bottom:18px}
+.business-form input:not([type=checkbox]),.business-form select,.filter-grid input,.filter-grid select,.business-card>label input{display:block;width:100%;padding:11px 12px;margin-top:6px;border:1px solid #bdcbbd;border-radius:6px;background:white;color:var(--ink);font:inherit;min-height:44px}
+.business-form input:focus-visible,.business-form select:focus-visible,.filter-grid input:focus-visible,.filter-grid select:focus-visible{outline:3px solid #b8793e;outline-offset:3px}
+.business-form textarea{margin-top:6px;font-size:14px}
+.business-form .check-label{display:flex;gap:10px;align-items:center;font-size:13px}
+.check-label input{width:20px;height:20px;accent-color:#345b48}
+.button-danger{background:#8d3429;color:white;border-color:#8d3429}
+.notice{padding:16px;border:1px solid #d6dfc7;border-radius:7px;background:#f0f4e8;margin-bottom:20px;font-size:13px}
+.filter-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr));gap:18px;align-items:end}
+.table-scroll{overflow-x:auto}
+.business-table{width:100%;border-collapse:collapse;text-align:left;font-size:13px}
+.business-table caption{text-align:left;padding:20px;font-size:12px;color:#596e60}
+.business-table th,.business-table td{padding:16px 20px;border-bottom:1px solid var(--line);vertical-align:top}
+.business-table th{background:#f3f6ef;font-weight:650;white-space:nowrap}
+.role-row{padding:25px;border-bottom:1px solid var(--line)}
+.role-row>p{margin-top:7px;color:#596e60}
+.business-form .role-options{display:flex;flex-wrap:wrap;gap:15px;margin-bottom:15px}
+.role-options legend{font-size:12px;margin-bottom:12px;overflow-wrap:anywhere;max-width:100%}
+.manager-nav{margin:12px 0;padding-block:10px;border-block:1px solid #4d644c}
+.utility-button{display:flex;gap:10px;align-items:center;font-size:11px;color:#c5d3c3;min-height:44px;border:0;background:none;padding:0;text-align:left}
+.utility-button .icon{width:16px;height:16px}
+@media(max-width:720px){.business-card{padding:20px}.page-heading{flex-wrap:wrap}.business-actions{gap:9px}.business-table th,.business-table td{padding:12px}.role-row{padding:20px}}

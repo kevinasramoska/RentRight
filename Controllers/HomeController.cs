@@ -11,6 +11,8 @@ public class HomeController(IPropertyService propertyService) : Controller
     public async Task<IActionResult> Index(
         CancellationToken cancellationToken = default)
     {
+        // The normal entry uses React; retain /Home/Index as a compatibility view.
+        if (HttpContext?.Request.Path == "/") return Redirect("/app/properties");
         var outcome = await propertyService.ListLatestAsync(
             new LatestPropertiesQuery(),
             cancellationToken);
