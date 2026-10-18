@@ -2,18 +2,20 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { eligibility, imageRepository, registryDigest, releaseTag, repository, validateEligibility, validatePackage, verifyImage } from './release.mjs';
+import { eligibility, imageRepository, registryDigest, releaseTag, repository, validateApprovalEnvironment, validateEligibility, validatePackage, verifyImage } from './release.mjs';
 
 const sha = 'a'.repeat(40);
 function fixture() {
   return {
     context: { repository, event: 'workflow_dispatch', ref: 'refs/heads/main', sha },
-    repo: { id: 123, full_name: repository, default_branch: 'main' },
+    repo: { id: 123, full_name: repository, default_branch: 'main', owner: { id: 99 } },
     workflow: { id: 456, path: '.github/workflows/ci.yml' },
     branch: { protected: true, commit: { sha } },
     run: { id: 789, run_attempt: 2, workflow_id: 456, repository: { id: 123 }, head_repository: { id: 123 },
       event: 'push', head_branch: 'main', head_sha: sha, status: 'completed', conclusion: 'success' },
     jobs: [{ name: 'Required quality gate', status: 'completed', conclusion: 'success' }],
+    approval: { name: 'ghcr-release', deployment_branch_policy: { protected_branches: true },
+      protection_rules: [{ type: 'required_reviewers', reviewers: [{ type: 'User', reviewer: { id: 99 } }] }] },
   };
 }
 const validate = value => validateEligibility(value.context, value.repo, value.workflow, value.branch, value.run, value.jobs);
@@ -58,6 +60,7 @@ test('CI API validation reads the requested run attempt, not previous successful
     if (path.endsWith('/actions/workflows/ci.yml')) return value.workflow;
     if (path.endsWith('/branches/main')) return value.branch;
     if (path.endsWith('/actions/runs/789')) return value.run;
+    if (path.endsWith('/environments/ghcr-release')) return value.approval;
     if (path.includes('/attempts/2/jobs?')) return { jobs: value.jobs };
     return value.repo;
   };
@@ -111,4 +114,13 @@ test('invalid CLI inputs are rejected without echoing their contents', () => {
   assert.equal(result.status, 1);
   assert.match(result.stderr, /numeric successful main CI run ID/);
   assert.ok(!result.stderr.includes(sentinel));
+});
+
+test('a missing/relaxed approval policy or different reviewer cannot authorize publication', () => {
+  assert.doesNotThrow(() => validateApprovalEnvironment(fixture().approval, 99));
+  for (const mutate of [value => { value.name = 'other'; }, value => { value.deployment_branch_policy = null; },
+    value => { value.protection_rules = []; }, value => { value.protection_rules[0].reviewers[0].reviewer.id = 100; }]) {
+    const value = fixture().approval; mutate(value);
+    assert.throws(() => validateApprovalEnvironment(value, 99));
+  }
 });

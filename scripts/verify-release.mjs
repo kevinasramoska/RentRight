@@ -34,7 +34,7 @@ try {
   }
   // Daemon-local loopback works both on Linux and inside Docker Desktop's VM.
   // Kernel-assigned ports avoid adopting another process; debug also stays loopback-only.
-  container = capture('docker', ['run', '--detach', '--name', name, '--network', 'host',
+  container = capture('docker', ['run', '--detach', '--name', name, '--network', 'host', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
     '--env', 'REGISTRY_HTTP_ADDR=127.0.0.1:0', '--env', 'REGISTRY_HTTP_DEBUG_ADDR=127.0.0.1:0',
     'registry:3@sha256:ddf754342cfc8acc51a56d5d0ab6af06826461864460636d8bd5c546dab2a7b8']);
   let address;

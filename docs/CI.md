@@ -7,7 +7,7 @@ produce a green aggregate. Superseded runs for the same PR/ref are cancelled.
 
 | Job | Blocking checks |
 | --- | --- |
-| React quality | Patch whitespace, release-authorization unit tests, `npm ci`, all-dependency high/critical audit, ESLint, TypeScript, all Vitest tests, production build |
+| React quality | Patch whitespace, pinned workflow syntax/context lint, release-authorization unit tests, `npm ci`, all-dependency high/critical audit, ESLint, TypeScript, all Vitest tests, production build |
 | .NET and SQL quality | Locked restore and audit of all three projects, warnings-as-errors Release build, pinned EF model-drift check, fast tests with production-assembly coverage, complete SQL Server integration suite |
 | Container quality | Locked production Docker build, high/critical vulnerability scan, real local-registry push/digest-pull/Production smoke/SBOM rehearsal, actual isolated HTTPS Compose lifecycle |
 

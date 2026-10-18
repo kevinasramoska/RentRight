@@ -141,7 +141,9 @@ removed; unrelated Docker projects and configured databases are never adopted.
 Docker images and ignored diagnostic metadata may remain for inspection.
 
 PR CI runs these release-rule tests and the real local-registry rehearsal in
-addition to the existing full-stack gate. Failed-CI/non-publication rules are
+addition to the existing full-stack gate. Pinned Actionlint validates both workflow
+files and expression contexts on every PR, with only `.github` mounted read-only
+and all container capabilities dropped. Failed-CI/non-publication rules are
 covered using explicit metadata fixtures; the local registry test is not claimed
 as proof of live GHCR authentication, private visibility or environment approval.
 
