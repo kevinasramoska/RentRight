@@ -122,7 +122,7 @@ the enabled-adapter test overrides every factory-created transport with a fake.
 | New SQL/HTTP geocoding suite | 23 passed, 0 failed/skipped, including 2048-character reference persistence. |
 | Existing SQL regression selection | 83 passed, 0 failed/skipped, 6m56s: `SqlPipelineTests`, `IntegrityConcurrencyRetentionSqlTests`, `QueryRegressionTests`, `QueryIndexMigrationTests`. |
 | Final fake-HTTP adapter journey after test-host configuration guard | 1 passed; a rerun of an existing case, not an additional distinct case. |
-| Node 24 frontend | Lint, type check/build and all 53 tests passed. No frontend dependency/source changes. |
+| Node 24 frontend | After merging the reviewed showcase into this branch, lint, type check/build and all 62 combined tests passed. P09-01 adds no frontend dependencies or source changes of its own. |
 | EF/model/migration | No pending model drift; reviewed Up/Down, incremental SQL and snapshot; real SQL migration rehearsal passed. |
 | Scope | 37 files, including the pre-merge reference-length fix, matching the inventory below; no shared database, account, key or live lookup used. |
 
@@ -130,6 +130,12 @@ There are 106 distinct passing SQL cases across these runs, not a claim that eve
 SQL test was rerun. The first builds caught two test constructor/helper updates;
 those were corrected without changing behavioral assertions. No live provider
 accuracy, production deployment or real-browser/assistive-technology audit is claimed.
+
+Pre-merge review accepts provider references through 2048 characters and rejects
+2049 at both the HTTP adapter and application boundary. SQL coverage checks full
+reference persistence, initial null metadata, preservation of an existing
+512-character reference through the widening migration, and rollback/reapplication.
+The original migration is unchanged. No shared/developer database was updated.
 
 Ignored TRX evidence is under `artifacts/test-results/p09-01/`. Run the normal
 Release solution checks plus the SQL project with a filter for

@@ -240,6 +240,7 @@ public sealed class PropertyGeocodingSqlTests : IClassFixture<SqlServerFixture>,
         await db.Database.ExecuteSqlRawAsync("INSERT INTO Properties (Title, Address, RentAmount, LandlordId) VALUES (N'Synthetic', N'Existing address', 1000, N'OwningLandlord')");
         var migrator = db.GetService<IMigrator>();
         await migrator.MigrateAsync("20261018071947_OptionalPropertyGeocoding");
+        Assert.Null((await db.Properties.AsNoTracking().SingleAsync()).Latitude);
         var originalReference = new string('x', 512);
         await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE Properties SET Latitude = 53.3, Longitude = -6.2, GeocodedUtc = SYSUTCDATETIME(), GeocodingPlaceId = {originalReference}");
         await migrator.MigrateAsync();
