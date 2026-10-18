@@ -19,12 +19,12 @@ h3{font-size:19px;font-weight:750}
 p,h1,h2,h3,a,dd{overflow-wrap:anywhere}
 .icon{width:20px;height:20px;flex-shrink:0;vertical-align:middle}
 a:focus-visible,button:focus-visible,textarea:focus-visible{outline:3px solid #b8793e;outline-offset:4px}
-h1:focus,main:focus{outline:none}
+h1:focus,main:focus{outline:3px solid #b8793e;outline-offset:4px}
 .skip-link{position:fixed;left:20px;top:-70px;z-index:100;padding:12px 20px;background:white;border:2px solid var(--green);border-radius:8px}
 .skip-link:focus{top:12px}
 
 .workspace{display:flex;min-height:100vh}
-.sidebar{width:252px;flex-shrink:0;background:#233f32;color:#e9eee7;position:fixed;inset:0 auto 0 0;display:flex;flex-direction:column;padding:36px 23px 0;z-index:30}
+.sidebar{width:252px;flex-shrink:0;background:#233f32;color:#e9eee7;position:fixed;inset:0 auto 0 0;display:flex;flex-direction:column;padding:36px 23px 0;z-index:30;overflow-y:auto}
 .wordmark{display:flex;align-items:center;font-family:'Manrope',sans-serif;font-size:29px;font-weight:800;letter-spacing:-1.4px;line-height:1;white-space:nowrap}
 .brand-mark{display:grid;place-items:center;width:35px;height:36px;margin-right:9px;background:#e6a17a;border-radius:10px;color:#233f32}
 .brand-mark .icon{width:24px;height:24px}

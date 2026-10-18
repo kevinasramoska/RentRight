@@ -89,6 +89,15 @@ suite was not rerun because no server, query, model, or database behavior change
 Browser checks covered 320/390px mobile, 768px tablet, and 1440px desktop widths;
 the sampled overview/detail screens had no horizontal overflow.
 
+Pre-merge review on 2026-10-18 brought the branch up to date with the browser and
+account security changes. All 62 combined frontend tests, 499 fast backend tests,
+lint, type checking, static builds and the clean Release solution build passed.
+The review restored visible focus outlines for routed headings and the skip-link
+target and enabled vertical scrolling for the fixed desktop sidebar. Browser
+checks confirmed 3px focus indicators on both targets and that, at 1440×420, the
+723px sidebar scrolls to expose its lower source link. No live API or database is
+needed by this preview. Earlier screenshots remain representative of the design.
+
 ## Files changed
 
 - `ClientApp/src/App.tsx`: selects the explicit demo entry and retains live-session handling.
