@@ -43,5 +43,5 @@ public interface IPropertyService
 
     Task<PropertyMutationOutcome> DeleteAsync(
         int propertyId,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken, string? expectedVersion = null);
 }

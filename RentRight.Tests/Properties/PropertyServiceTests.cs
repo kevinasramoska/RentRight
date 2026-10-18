@@ -316,7 +316,7 @@ public class PropertyServiceTests
         };
         var service = CreateService(store, "landlord-1", "Landlord");
 
-        var outcome = await service.DeleteAsync(1, CancellationToken.None);
+        var outcome = await service.DeleteAsync(1, CancellationToken.None, "AAAAAAAAAAE=");
 
         Assert.Equal(PropertyOperationStatus.HasHistory, outcome.Status);
         Assert.Single(store.Properties);
@@ -332,7 +332,7 @@ public class PropertyServiceTests
         };
         var service = CreateService(store, "landlord-1", "Landlord");
 
-        var outcome = await service.DeleteAsync(1, CancellationToken.None);
+        var outcome = await service.DeleteAsync(1, CancellationToken.None, "AAAAAAAAAAE=");
 
         Assert.Equal(PropertyOperationStatus.Conflict, outcome.Status);
     }
@@ -344,7 +344,7 @@ public class PropertyServiceTests
             Property("Protected", landlordId: "landlord-2", id: 1));
         var service = CreateService(store, "landlord-1", "Landlord");
 
-        var outcome = await service.DeleteAsync(1, CancellationToken.None);
+        var outcome = await service.DeleteAsync(1, CancellationToken.None, "AAAAAAAAAAE=");
 
         Assert.Equal(PropertyOperationStatus.Forbidden, outcome.Status);
         Assert.Equal(0, store.DeleteCount);
@@ -369,8 +369,39 @@ public class PropertyServiceTests
             ["Address", "Description", "RentAmount", "Title"],
             createProperties.OrderBy(name => name).ToArray());
         Assert.Equal(
-            ["Address", "Description", "Id", "RentAmount", "Title"],
+            ["Address", "Description", "ExpectedVersion", "Id", "RentAmount", "Title"],
             editProperties.OrderBy(name => name).ToArray());
+    }
+
+    [Theory]
+    [InlineData(null, PropertyOperationStatus.ValidationFailed)]
+    [InlineData("broken", PropertyOperationStatus.ValidationFailed)]
+    [InlineData("AAAAAAAAAAI=", PropertyOperationStatus.Conflict)]
+    public async Task Mutations_MissingMalformedOrStaleVersion_DoNotInvokeStore(string? version, PropertyOperationStatus expected)
+    {
+        var store = new FakePropertyStore(Property("Original", "landlord-1", 1));
+        var service = CreateService(store, "landlord-1", "Landlord");
+        var input = EditInput(1, "Lost update");
+        input.ExpectedVersion = version;
+
+        var update = await service.UpdateAsync(1, input, default);
+        var delete = await service.DeleteAsync(1, default, version);
+
+        Assert.Equal(expected, update.Status);
+        Assert.Equal(expected, delete.Status);
+        Assert.Equal(0, store.UpdateCount);
+        Assert.Equal(0, store.DeleteCount);
+        Assert.Equal("Original", Assert.Single(store.Properties).Title);
+    }
+
+    [Fact]
+    public async Task GetEditAndDelete_Owner_ReceivePersistedVersion()
+    {
+        var service = CreateService(new FakePropertyStore(Property("Original", "landlord-1", 1)), "landlord-1", "Landlord");
+        var edit = await service.GetEditAsync(1, default);
+        var delete = await service.GetDeleteAsync(1, default);
+        Assert.Equal("AAAAAAAAAAE=", edit.Value!.ExpectedVersion);
+        Assert.Equal(edit.Value.ExpectedVersion, delete.Value!.Version);
     }
 
     private static PropertyService CreateService(
@@ -382,6 +413,7 @@ public class PropertyServiceTests
     private static PropertyEditInput EditInput(int id, string title) =>
         new()
         {
+            ExpectedVersion = "AAAAAAAAAAE=",
             Id = id,
             Title = title,
             Address = "Updated address",
@@ -390,7 +422,7 @@ public class PropertyServiceTests
         };
 
     private static PropertyRecord Property(string title, string landlordId, int id) =>
-        new(id, title, $"{id} Main Street", 1_000m, "Description", landlordId);
+        new(id, title, $"{id} Main Street", 1_000m, "Description", landlordId, "AAAAAAAAAAE=");
 
     private sealed class FakeCurrentUser(
         string? userId,
@@ -565,7 +597,7 @@ public class PropertyServiceTests
 
         public Task<PropertyDeleteStoreStatus> DeleteAsync(
             int propertyId,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken, byte[] expectedVersion, string expectedLandlordId)
         {
             DeleteCount++;
             if (DeleteStatus == PropertyDeleteStoreStatus.Deleted)

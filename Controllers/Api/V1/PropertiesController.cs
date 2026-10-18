@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RentRight.Api;
+using RentRight.Authorization;
 using RentRight.Features.Properties;
 using RentRight.Features.Properties.Contracts;
 
@@ -54,8 +55,20 @@ public sealed class PropertiesController(IPropertyService propertyService) :
         };
     }
 
+    [HttpGet("{propertyId:int}/edit")]
+    [ProducesResponseType<PropertyEditInput>(StatusCodes.Status200OK)]
+    [Authorize(Policy = RentalPolicies.Manager)]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> GetEdit(int propertyId, CancellationToken cancellationToken)
+    {
+        var outcome = await propertyService.GetEditAsync(propertyId, cancellationToken);
+        return outcome.Status == PropertyOperationStatus.Success
+            ? Ok(outcome.Value)
+            : MapPropertyQueryFailure(outcome, concealForbidden: true);
+    }
+
     [HttpPost]
-    [Authorize(Roles = "Landlord,Admin")]
+    [Authorize(Policy = RentalPolicies.Manager)]
     [Consumes("application/json")]
     [ProducesResponseType<PropertyResponse>(StatusCodes.Status201Created)]
     public async Task<IActionResult> Create(
@@ -89,7 +102,7 @@ public sealed class PropertiesController(IPropertyService propertyService) :
     }
 
     [HttpPut("{propertyId:int}")]
-    [Authorize(Roles = "Landlord,Admin")]
+    [Authorize(Policy = RentalPolicies.Manager)]
     [Consumes("application/json")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> Update(
@@ -105,7 +118,8 @@ public sealed class PropertiesController(IPropertyService propertyService) :
                 Title = request.Title,
                 Address = request.Address,
                 RentAmount = request.RentAmount,
-                Description = request.Description
+                Description = request.Description,
+                ExpectedVersion = request.ExpectedVersion
             },
             cancellationToken);
         return outcome.Status switch
@@ -116,13 +130,14 @@ public sealed class PropertiesController(IPropertyService propertyService) :
     }
 
     [HttpDelete("{propertyId:int}")]
-    [Authorize(Roles = "Landlord,Admin")]
+    [Authorize(Policy = RentalPolicies.Manager)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> Delete(
         int propertyId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        [FromHeader(Name = "X-Expected-Version")] string? expectedVersion = null)
     {
-        var outcome = await propertyService.DeleteAsync(propertyId, cancellationToken);
+        var outcome = await propertyService.DeleteAsync(propertyId, cancellationToken, expectedVersion);
         return outcome.Status switch
         {
             PropertyOperationStatus.Success => NoContent(),

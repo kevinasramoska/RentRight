@@ -52,9 +52,11 @@ public sealed class QueryIndexMigrationTests(SqlServerFixture server) : IClassFi
 
     private static async Task<string> DataAsync(ApplicationDbContext db) => JsonSerializer.Serialize(new
     {
-        Properties = await db.Properties.AsNoTracking().OrderBy(p => p.Id).ToArrayAsync(),
+        Properties = await db.Properties.AsNoTracking().OrderBy(p => p.Id)
+            .Select(p => new { p.Id, p.Title, p.Address, p.RentAmount, p.Description, p.LandlordId }).ToArrayAsync(),
         Tenancies = await db.Tenancies.AsNoTracking().OrderBy(t => t.Id).ToArrayAsync(),
-        Requests = await db.MaintenanceRequests.AsNoTracking().OrderBy(r => r.Id).ToArrayAsync(),
+        Requests = await db.MaintenanceRequests.AsNoTracking().OrderBy(r => r.Id)
+            .Select(r => new { r.Id, r.TenancyId, r.Description, r.Status, r.Priority, r.Revision, r.DateSubmitted, r.LastUpdatedUtc }).ToArrayAsync(),
         History = await db.MaintenanceStatusEvents.AsNoTracking().OrderBy(e => e.Id).ToArrayAsync(),
         Roles = await db.UserRoles.AsNoTracking().OrderBy(r => r.UserId).ThenBy(r => r.RoleId).ToArrayAsync()
     });

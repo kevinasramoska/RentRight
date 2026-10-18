@@ -1,11 +1,12 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RentRight.Authorization;
 using RentRight.Features.Maintenance;
 using RentRight.ViewModels;
 
 namespace RentRight.Controllers;
 
-[Authorize(Roles = "Landlord,Admin")]
+[Authorize(Policy = RentalPolicies.Manager)]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public sealed class MaintenanceQueueController(ILandlordMaintenanceService service) : Controller
 {

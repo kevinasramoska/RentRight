@@ -22,7 +22,7 @@ The application uses ASP.NET Core Identity for authentication and role managemen
 
 - Public home page with latest property listings
 - Public property list and property details pages
-- Authentication with built-in Identity UI
+- Authentication with Identity UI and focused account-security overrides
 - Automatic seeding of roles: `Admin`, `Landlord`, `Tenant`
 - Automatic seeding of a default admin user on startup
 - Admin dashboard with total user and property counts
@@ -153,8 +153,12 @@ From the project directory, configure local secrets without committing them:
 ```bash
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Server=localhost,1433;Database=RentRightDB;User Id=sa;Password=<password>;TrustServerCertificate=True;MultipleActiveResultSets=True;"
 dotnet user-secrets set "SeedAdmin:Email" "admin@example.test"
-dotnet user-secrets set "SeedAdmin:Password" "use-a-strong-local-password"
+dotnet user-secrets set "SeedAdmin:Password" "<your-unique-password-meeting-the-rules-below>"
 ```
+
+Replace the password example with a unique secret of at least 12 characters,
+including uppercase/lowercase, a digit and a symbol (at least four distinct
+characters). Do not commit it.
 
 ## Getting Started
 
@@ -182,6 +186,8 @@ By default, local launch settings use:
 
 - `https://localhost:7216`
 - `http://localhost:5022`
+
+Use the HTTPS address for sign-in; application cookies are Secure Always.
 
 When running in Development, the generated API contract is available at
 `/openapi/v1.json`. The property REST resource is available at `/api/v1/properties`;
@@ -241,7 +247,7 @@ property forms post to `/Properties/Create` and retain antiforgery protection.
 ## Repository notes
 
 - Generated `bin/`, `obj/`, IDE files, and local secrets are intentionally excluded from Git
-- The app uses default Identity UI routes such as `/Identity/Account/Login`
+- The app preserves Identity routes such as `/Identity/Account/Login`, with local login/registration/reauthentication/retention overrides
 - Some UI and controller files suggest work in progress, so the `README` intentionally documents only behaviour visible in the current code
 
 ## Tenancy invitations (P05-01)
@@ -299,8 +305,10 @@ ownership. Status changes append one event in the same transaction; failed or
 stale writes commit neither priority/status nor an event. Priority-only changes
 advance the revision without inventing a status transition. A status-only check
 would miss competing priority edits and reopened status cycles; the scalar revision
-closes those gaps using the existing conditional-update approach, without adding
-rowversion to other aggregates.
+closes those gaps. P07-02 adds SQL rowversion to property and maintenance rows;
+maintenance keeps this expectedRevision contract and checks its observed rowversion
+in the same conditional write. A SQL trigger requires every maintenance update to
+advance revision exactly once, including bulk SQL.
 
 The incremental `MaintenanceTriageAudit` migration defaults existing priorities to
 Normal and revisions to zero. Historical actor/previous-status/note fields remain
@@ -309,7 +317,7 @@ meaning. New submissions record the tenant actor with no previous status. New
 transitions record authenticated actor, previous/new status, server UTC time and
 optional note. Actor IDs are retained as historical facts without a user-delete
 cascade. Downgrade refuses to discard recorded triage/audit data. Descriptions and
-notes render as encoded text. Phase 7 query/index measurement remains deferred.
+notes render as encoded text. P07-01 query/index measurements are recorded below.
 
 ## React tenant portal (P06-01 / P06-02)
 
@@ -439,3 +447,59 @@ choose presentation only; existing server authorization remains authoritative.
 P07-01's opt-in disposable SQL benchmark, synthetic dataset, observed plans/reads,
 and index tradeoffs are documented in [Query performance](docs/performance/QUERY_PERFORMANCE.md).
 It runs separately from normal startup and test timing assertions.
+
+
+## Integrity, concurrency and retention (P07-02)
+
+Property PUT requires `expectedVersion` from owner/Admin
+`GET /api/v1/properties/{id}/edit`; property DELETE and tenancy end/cancel require
+`X-Expected-Version` (tenancy versions come from scoped list/detail). Razor forms
+carry the same values. Missing/malformed versions are rejected; stale versions
+conflict and require a reload. Tokens never grant resource access. Maintenance
+keeps its required `expectedRevision` API; SQL rowversion also protects its writes.
+
+Properties with tenancy history, all tenancies, maintenance requests and immutable
+status events are retained. SQL guards reject history updates/deletes and request/
+tenancy deletion, including bulk SQL; restrictive foreign keys preserve user and
+audit references. Unused properties can still be deleted with a current version.
+There is no automated purge, invented retention period, archive UI or anonymization
+job. See [the concurrency, retention and migration report](docs/CONCURRENCY_RETENTION.md)
+for contracts, deployment/rollback limits, changed files and verification evidence.
+
+## Authorization and account security (P08-01)
+
+Named policies protect role-specific MVC/API endpoints, with shared resource
+decisions and existing database ownership/current-tenancy scoping. Sessions validate
+persisted account state and security stamps on every request; role changes revoke
+the target's previous cookies. Cookies are Secure/HttpOnly/SameSite=Lax, with
+30-minute sliding idle expiry and an eight-hour absolute cap. Five failed password
+attempts lock an account for 15 minutes. Rollout requires existing users to sign in again.
+
+Development registration atomically assigns Tenant only. Production/Staging
+self-registration is closed until real onboarding exists; existing provisioned
+accounts can still sign in. No working confirmation/recovery email service is
+claimed. Self-service account deletion is blocked to protect history/admin access.
+Sensitive account actions and role mutations require a password verified within
+10 minutes. Role mutations are serialized in SQL, preserving a usable local Admin
+and committing role/stamp changes together. Legitimate self-service stamp changes
+refresh only the current session without extending those security times.
+See [Authorization](docs/AUTHORIZATION.md) for policies, operational limits,
+verification and every changed file.
+
+## Browser security (P08-02, external sign-in deferred)
+
+Local email/password login remains the only sign-in method; Google/Microsoft/Auth0
+integration is deferred, so the original P08-02 scope is not fully complete. The
+browser-security portion adds Secure/HttpOnly/Strict antiforgery cookies, baseline
+response headers, same-origin API path validation and configurable rate limits.
+Account POSTs default to 20/minute per connection IP; other writes to 60/minute per
+authenticated user (IP for anonymous). Reads/navigation remain available. Excess
+requests return 429 with Retry-After; React asks the user to wait without replaying
+writes. Limits are per process, not distributed/edge protection.
+
+An opt-in external key directory, stable application name and RSA PFX configuration
+support encrypted key persistence across restarts. No deployment volume, certificate
+or managed Azure key store has been provisioned. Explicit persistent keys outside
+Development/Testing require certificate encryption. See [Browser security](docs/BROWSER_SECURITY.md)
+for configuration, key/certificate lifecycle limits, remaining deployment gates,
+verification and an explanation of every changed file.

@@ -292,7 +292,7 @@ public class PropertiesControllerTests
 
         public Task<PropertyMutationOutcome> DeleteAsync(
             int propertyId,
-            CancellationToken cancellationToken) =>
+            CancellationToken cancellationToken, string? expectedVersion = null) =>
             Task.FromResult(DeleteOutcome);
     }
 

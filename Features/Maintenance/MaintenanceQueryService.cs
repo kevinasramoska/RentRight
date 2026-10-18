@@ -1,4 +1,5 @@
 using RentRight.Application.Abstractions;
+using RentRight.Authorization;
 using RentRight.Features.Maintenance.Contracts;
 using RentRight.Models;
 
@@ -9,9 +10,9 @@ public sealed class MaintenanceQueryService(
     ICurrentUser currentUser,
     IClock clock) : IMaintenanceQueryService
 {
-    private const string AdministratorRole = "Admin";
-    private const string LandlordRole = "Landlord";
-    private const string TenantRole = "Tenant";
+    private const string AdministratorRole = AppRoles.Admin;
+    private const string LandlordRole = AppRoles.Landlord;
+    private const string TenantRole = AppRoles.Tenant;
 
     public Task<MaintenanceListOutcome> ListAsync(MaintenanceRequestsQuery query, CancellationToken cancellationToken) =>
         ExecuteAsync(() => ListCoreAsync(query, cancellationToken), () => new MaintenanceListOutcome(MaintenanceOutcomeStatus.Unavailable));
@@ -109,7 +110,8 @@ public sealed class MaintenanceQueryService(
             var activeTenancies = await store.ListActiveTenanciesAsync(userId, DateOnly.FromDateTime(clock.UtcNow), cancellationToken);
             tenantOwnsRequest = activeTenancies.Any(t => t.Id == request.TenancyId);
         }
-        if (!isAdministrator && !landlordOwnsRequest && !tenantOwnsRequest)
+        if (!RentalAccess.CanReadMaintenance(currentUser,
+            new MaintenanceAccessResource(request.LandlordId, request.TenantId, tenantOwnsRequest)))
         {
             return MaintenanceDetailOutcome.ConcealedNotFound();
         }
@@ -190,7 +192,7 @@ public sealed class MaintenanceQueryService(
             return MaintenanceStatusUpdateOutcome.NotFound();
         }
 
-        if (!isAdministrator && request.LandlordId != userId)
+        if (!RentalAccess.CanManageProperty(currentUser, request.LandlordId))
         {
             return MaintenanceStatusUpdateOutcome.ConcealedNotFound();
         }

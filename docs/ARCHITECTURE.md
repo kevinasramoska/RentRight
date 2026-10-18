@@ -544,11 +544,48 @@ reading or mutating lifecycle state, serializing create/accept/end and property
 ownership/deletion changes. The combined filtered unique index prevents reservation
 collisions even outside the service. SQL rowversion rejects stale tracked writes;
 deadlocks, unique collisions and EF concurrency failures map to conflict, without
-blind retries. The command API does not expose rowversion: there are no editable
-lifecycle fields, state transitions are checked after locking, and each invitation
-has an immutable token target. End-after-accept is a valid sequential outcome;
-second acceptance/ending never rewrites original audit values.
+blind retries. P07-02 adds an opaque expected version to end/cancel so a form
+read before acceptance cannot end the newly accepted tenancy without review.
+Acceptance retains its one-use immutable invitation token and locked Pending
+precondition. Second acceptance/ending never rewrites original audit values.
 
 All existing properties are treated as lifecycle-available subject to reservations:
 archive/publication state does not exist yet. Historical rows are never deleted.
-Maintenance status/history and broad property concurrency work remain separate tasks.
+Maintenance status/history is implemented in P05-02/P05-03. P07-02 extends
+rowversion to properties and maintenance and defines retained-history SQL guards;
+see [CONCURRENCY_RETENTION.md](CONCURRENCY_RETENTION.md).
+
+## P08-01 authorization and account security
+
+Named audience policies protect all role-specific MVC/API endpoints. Shared
+`RentalAccess` resource decisions are used by property/maintenance
+services and a registered ASP.NET Core resource handler. EF scoping, current-tenancy
+checks and conditional mutation ownership/version predicates remain in place.
+Resource policies require trusted server-loaded facts and do not replace invitation
+consent, database races or domain status transitions. The executable policy matrix
+and precise implementation boundary are in [AUTHORIZATION.md](AUTHORIZATION.md).
+Persisted account/stamp validation runs on every authenticated request. Cookie
+idle/absolute limits, failed-login lockout, closed production self-registration,
+tenant-only development onboarding and recent-password role mutations are explicit.
+Role mutations acquire a transaction-owned SQL application lock, revalidate the
+persisted actor, preserve a usable local Admin and atomically rotate the target's
+stamp. Self-deletion cannot bypass retention/last-admin protection. No new schema
+or dependency was needed. Operational limits and verification are documented in
+the authorization report; P08-02/OIDC and deployment configuration remain separate.
+
+## P08-02 browser-security checkpoint (OIDC deferred)
+
+External sign-in/provider selection and account linking are deferred by user choice;
+local Identity remains the only sign-in method. The browser-boundary portion adds
+Secure/HttpOnly/Strict antiforgery cookies, baseline headers before static/MVC/API
+responses, same-origin client path validation and the framework's per-process
+account-IP/write-user rate limiter. Reads are not limited; rejected writes return
+no-store 429 with Retry-After and safe feedback. No permissive CORS is introduced.
+
+Opt-in persistent filesystem keys use an explicit stable application name and
+external certificate encryption, mandatory outside Development/Testing. No Azure
+resource/certificate/volume is provisioned. Proxy trust, actual persistent-volume
+verification, multi-certificate rotation and managed key storage remain deployment
+gates. This does not fulfill the original OIDC acceptance criteria. See
+[BROWSER_SECURITY.md](BROWSER_SECURITY.md) for the current boundary, configuration,
+testing and operational limitations.

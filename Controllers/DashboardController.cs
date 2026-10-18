@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RentRight.Authorization;
 using RentRight.Features.Dashboards;
 using RentRight.Features.Dashboards.Contracts;
 using RentRight.ViewModels;
@@ -31,7 +32,7 @@ public class DashboardController(
         };
     }
 
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = RentalPolicies.AdministerRoles)]
     public async Task<IActionResult> AdminDashboard(CancellationToken cancellationToken)
     {
         var outcome = await adminDashboardService.QueryAsync(cancellationToken);
@@ -51,7 +52,7 @@ public class DashboardController(
         };
     }
 
-    [Authorize(Roles = "Landlord")]
+    [Authorize(Policy = RentalPolicies.Landlord)]
     public async Task<IActionResult> LandlordDashboard(CancellationToken cancellationToken)
     {
         var outcome = await landlordDashboardService.QueryAsync(cancellationToken);
@@ -78,7 +79,7 @@ public class DashboardController(
         };
     }
 
-    [Authorize(Roles = "Tenant")]
+    [Authorize(Policy = RentalPolicies.Tenant)]
     public async Task<IActionResult> TenantDashboard(CancellationToken cancellationToken)
     {
         var outcome = await tenantDashboardService.QueryAsync(cancellationToken);

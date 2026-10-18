@@ -1,6 +1,9 @@
 using Testcontainers.MsSql;
 using Xunit;
 
+// Serialize container-owning classes; explicit Task.WhenAll race tests still run concurrently.
+[assembly: CollectionBehavior(DisableTestParallelization = true)]
+
 namespace RentRight.Tests.SqlIntegration;
 
 public sealed class SqlServerFixture : IAsyncLifetime

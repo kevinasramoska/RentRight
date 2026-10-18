@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RentRight.Authorization;
 using RentRight.Features.Properties;
 using RentRight.Features.Properties.Contracts;
 
@@ -44,13 +45,13 @@ public class PropertiesController(IPropertyService propertyService) : Controller
     }
 
     // GET: Properties/Create
-    [Authorize(Roles = "Landlord,Admin")]
+    [Authorize(Policy = RentalPolicies.Manager)]
     public IActionResult Create() => View(new PropertyCreateInput());
 
     // POST: Properties/Create
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Roles = "Landlord,Admin")]
+    [Authorize(Policy = RentalPolicies.Manager)]
     public async Task<IActionResult> Create(
         PropertyCreateInput input,
         CancellationToken cancellationToken = default)
@@ -65,7 +66,7 @@ public class PropertiesController(IPropertyService propertyService) : Controller
     }
 
     // GET: Properties/Edit/5
-    [Authorize(Roles = "Landlord,Admin")]
+    [Authorize(Policy = RentalPolicies.Manager)]
     public async Task<IActionResult> Edit(
         int? id,
         CancellationToken cancellationToken = default)
@@ -82,7 +83,7 @@ public class PropertiesController(IPropertyService propertyService) : Controller
     // POST: Properties/Edit/5
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Roles = "Landlord,Admin")]
+    [Authorize(Policy = RentalPolicies.Manager)]
     public async Task<IActionResult> Edit(
         int id,
         PropertyEditInput input,
@@ -111,7 +112,7 @@ public class PropertiesController(IPropertyService propertyService) : Controller
     }
 
     // GET: Properties/Delete/5
-    [Authorize(Roles = "Landlord,Admin")]
+    [Authorize(Policy = RentalPolicies.Manager)]
     public async Task<IActionResult> Delete(
         int? id,
         CancellationToken cancellationToken = default)
@@ -129,18 +130,20 @@ public class PropertiesController(IPropertyService propertyService) : Controller
     [HttpPost]
     [ActionName("DeleteConfirmed")]
     [ValidateAntiForgeryToken]
-    [Authorize(Roles = "Landlord,Admin")]
+    [Authorize(Policy = RentalPolicies.Manager)]
     public async Task<IActionResult> DeleteConfirmed(
         int id,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? expectedVersion = null)
     {
-        var outcome = await propertyService.DeleteAsync(id, cancellationToken);
+        var outcome = await propertyService.DeleteAsync(id, cancellationToken, expectedVersion);
         return outcome.Status switch
         {
             PropertyOperationStatus.Success => RedirectToAction(nameof(Index)),
             PropertyOperationStatus.Unauthenticated => Challenge(),
             PropertyOperationStatus.Forbidden => Forbid(),
             PropertyOperationStatus.NotFound => NotFound(),
+            PropertyOperationStatus.ValidationFailed => BadRequest("Reload the property and supply its version."),
             PropertyOperationStatus.HasHistory => RedirectWithError(
                 "A property with tenancy history cannot be deleted."),
             PropertyOperationStatus.Conflict => RedirectWithError(

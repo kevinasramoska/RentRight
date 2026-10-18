@@ -1,17 +1,18 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using RentRight.Authorization;
 using RentRight.Features.Tenancies;
 using RentRight.Features.Tenancies.Contracts;
 using RentRight.ViewModels;
 
 namespace RentRight.Controllers;
 
-[Authorize(Roles = "Admin,Landlord,Tenant")]
+[Authorize(Policy = RentalPolicies.Participant)]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public class TenanciesController(ITenancyService tenancyService) : Controller
 {
-    [Authorize(Roles = "Admin,Landlord")]
+    [Authorize(Policy = RentalPolicies.Manager)]
     public async Task<IActionResult> Index(CancellationToken cancellationToken)
     {
         var outcome = await tenancyService.ListForAdministrationAsync(cancellationToken);
@@ -30,7 +31,7 @@ public class TenanciesController(ITenancyService tenancyService) : Controller
         };
     }
 
-    [Authorize(Roles = "Admin,Landlord")]
+    [Authorize(Policy = RentalPolicies.Manager)]
     public async Task<IActionResult> Create(CancellationToken cancellationToken)
     {
         var outcome = await tenancyService.GetCreateFormAsync(cancellationToken);
@@ -45,7 +46,7 @@ public class TenanciesController(ITenancyService tenancyService) : Controller
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin,Landlord")]
+    [Authorize(Policy = RentalPolicies.Manager)]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(
         TenancyCreateViewModel model,
@@ -91,11 +92,11 @@ public class TenanciesController(ITenancyService tenancyService) : Controller
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin,Landlord")]
+    [Authorize(Policy = RentalPolicies.Manager)]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> End(int id, CancellationToken cancellationToken)
+    public async Task<IActionResult> End(int id, CancellationToken cancellationToken, string? expectedVersion = null)
     {
-        var outcome = await tenancyService.EndAsync(id, cancellationToken);
+        var outcome = await tenancyService.EndAsync(id, cancellationToken, expectedVersion);
 
         switch (outcome.Status)
         {
@@ -111,6 +112,8 @@ public class TenanciesController(ITenancyService tenancyService) : Controller
                 return Forbid();
             case EndTenancyStatus.NotFound:
                 return NotFound();
+            case EndTenancyStatus.InvalidVersion:
+                return BadRequest("Reload the tenancy and supply its version.");
             case EndTenancyStatus.Conflict:
                 TempData["Error"] =
                     "The tenancy changed before it could be ended. Reload and try again.";
@@ -120,11 +123,11 @@ public class TenanciesController(ITenancyService tenancyService) : Controller
         }
     }
 
-    [Authorize(Roles = "Tenant")]
+    [Authorize(Policy = RentalPolicies.Tenant)]
     public IActionResult Accept() => View(new TenancyAcceptViewModel());
 
     [HttpPost]
-    [Authorize(Roles = "Tenant")]
+    [Authorize(Policy = RentalPolicies.Tenant)]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Accept(TenancyAcceptViewModel model, CancellationToken cancellationToken)
     {
@@ -168,6 +171,7 @@ public class TenanciesController(ITenancyService tenancyService) : Controller
             TenantEmail = tenancy.TenantEmail,
             StartDate = tenancy.StartDate,
             EndDate = tenancy.EndDate,
+            Version = tenancy.Version,
             Status = tenancy.Status
         };
 

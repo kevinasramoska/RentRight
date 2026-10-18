@@ -50,10 +50,20 @@ describe('apiRequest', () => {
     await expect(apiRequest('/api/v1/items', { method: 'POST' })).rejects.toBeInstanceOf(ApiError);
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
-  it.each(['https://other.example/api/v1/items', '//other.example/api/v1/items', '/api/v1/\\other'])('rejects external or ambiguous paths: %s', async path => {
+  it.each(['https://other.example/api/v1/items', '//other.example/api/v1/items', '/api/v1/\\other',
+    '/api/v1/../../Identity/Account/Logout', '/api/v1/%2e%2e/session', '/api/v1/%2e%2e%2fprivate',
+    '/api/v1/%5cother', '/api/v1/items#ignored', '/api/v1/ite\tms'])('rejects external or ambiguous paths: %s', async path => {
     const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher);
     await expect(apiRequest(path)).rejects.toThrow('same-origin');
     expect(fetcher).not.toHaveBeenCalled();
+  });
+  it('does not retry a rate-limited mutation or bootstrap it again', async () => {
+    const fetcher = vi.fn().mockResolvedValueOnce(json({ requestToken: 'test-token' }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ code: 'rate_limited', title: 'Too many requests' }),
+        { status: 429, headers: { 'Content-Type': 'application/problem+json', 'Retry-After': '60' } }));
+    vi.stubGlobal('fetch', fetcher);
+    await expect(apiRequest('/api/v1/items', { method: 'POST' })).rejects.toMatchObject({ status: 429, problem: { code: 'rate_limited' } });
+    expect(fetcher).toHaveBeenCalledTimes(2);
   });
 });
 it('filters malformed problem fields', () => {

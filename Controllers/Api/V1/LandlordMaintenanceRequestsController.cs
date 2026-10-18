@@ -3,13 +3,14 @@ using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RentRight.Api;
+using RentRight.Authorization;
 using RentRight.Features.Maintenance;
 using RentRight.Features.Maintenance.Contracts;
 using RentRight.Models;
 
 namespace RentRight.Controllers.Api.V1;
 
-[Authorize(Roles = "Landlord,Admin")]
+[Authorize(Policy = RentalPolicies.Manager)]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 [ProducesResponseType<ProblemDetails>(503, "application/problem+json")]
 public sealed class LandlordMaintenanceRequestsController(ILandlordMaintenanceService queries, IMaintenanceCommandService commands) : ApiV1ControllerBase

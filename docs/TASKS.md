@@ -335,6 +335,8 @@ Implementation checkpoint (2026-08-11): the focused core-domain request is imple
 
 ### P07-02 — Add database-enforced integrity, optimistic concurrency, and retention rules
 
+- **Implementation status:** Implemented — SQL rowversion for mutable aggregates, required property/end versions, compatible maintenance revision protection, SQL constraints and retained-history guards, restrictive audit references, and reviewed incremental/idempotent migration. See [CONCURRENCY_RETENTION.md](CONCURRENCY_RETENTION.md) for deployment limits and verification.
+
 - **Why it matters:** Application checks alone are race-prone. Production-style workflows need database constraints, stale-write detection, and explicit history retention.
 - **Files/components likely affected:** domain entities, EF configurations, services/API contracts, migrations, Problem Details mapping, concurrency UI, database tests.
 - **Implementation steps:**
@@ -355,6 +357,8 @@ Implementation checkpoint (2026-08-11): the focused core-domain request is imple
 
 ### P08-01 — Centralize resource authorization and harden Identity/account rules
 
+- **Implementation status:** Implemented and verified — named policies, Identity/cookie/session hardening, tenant-only development onboarding, closed production self-registration/demo confirmation, recent-password account/role actions and serialized usable-last-admin protection. Release build clean; 459 fast and 45 frontend tests passed; SQL regression/focused runs cover 207 distinct passing cases with one opt-in benchmark skipped. No schema/package change. See [AUTHORIZATION.md](AUTHORIZATION.md) for exact run scopes and operational boundaries; P08-02 remains separate.
+
 - **Why it matters:** Role attributes alone cannot answer whether a landlord owns a property or a tenant participates in a tenancy. Identity defaults and scattered role strings also leave account onboarding and multi-role behavior ambiguous.
 - **Files/components likely affected:** new `Authorization/*` requirements/handlers, role/policy constants, services/controllers/views, `Program.cs` Identity/cookie options, registration/onboarding customization if needed, admin role service, integration tests.
 - **Implementation steps:**
@@ -373,6 +377,9 @@ Implementation checkpoint (2026-08-11): the focused core-domain request is imple
 - **Resume/portfolio value:** High interview value: concrete policy/resource authorization, defense in depth, onboarding trade-offs, and Identity hardening.
 
 ### P08-02 — Add external OpenID Connect and secure the browser API boundary
+
+- **Scope decision:** External OIDC/provider selection, account linking and callback tests are deferred by user choice. Keep the existing local Identity login; no paid/free provider registration is required to continue the portfolio work.
+- **Implementation status:** Browser-security portion implemented and verified: 499 fast backend tests, 53 frontend tests and 68 focused real-SQL account/property-pipeline tests passed; Release build clean and no EF model drift. Secure antiforgery cookies, same-origin client path checks, baseline headers, per-IP account/per-user write rate limits and opt-in encrypted external key-ring configuration. No schema/package change or production key-store provisioning. Original OIDC acceptance criteria are not complete. See [BROWSER_SECURITY.md](BROWSER_SECURITY.md).
 
 - **Why it matters:** External sign-in demonstrates standards-based federation, while React plus cookie authentication requires an explicit CSRF, CORS, redirect, and data-protection design.
 - **Files/components likely affected:** authentication registration/options in `Program.cs`, external-login Identity UI customization, configuration/options classes, secret documentation, antiforgery token endpoint/header handling, React API client, security-header/rate-limit middleware, tests.

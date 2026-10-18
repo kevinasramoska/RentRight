@@ -1,6 +1,7 @@
 using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
 using RentRight.Application.Abstractions;
+using RentRight.Authorization;
 using RentRight.Data;
 using RentRight.Features.Maintenance.Contracts;
 using RentRight.Models;
@@ -11,7 +12,7 @@ public sealed class TenantMaintenanceService(ApplicationDbContext db, ICurrentUs
     IMaintenanceCommandService commands) : ITenantMaintenanceService
 {
     private TenantMaintenanceStatus Access => !user.IsAuthenticated || string.IsNullOrWhiteSpace(user.UserId)
-        ? TenantMaintenanceStatus.Unauthenticated : !user.IsInRole("Tenant")
+        ? TenantMaintenanceStatus.Unauthenticated : !user.IsInRole(AppRoles.Tenant)
             ? TenantMaintenanceStatus.Forbidden : TenantMaintenanceStatus.Success;
 
     private IQueryable<MaintenanceRequest> Visible()

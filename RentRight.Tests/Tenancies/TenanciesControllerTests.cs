@@ -213,7 +213,7 @@ public class TenanciesControllerTests
 
         public Task<EndTenancyOutcome> EndAsync(
             int tenancyId,
-            CancellationToken cancellationToken) => Task.FromResult(EndOutcome);
+            CancellationToken cancellationToken, string? expectedVersion = null) => Task.FromResult(EndOutcome);
     }
 
     private sealed class InMemoryTempDataProvider : ITempDataProvider

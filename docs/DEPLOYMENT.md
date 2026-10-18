@@ -38,8 +38,19 @@ Never copy a real tenancy database into the public demo.
   merely to create a production administrator.
 - Persist ASP.NET Core data-protection keys across deployments/instances so
   authentication cookies and antiforgery tokens survive restarts.
+  The opt-in `Security:DataProtection` settings support a pre-existing external
+  persistent key directory, stable application name and separately mounted valid
+  RSA PFX. Explicit persistent keys in Production/Staging require certificate
+  encryption. No settings means platform defaults, not verified durable storage.
+  See [Browser security](BROWSER_SECURITY.md) for paths/secrets, permissions,
+  backups, initial sign-in reset and the single-certificate rotation limitation.
 - Configure trusted forwarded headers for the actual proxy and verify HTTPS
   redirects/cookies. Do not trust arbitrary forwarded headers from the internet.
+  Account/write limits use the connection IP or authenticated user, not an
+  untrusted forwarding header. Tune the defaults for shared NAT/proxies; per-process
+  limits reset on restart and are not distributed or DDoS protection. Verify 429
+  wait/retry behavior before promotion. Baseline headers are implemented; a full
+  script/resource CSP and real-browser audit remain separate.
 - Use synthetic properties, users, and tenancies and define a reset process
   before publishing shared demo credentials.
 

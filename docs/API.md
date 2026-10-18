@@ -67,6 +67,7 @@ returning transport-neutral outcomes; the API maps representative outcomes as fo
 | 403 | `access_denied` | Authenticated caller is not permitted |
 | 404 | `resource_not_found` | Missing or deliberately concealed resource |
 | 409 | `resource_conflict` | State, history, or concurrency conflict |
+| 429 | `rate_limited` | Write budget exceeded; wait for `Retry-After` before an explicit retry |
 | 500 | `internal_error` | Unexpected server failure |
 
 Problem responses do not include exception messages, stack traces, provider/SQL
@@ -76,8 +77,8 @@ is the support/correlation handle. A controller must deliberately choose conceal
 
 ## Identity cookie and antiforgery behavior
 
-The planned React client is hosted on the same origin and uses the existing ASP.NET
-Core Identity application cookie with `credentials: "include"`. The API does not issue
+The React client is hosted on the same origin and uses the existing ASP.NET
+Core Identity application cookie with `credentials: "same-origin"`. The API does not issue
 or accept a custom JWT.
 
 Known `/api/v1` endpoints return Problem Details with 401 or 403 instead of redirecting
@@ -85,10 +86,34 @@ to Identity HTML pages. Existing MVC routes retain their login/access-denied red
 
 The existing global `AutoValidateAntiforgeryToken` filter protects unsafe methods
 (`POST`, `PUT`, `PATCH`, and `DELETE`). A browser client must obtain a server-generated
-request token from a future authenticated host bootstrap/token endpoint and send it in
+request token from `GET /api/v1/session/antiforgery` and send it in
 the `X-CSRF-TOKEN` header while also including the Identity cookie. The antiforgery
-cookie alone is insufficient. P03-01 configures and tests this header contract but does
-not add a token endpoint or weaken validation for API actions.
+cookie alone is insufficient. The endpoint is no-store and issues a request token
+for the current session (including anonymous bootstrap); it does not weaken write
+authorization or antiforgery validation.
+
+The antiforgery cookie is explicitly Secure Always, HttpOnly and SameSite Strict.
+Tokens are tied to the current identity: an anonymous/previous-user request token
+must be replaced after sign-in/account changes. The client holds it in memory only,
+rejects external/traversal/ambiguous API paths and refuses redirects. No production
+CORS policy grants foreign origins access. CORS alone is not CSRF protection.
+
+Unsafe MVC/API writes now have per-process budgets (by default 60/minute per local
+user, anonymous by connection IP). Identity account POSTs separately share an IP
+budget of 20/minute. Rejections return no-store 429 with a positive `Retry-After`
+delta in seconds; APIs retain the Problem Details/trace contract. Reads and CSRF
+bootstrap remain available. Never automatically retry mutations; wait, review
+current state and explicitly retry. See [BROWSER_SECURITY.md](BROWSER_SECURITY.md)
+for configuration, baseline headers, proxy/NAT limits and external key persistence.
+
+P08-01 cookies are Secure/HttpOnly/SameSite=Lax, with a 30-minute sliding idle
+lifetime and an eight-hour absolute cap. Every authenticated request validates the
+persisted security stamp/account/lockout state. A role change invalidates previous
+cookies; the next protected API request returns 401 and requires a new sign-in.
+Expired/disabled sessions do not receive HTML login redirects. Rollout logs out
+older cookies that lack the protected original-session timestamp. Public resource
+DTOs and all existing version/revision preconditions remain unchanged. See
+[AUTHORIZATION.md](AUTHORIZATION.md) for the account and role-administration boundary.
 
 OpenAPI describes the Identity application cookie as the `IdentityCookie` cookie
 security scheme and marks operations carrying authorization metadata. Authorization
@@ -118,7 +143,7 @@ Results are ordered deterministically by title, address, and property ID before 
 The query performs a no-tracking count and projection and does not load landlord,
 tenancy, or maintenance entities.
 
-Create and update JSON accept exactly these writable values:
+Create JSON accepts these writable values (PUT additionally requires `expectedVersion`):
 
 ```json
 {
@@ -129,7 +154,7 @@ Create and update JSON accept exactly these writable values:
 }
 ```
 
-Owner/`landlordId`, IDs, roles, timestamps, publication state, concurrency state,
+Owner/`landlordId`, IDs, roles, timestamps, publication state,
 tenancies, and maintenance data are not mutation-contract fields. The owner is always
 the authenticated creator; updates preserve the persisted owner. Public list/detail
 responses contain only `id`, `title`, `address`, `rentAmount`, and `description`.
@@ -144,8 +169,19 @@ DELETE preserves the current MVC lifecycle rule: an unused property is hard-dele
 while a property with tenancy history is retained and produces `409`. The current EF
 model has no separate unpublished/archive flag, so every persisted property is a
 published listing today and public reads use a dedicated published-only service/store
-path. Persistent archive/unpublish state and opaque rowversion concurrency are deferred
-to Phase 7; no concurrency value is accepted or returned by this API version yet.
+path. Persistent archive/unpublish state remains deferred.
+
+P07-02 requires an opaque version on property mutations. Owner/Admin
+`GET /api/v1/properties/{propertyId}/edit` returns the editable fields, `id`, and
+`expectedVersion` (canonical base64 of the persisted eight-byte SQL rowversion),
+with no-store caching. Cross-owner reads are concealed as 404. PUT includes that
+`expectedVersion` in JSON; DELETE sends it in the `X-Expected-Version` header.
+Missing/malformed values return 400 after resource authorization; a well-formed
+stale/forged value returns 409. Reload the edit resource before retrying; never
+substitute a locally generated token. Successful mutations return 204 and require
+a fresh GET for another mutation. Public property list/detail contracts are unchanged.
+Razor edit/delete forms carry the persisted version in hidden inputs. Values are
+concurrency preconditions, never access credentials; all ownership checks still apply.
 
 POST, PUT, and DELETE use the existing Identity cookie and require the
 `X-CSRF-TOKEN` antiforgery header. OpenAPI declares their cookie security requirement,
@@ -190,8 +226,8 @@ echoed into errors. Successful acceptance clears the hash and records actor/time
 Admin cannot consent for another tenant, including a multi-role Admin.
 
 `TenancyResponse` contains `id`, `propertyTitle`, `propertyAddress`, `startDate`,
-`endDate`, and string `status` (`Pending`, `Active`, `Ended`). No account identity,
-token/hash, audit IDs, or rowversion is exposed. Lists use standard paging limits
+`endDate`, string `status` (`Pending`, `Active`, `Ended`), and opaque base64 `version`.
+No account identity, invitation token/hash, raw rowversion bytes, or audit IDs are exposed. Lists use standard paging limits
 (1–100 items; maximum page 10,000) and deterministic newest-ID ordering. Tenant
 queries include only their currently active, date-eligible tenancies. Manager
 queries include owned history; Admin explicitly overrides ownership. Inaccessible
@@ -204,9 +240,14 @@ records the UTC calendar end date, bounded by a future start date. Repeated endi
 returns 409 and leaves the original audit untouched. All mutations lock the property
 inside a serializable transaction, re-read state, and use rowversion/unique-index
 protection. Concurrent commands are ordered by this lock: a stale or losing command
-returns 404/409 as appropriate. There is no client If-Match/version contract because
-commands have immutable targets, explicit state preconditions and no editable fields.
-A sequential accept followed by end can legitimately both succeed.
+returns 404/409 as appropriate. P07-02 requires `X-Expected-Version` on
+`POST /api/v1/tenancies/{id}/end`, copied from the current list/detail `version`.
+Missing/malformed versions return 400; stale versions return 409. MVC end/cancel
+forms submit `ExpectedVersion`. Validation occurs after persisted ownership checks.
+An end form read before acceptance can no longer cancel a newly accepted tenancy;
+reload and review it first. Acceptance continues to use the persisted one-use
+invitation token and locked Pending-state precondition; no second version input
+is needed for that command.
 
 Failures use existing Problem Details codes (`validation_failed`,
 `authentication_required`, `access_denied`, `resource_not_found`, `resource_conflict`)

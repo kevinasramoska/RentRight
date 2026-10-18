@@ -150,6 +150,15 @@ internal sealed class ApiOpenApiOperationTransformer : IOpenApiOperationTransfor
         OpenApiOperationTransformerContext context,
         CancellationToken cancellationToken)
     {
+        if (context.Description.HttpMethod is "POST" or "PUT" or "PATCH" or "DELETE")
+        {
+            operation.Responses ??= new OpenApiResponses();
+            operation.Responses.TryAdd("429", new OpenApiResponse
+            {
+                Description = "Write rate limit exceeded. Problem Details code: rate_limited. " +
+                    "Retry-After specifies seconds to wait before an explicit retry; writes are not automatically replayed."
+            });
+        }
         var metadata = context.Description.ActionDescriptor.EndpointMetadata;
         if (metadata.OfType<IAllowAnonymous>().Any() ||
             !metadata.OfType<IAuthorizeData>().Any())

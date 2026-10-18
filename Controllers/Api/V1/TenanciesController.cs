@@ -2,12 +2,13 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RentRight.Api;
+using RentRight.Authorization;
 using RentRight.Features.Tenancies;
 using RentRight.Features.Tenancies.Contracts;
 
 namespace RentRight.Controllers.Api.V1;
 
-[Authorize(Roles = "Admin,Landlord,Tenant")]
+[Authorize(Policy = RentalPolicies.Participant)]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public sealed class TenanciesController(ITenancyService service) : ApiV1ControllerBase
 {
@@ -30,7 +31,7 @@ public sealed class TenanciesController(ITenancyService service) : ApiV1Controll
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin,Landlord")]
+    [Authorize(Policy = RentalPolicies.Manager)]
     [ProducesResponseType<InvitationResponse>(202)]
     public async Task<IActionResult> Invite(InviteTenancyRequest request, CancellationToken cancellationToken)
     {
@@ -49,7 +50,7 @@ public sealed class TenanciesController(ITenancyService service) : ApiV1Controll
     }
 
     [HttpPost("accept")]
-    [Authorize(Roles = "Tenant")]
+    [Authorize(Policy = RentalPolicies.Tenant)]
     [ProducesResponseType(204)]
     public async Task<IActionResult> Accept(AcceptInvitationRequest request, CancellationToken cancellationToken)
     {
@@ -65,13 +66,16 @@ public sealed class TenanciesController(ITenancyService service) : ApiV1Controll
     }
 
     [HttpPost("{id:int}/end")]
-    [Authorize(Roles = "Admin,Landlord")]
+    [Authorize(Policy = RentalPolicies.Manager)]
     [ProducesResponseType(204)]
-    public async Task<IActionResult> End(int id, CancellationToken cancellationToken)
+    public async Task<IActionResult> End(int id, CancellationToken cancellationToken,
+        [FromHeader(Name = "X-Expected-Version")] string? expectedVersion = null)
     {
-        var result = await service.EndAsync(id, cancellationToken);
+        var result = await service.EndAsync(id, cancellationToken, expectedVersion);
         return result.Status switch
         {
+            EndTenancyStatus.InvalidVersion => ApiValidationProblem(new Dictionary<string, string[]>
+                { ["expectedVersion"] = ["Reload the tenancy and supply its version."] }),
             EndTenancyStatus.Success => NoContent(),
             EndTenancyStatus.Unauthenticated => ApiProblem(401, ApiErrorCodes.AuthenticationRequired),
             EndTenancyStatus.Forbidden => ApiProblem(403, ApiErrorCodes.AccessDenied),
@@ -82,7 +86,7 @@ public sealed class TenanciesController(ITenancyService service) : ApiV1Controll
 
     private IActionResult QueryFailure(TenancyQueryStatus status) => status == TenancyQueryStatus.Unauthenticated
         ? ApiProblem(401, ApiErrorCodes.AuthenticationRequired) : ApiProblem(403, ApiErrorCodes.AccessDenied);
-    private static TenancyResponse ToResponse(TenancyAdminRow row) => new(row.Id, row.PropertyTitle, row.PropertyAddress, row.StartDate, row.EndDate, row.Status.ToString());
+    private static TenancyResponse ToResponse(TenancyAdminRow row) => new(row.Id, row.PropertyTitle, row.PropertyAddress, row.StartDate, row.EndDate, row.Status.ToString(), row.Version);
 }
 
 public sealed class InviteTenancyRequest
@@ -97,4 +101,4 @@ public sealed class AcceptInvitationRequest
     [Required, StringLength(64, MinimumLength = 64)] public string Token { get; init; } = string.Empty;
 }
 public sealed record InvitationResponse(string Token, DateTime ExpiresUtc);
-public sealed record TenancyResponse(int Id, string PropertyTitle, string PropertyAddress, DateOnly StartDate, DateOnly? EndDate, string Status);
+public sealed record TenancyResponse(int Id, string PropertyTitle, string PropertyAddress, DateOnly StartDate, DateOnly? EndDate, string Status, string? Version);

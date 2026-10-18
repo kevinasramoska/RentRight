@@ -16,6 +16,7 @@ export function errorMessage(error: unknown): string {
     case 403: return 'You don’t have access to this tenant resource.';
     case 404: return 'This request is unavailable or no longer accessible.';
     case 409: return error.problem.code === 'no_active_tenancy' ? 'You need a currently active tenancy to submit a request.' : 'Your tenancy or request has changed. Review the overview before trying again.';
+    case 429: return 'Too many requests. Please wait before trying again.';
     case 503: return 'The service is temporarily unavailable. Please try again later.';
     default: return 'We couldn’t complete the request. Please try again.';
   }

@@ -230,16 +230,95 @@ public class AdministrationServiceTests
         bool isAdministrator = true) =>
         new(store, new FakeCurrentUser(isAuthenticated, isAdministrator));
 
+    [Fact]
+    public async Task UpdateUserRolesAsync_ActorRevokedWhileWaiting_DoesNotMutate()
+    {
+        var store = CreateStore(("user-1", "user@example.test", ["Tenant"]));
+        store.ActorIsUsableAdmin = false;
+        var result = await CreateService(store).UpdateUserRolesAsync(new("user-1", ["Landlord"]), default);
+        Assert.Equal(UpdateUserRolesStatus.Forbidden, result.Status);
+        Assert.Equal(1, store.RollbackCount);
+        Assert.Empty(store.AddCalls);
+        Assert.Equal(0, store.StampUpdateCount);
+    }
+
+    [Fact]
+    public async Task UpdateUserRolesAsync_StoredUnsupportedRole_IsStillRejected()
+    {
+        var store = new FakeAdministrationRoleStore(["Admin", "Landlord", "Tenant", "SuperAdmin"],
+            [("user-1", "user@example.test", ["Tenant"])]);
+        var result = await CreateService(store).UpdateUserRolesAsync(new("user-1", ["SuperAdmin"]), default);
+        Assert.Equal(UpdateUserRolesStatus.InvalidRoles, result.Status);
+        Assert.Empty(store.AddCalls);
+    }
+
+    [Fact]
+    public async Task UpdateUserRolesAsync_StampUpdateFails_RollsBackRoles()
+    {
+        var store = CreateStore(("user-1", "user@example.test", ["Tenant"]));
+        store.StampFailure = AdministrationIdentityOperation.Failure("Synthetic stamp failure.");
+        var result = await CreateService(store).UpdateUserRolesAsync(new("user-1", ["Landlord"]), default);
+        Assert.Equal(UpdateUserRolesStatus.IdentityFailure, result.Status);
+        Assert.Equal(["Tenant"], store.RolesFor("user-1"));
+        Assert.Equal(1, store.StampUpdateCount);
+        Assert.Equal(1, store.RollbackCount);
+    }
+
+    [Fact]
+    public async Task UpdateUserRolesAsync_ActualChange_InvalidatesSessionsButNoOpDoesNot()
+    {
+        var store = CreateStore(("user-1", "user@example.test", ["Tenant"]));
+        Assert.Equal(UpdateUserRolesStatus.Success, (await CreateService(store).UpdateUserRolesAsync(new("user-1", ["Tenant"]), default)).Status);
+        Assert.Equal(0, store.StampUpdateCount);
+        Assert.Equal(UpdateUserRolesStatus.Success, (await CreateService(store).UpdateUserRolesAsync(new("user-1", ["Landlord"]), default)).Status);
+        Assert.Equal(1, store.StampUpdateCount);
+    }
+
+    [Fact]
+    public async Task UpdateUserRolesAsync_UnusableAdminWithUsableReplacement_CanBeDemoted()
+    {
+        var store = CreateStore(("admin-1", "first@example.test", ["Admin"]), ("admin-2", "second@example.test", ["Admin"]));
+        store.UnusableUsers.Add("admin-1");
+        var result = await CreateService(store).UpdateUserRolesAsync(new("admin-1", ["Tenant"]), default);
+        Assert.Equal(UpdateUserRolesStatus.Success, result.Status);
+        Assert.Equal(["Admin"], store.RolesFor("admin-2"));
+    }
+
     private static FakeAdministrationRoleStore CreateStore(
         params (string UserId, string Email, string[] Roles)[] users) =>
         new(["Admin", "Landlord", "Tenant"], users);
 
-    private sealed class FakeCurrentUser(bool isAuthenticated, bool isAdministrator) : ICurrentUser
+    private sealed class FakeCurrentUser(bool isAuthenticated, bool isAdministrator, string? userId = "current-admin") : ICurrentUser
     {
         public bool IsAuthenticated { get; } = isAuthenticated;
-        public string? UserId => "current-admin";
+        public string? UserId => userId;
         public bool IsInRole(string roleName) =>
             isAdministrator && string.Equals(roleName, "Admin", StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public async Task UpdateUserRolesAsync_MalformedRole_DoesNotThrowOrMutate(string? role)
+    {
+        var store = CreateStore(("user-1", "user@example.test", ["Tenant"]));
+        var result = await CreateService(store).UpdateUserRolesAsync(new("user-1", [role!]), default);
+        Assert.Equal(UpdateUserRolesStatus.InvalidRoles, result.Status);
+        Assert.Empty(store.AddCalls);
+        Assert.Equal(["Tenant"], store.RolesFor("user-1"));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(" ")]
+    public async Task Administration_MissingUserIdentifier_RejectsBeforeStoreAccess(string? id)
+    {
+        var store = CreateStore(("user-1", "user@example.test", ["Tenant"]));
+        var service = new AdministrationService(store, new FakeCurrentUser(true, true, id));
+        Assert.Equal(ListAdministrationUsersStatus.Unauthenticated, (await service.ListUsersAsync(new(), default)).Status);
+        Assert.Equal(UpdateUserRolesStatus.Unauthenticated, (await service.UpdateUserRolesAsync(new("user-1", ["Landlord"]), default)).Status);
+        Assert.Equal(0, store.GetUsersPageCount);
+        Assert.Equal(0, store.SerializableTransactionCount);
     }
 
     private sealed class FakeAdministrationRoleStore : IAdministrationRoleStore
@@ -262,6 +341,10 @@ public class AdministrationServiceTests
         public AdministrationIdentityOperation? AddFailure { get; set; }
         public AdministrationIdentityOperation? RemoveFailure { get; set; }
         public DbUpdateException? AddException { get; set; }
+        public bool ActorIsUsableAdmin { get; set; } = true;
+        public AdministrationIdentityOperation? StampFailure { get; set; }
+        public int StampUpdateCount { get; private set; }
+        public HashSet<string> UnusableUsers { get; } = [];
         public List<IReadOnlyList<string>> AddCalls { get; } = [];
         public List<IReadOnlyList<string>> RemoveCalls { get; } = [];
         public int SerializableTransactionCount { get; private set; }
@@ -317,13 +400,21 @@ public class AdministrationServiceTests
             return Task.FromResult<AdministrationUserRoleState?>(new(
                 userId,
                 user.Email,
-                user.Roles.ToArray()));
+                user.Roles.ToArray(), !UnusableUsers.Contains(userId)));
         }
 
         public Task<int> CountUsersInRoleAsync(
             string roleName,
             CancellationToken cancellationToken) =>
-            Task.FromResult(_users.Count(user => user.Value.Roles.Contains(roleName)));
+            Task.FromResult(_users.Count(user => user.Value.Roles.Contains(roleName) && !UnusableUsers.Contains(user.Key)));
+
+        public Task<bool> IsUsableAdministratorAsync(string userId, CancellationToken cancellationToken) => Task.FromResult(ActorIsUsableAdmin);
+
+        public Task<AdministrationIdentityOperation> UpdateSecurityStampAsync(string userId, CancellationToken cancellationToken)
+        {
+            StampUpdateCount++;
+            return Task.FromResult(StampFailure ?? AdministrationIdentityOperation.Success());
+        }
 
         public Task<AdministrationIdentityOperation> AddToRolesAsync(
             string userId,

@@ -20,7 +20,7 @@ public sealed class EfTenancyStore(ApplicationDbContext db, ILookupNormalizer no
         // Pending/cancelled invitation data must not reveal account existence.
         t.AcceptedUtc != null || (t.InvitedUtc == null && t.TenantId != null) ? t.Tenant!.FullName : string.Empty,
         t.AcceptedUtc != null || (t.InvitedUtc == null && t.TenantId != null) ? t.Tenant!.Email ?? string.Empty : string.Empty,
-        t.StartDate, t.EndDate, t.Status));
+        t.StartDate, t.EndDate, t.Status, Convert.ToBase64String(t.RowVersion)));
 
     public async Task<IReadOnlyList<TenancyAdminRow>> ListAsync(TenancyActor actor, DateOnly today, int skip, int take, CancellationToken cancellationToken) =>
         await Project(Visible(actor, today).OrderByDescending(t => t.Id).Skip(skip).Take(take)).ToListAsync(cancellationToken);
@@ -126,7 +126,7 @@ public sealed class EfTenancyStore(ApplicationDbContext db, ILookupNormalizer no
         }
     }
 
-    public async Task<EndTenancyOutcome> EndAsync(int id, TenancyActor actor, DateTime now, CancellationToken cancellationToken)
+    public async Task<EndTenancyOutcome> EndAsync(int id, TenancyActor actor, DateTime now, CancellationToken cancellationToken, string? expectedVersion = null)
     {
         var propertyId = await db.Tenancies.AsNoTracking().Where(t => t.Id == id).Select(t => (int?)t.PropertyId).SingleOrDefaultAsync(cancellationToken);
         if (propertyId is null) return EndTenancyOutcome.NotFound();
@@ -136,6 +136,9 @@ public sealed class EfTenancyStore(ApplicationDbContext db, ILookupNormalizer no
             var property = await LockPropertyAsync(propertyId.Value, cancellationToken);
             if (property is null || !CanManage(property, actor)) return EndTenancyOutcome.NotFound();
             var tenancy = await db.Tenancies.SingleAsync(t => t.Id == id, cancellationToken);
+            if (!RentRight.Application.ExpectedVersion.TryParse(expectedVersion, out var version))
+                return new(EndTenancyStatus.InvalidVersion);
+            if (!tenancy.RowVersion.SequenceEqual(version)) return EndTenancyOutcome.Conflict();
             if (!tenancy.End(actor.UserId, now)) return EndTenancyOutcome.Conflict();
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);

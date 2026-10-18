@@ -17,6 +17,10 @@ public interface IAdministrationRoleStore
 
     Task<int> CountUsersInRoleAsync(string roleName, CancellationToken cancellationToken);
 
+    Task<bool> IsUsableAdministratorAsync(string userId, CancellationToken cancellationToken);
+
+    Task<AdministrationIdentityOperation> UpdateSecurityStampAsync(string userId, CancellationToken cancellationToken);
+
     Task<AdministrationIdentityOperation> AddToRolesAsync(
         string userId,
         IReadOnlyCollection<string> roles,
@@ -34,7 +38,8 @@ public interface IAdministrationRoleStore
 public sealed record AdministrationUserRoleState(
     string UserId,
     string Email,
-    IReadOnlyList<string> Roles);
+    IReadOnlyList<string> Roles,
+    bool IsUsable = true);
 
 public sealed record AdministrationIdentityOperation(
     bool Succeeded,
