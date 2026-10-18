@@ -30,7 +30,8 @@ run. Wall-clock/plan collection is not a stable PR gate.
 ## Security and failure policy
 
 - Every action is pinned to a full upstream commit. Refresh the SHA and adjacent
-  version comment together after reviewing upstream changes. Node 24 and the
+  version comment together after reviewing upstream changes. All actions use
+  their supported Node 24 runtime. Node 24 and the
   repository's SDK pin are used. Application and scanner manifests are digest-pinned.
 - Permissions are `contents: read`. Checkout does not persist credentials.
   There is no `pull_request_target`, registry publication, deployment or secret
@@ -128,6 +129,26 @@ HTTP-test failures because React assets had not crossed the new job boundary.
 The workflow now transfers the actual built frontend before backend build/tests;
 no behavioral assertion was removed or weakened. The deliberate probe was removed
 after confirming failure, and a clean rerun is required before marking ready.
+
+Local verification on 2026-10-18: locked restore of all three projects, warning-free
+Release build, 596 fast tests with a real Cobertura artifact, all 85 React tests
+with JUnit, lint/type-check/production build, clean npm/NuGet audits, and no EF
+model drift. The digest-pinned empty-database SQL migration smoke passed. The
+production Docker build and Trivy scan passed (three .NET dependency manifests,
+97 Ubuntu packages, zero HIGH/CRITICAL findings). A temporary real project-version
+mismatch failed locked restore with `NU1004` for all three projects; restoring
+the original dependency restored a successful forced locked restore. Merely
+changing informational lock metadata was not used as evidence for that check.
+Scanning a nonexistent image failed rather than reporting success.
+
+The final immutable tested head, complete SQL-suite/Compose outcomes and downloadable
+reports are available in [PR #27's checks](https://github.com/kevinasramoska/RentRight/pull/27/checks).
+The PR is left draft until those checks pass. No branch protection, registry
+publication or Azure resource is configured by this task.
+
+Underlying policies follow the official [NuGet lock-file guidance](https://learn.microsoft.com/en-us/nuget/consume-packages/package-references-in-project-files#locking-dependencies),
+[NuGet audit guidance](https://learn.microsoft.com/en-us/nuget/concepts/auditing-packages)
+and [GitHub secure-use guidance](https://docs.github.com/en/actions/reference/security/secure-use).
 
 ## Changed files
 
