@@ -291,6 +291,8 @@ Implementation checkpoint (2026-08-11): the focused core-domain request is imple
 
 ### P06-02 — Build and test the React tenant maintenance portal
 
+- **Presentation follow-up:** Responsive resident-workspace styling, local fonts and illustrations, an explicitly labelled synthetic `/app/demo/` journey, and portfolio screenshot assets are documented in [PORTFOLIO_SHOWCASE.md](PORTFOLIO_SHOWCASE.md). The demo is a browser-only simulation of the same tenant screens, not an authenticated backend demonstration.
+
 - **Implementation status:** Delivered: authenticated overview, paged list, detail/history and validated submission under `/app`; safe dashboard API adapter and read-only maintenance priority; session clearing/cancellation, fixed problem messages, responsive accessible controls, component integration and real-host HTTP smoke coverage. SQL tests verify dashboard eligibility/scoping. No dependencies or schema changes. Browser/device and assistive-technology testing remains manual; the smoke combines component integration with WebApplicationFactory rather than a browser runner. See README.
 
 - **Why it matters:** A focused, complete user journey is stronger portfolio evidence than a broad visual rewrite of working MVC screens.

@@ -5,8 +5,8 @@ import react from '@vitejs/plugin-react';
 // Explicit local certificate paths; never export private keys into the repository.
 const cert = process.env.RENTRIGHT_DEV_CERT;
 const key = process.env.RENTRIGHT_DEV_KEY;
-export default defineConfig(({ command, mode }) => {
-  if (command === 'serve' && mode !== 'test' && (!cert || !key)) {
+export default defineConfig(({ command, mode, isPreview }) => {
+  if (command === 'serve' && !isPreview && mode !== 'test' && (!cert || !key)) {
     throw new Error('Set RENTRIGHT_DEV_CERT and RENTRIGHT_DEV_KEY to local HTTPS certificate paths. See README.md.');
   }
   return {

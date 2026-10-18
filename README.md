@@ -321,6 +321,11 @@ notes render as encoded text. P07-01 query/index measurements are recorded below
 
 ## React tenant portal (P06-01 / P06-02)
 
+The tenant portal now has a responsive resident-workspace design and an isolated
+portfolio demo at `/app/demo/`. The demo uses fictional in-memory data and makes
+no session, maintenance, or database calls. See [portfolio showcase](docs/PORTFOLIO_SHOWCASE.md)
+for the local demo command, static export, screenshots, and testing boundaries.
+
 The authenticated tenant portal lives at `/app/`; Razor, Identity and `/api/v1`
 retain their existing routes and server authorization. Overview shows accepted,
 currently active tenancies, open and 30-day request counts, and recent requests.
