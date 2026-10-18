@@ -76,18 +76,18 @@ Use Node 24, the pinned SDK, Docker/Linux amd64 support and enough memory for SQ
 These tests create only disposable SQL containers/databases and Compose volumes.
 
 ```bash
-dotnet restore RentRight.CI.slnx --locked-mode /p:ContinuousIntegrationBuild=true
-dotnet build RentRight.CI.slnx --no-restore --configuration Release /p:ContinuousIntegrationBuild=true
-dotnet tool restore
-dotnet ef migrations has-pending-model-changes --project RentRight.csproj --configuration Release --no-build
-dotnet test RentRight.Tests/RentRight.Tests.csproj --configuration Release --no-build --no-restore --settings coverage.runsettings --collect:"Code Coverage;Format=Cobertura" --logger "trx;LogFileName=fast.trx" --results-directory TestResults/fast
-dotnet test RentRight.Tests/SqlIntegration/RentRight.SqlIntegration.Tests.csproj --configuration Release --no-build --no-restore --logger "trx;LogFileName=sql.trx" --results-directory TestResults/sql --blame-hang-timeout 5m
 npm ci --prefix ClientApp
 npm audit --prefix ClientApp --audit-level=high
 npm run lint --prefix ClientApp
 npm run type-check --prefix ClientApp
 npm test --prefix ClientApp -- --reporter=default --reporter=junit --outputFile=../TestResults/frontend.xml
 npm run build --prefix ClientApp
+dotnet restore RentRight.CI.slnx --locked-mode /p:ContinuousIntegrationBuild=true
+dotnet build RentRight.CI.slnx --no-restore --configuration Release /p:ContinuousIntegrationBuild=true
+dotnet tool restore
+dotnet ef migrations has-pending-model-changes --project RentRight.csproj --configuration Release --no-build
+dotnet test RentRight.Tests/RentRight.Tests.csproj --configuration Release --no-build --no-restore --settings coverage.runsettings --collect:"Code Coverage;Format=Cobertura" --logger "trx;LogFileName=fast.trx" --results-directory TestResults/fast
+dotnet test RentRight.Tests/SqlIntegration/RentRight.SqlIntegration.Tests.csproj --configuration Release --no-build --no-restore --logger "trx;LogFileName=sql.trx" --results-directory TestResults/sql --blame-hang-timeout 5m
 docker build --build-arg VERSION=local --tag rentright:quality .
 bash scripts/scan-image.sh rentright:quality
 node scripts/verify-compose.mjs
@@ -115,10 +115,13 @@ After a successful PR run, configure a `main` branch ruleset/protection requirin
    requirement if previously configured.
 3. No bypass/force-push/deletion except an explicitly agreed emergency process.
 
-The workflow does not edit repository rules. At implementation time the branch
-protection API reported `main` unprotected; therefore these checks alone cannot
-prevent an authorized user from bypassing PRs or merging a red PR. Enabling
-protection is a separate repository-owner action, not claimed complete here.
+The workflow does not edit repository rules. After explicit owner authorization
+on 2026-10-18, `main` protection was enabled and read back through GitHub's API:
+a PR and an up-to-date passing `Required quality gate` specifically from GitHub
+Actions (app 15368) are required, including for administrators. Force pushes and
+branch deletion are blocked. No additional reviewer approval is required for the
+single-owner workflow. At initial implementation the branch was unprotected;
+the protection configuration was a separately authorized follow-up.
 
 ## Verification record
 
@@ -143,8 +146,12 @@ Scanning a nonexistent image failed rather than reporting success.
 
 The final immutable tested head, complete SQL-suite/Compose outcomes and downloadable
 reports are available in [PR #27's checks](https://github.com/kevinasramoska/RentRight/pull/27/checks).
-The PR is left draft until those checks pass. No branch protection, registry
-publication or Azure resource is configured by this task.
+The PR was kept draft until those checks passed. Protection was enabled separately
+as recorded above; no registry publication or Azure resource is configured here.
+
+Review corrected the local command order so the real React assets exist before
+the .NET build/HTTP tests on a fresh checkout. This does not change the workflow
+or application behavior; CI already transfers those assets before backend build.
 
 Underlying policies follow the official [NuGet lock-file guidance](https://learn.microsoft.com/en-us/nuget/consume-packages/package-references-in-project-files#locking-dependencies),
 [NuGet audit guidance](https://learn.microsoft.com/en-us/nuget/concepts/auditing-packages)
@@ -166,5 +173,5 @@ and [GitHub secure-use guidance](https://docs.github.com/en/actions/reference/se
 | `scripts/scan-image.sh` | Fail-closed pinned image scan with temporary-archive cleanup |
 | `README.md` | Link the current CI behavior/runbook |
 | `docs/SQL_INTEGRATION_TESTS.md` | Explain actual lock/CI solution and pinned SQL behavior |
-| `docs/TASKS.md` | Record the delivered P11-01 scope and remaining protection boundary |
+| `docs/TASKS.md` | Record the delivered P11-01 scope and enabled protection boundary |
 | `docs/CI.md` | This runbook, inventory, response rules and verification evidence |
