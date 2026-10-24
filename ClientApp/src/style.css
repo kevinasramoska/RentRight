@@ -436,3 +436,24 @@ h1{font-size:29px}
 .utility-button{display:flex;gap:10px;align-items:center;font-size:11px;color:#c5d3c3;min-height:44px;border:0;background:none;padding:0;text-align:left}
 .utility-button .icon{width:16px;height:16px}
 @media(max-width:720px){.business-card{padding:20px}.page-heading{flex-wrap:wrap}.business-actions{gap:9px}.business-table th,.business-table td{padding:12px}.role-row{padding:20px}}
+
+.demo-guide{background:#eef3e9;border:1px solid #d5dfcc;border-radius:12px;padding:21px;margin-bottom:30px}
+.demo-guide-heading{display:flex;align-items:center;justify-content:space-between;gap:18px}
+.demo-guide-heading .eyebrow{margin-bottom:6px}
+.demo-guide-heading h2{font-size:19px}
+.demo-guide-heading p:not(.eyebrow){font-size:12px;color:#596e60;margin-top:7px}
+.demo-guide-actions{display:flex;flex-wrap:wrap;gap:9px;flex-shrink:0}
+.demo-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;padding:0;margin:19px 0 13px;list-style:none}
+.demo-steps a{display:flex;gap:10px;height:100%;padding:13px 11px;border:1px solid #dce5d5;border-radius:8px;background:#fcfdfb;min-height:44px}
+.demo-steps a:hover{border-color:#78906b}
+.demo-steps a[aria-current=step]{background:#e0ead9;border-color:#6b845d}
+.demo-step-number{display:grid;place-items:center;flex-shrink:0;width:23px;height:23px;border:1px solid #c4d1bc;border-radius:50%;font-size:11px;font-weight:650;color:#345b48}
+.demo-steps strong{display:block;font-size:12px;font-weight:650}
+.demo-steps a>span>span{display:block;font-size:11px;line-height:1.7;color:#596e60;margin-top:4px}
+.demo-guide-note{display:flex;gap:7px;align-items:center;color:#596e60;font-size:11px;margin-top:14px}
+.demo-guide-note .icon{width:14px;height:14px}
+.demo-reset{display:flex;align-items:center;justify-content:space-between;gap:16px;background:#fffaf4;border:1px solid #e4d2bb;border-radius:8px;padding:16px;margin-top:16px;font-size:12px}
+.demo-reset p{color:#695b49;margin-top:5px}
+.demo-reset-actions{display:flex;flex-wrap:wrap;gap:9px;flex-shrink:0}
+@media(max-width:1200px){.demo-guide-heading{flex-wrap:wrap}.demo-steps{grid-template-columns:repeat(2,minmax(0,1fr))}.demo-reset{flex-wrap:wrap}}
+@media(max-width:720px){.demo-guide{padding:17px;margin-bottom:24px}.demo-guide-heading{align-items:flex-start;flex-wrap:wrap;gap:12px}.demo-guide-heading h2{font-size:18px}.demo-steps{grid-template-columns:1fr;gap:8px}.demo-steps a{padding:12px}.demo-guide-note{align-items:flex-start}.demo-guide-note .icon{margin-top:2px}.demo-reset-actions{flex-shrink:1}.demo-reset-actions .button{white-space:normal}}

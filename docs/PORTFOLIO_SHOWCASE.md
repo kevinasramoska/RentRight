@@ -31,6 +31,25 @@ authorization rules. Leaving the demo rechecks the live session. Demo data is
 never used as a fallback when a live request fails. Please enter fictional text.
 The scenario uses fixed October 2026 dates so the example remains reproducible.
 
+## Guided portfolio journey
+
+Select **Show walkthrough** for four linked steps: home, request list, repair
+timeline, and fictional submission. The guide stays open across client navigation;
+**Hide walkthrough** hides only the guide, not an unfinished form or simulated
+requests. It starts collapsed so the actual workspace remains the focus on small
+screens. Deep links still work without starting a tour.
+
+**Reset demo** first offers **Keep exploring** or **Reset and start again**. Cancel
+preserves the current route, form text, and requests and restores button focus.
+Confirm replaces only the in-memory adapter, clears unfinished text, collapses
+the guide, and returns to the original overview, including when already on that
+route. The routed heading receives focus. Old simulated request links then become
+unavailable; browser navigation does not resurrect the discarded request data.
+No live account, API, cookie, storage, database, or hosting setting is changed.
+
+For a concise explanation of the product, decisions, and evidence, use the
+[portfolio case study](PORTFOLIO_CASE_STUDY.md).
+
 ## Screenshots for the portfolio
 
 These are actual browser captures of the running UI with synthetic data:
@@ -42,10 +61,14 @@ These are actual browser captures of the running UI with synthetic data:
 | [Timeline, desktop](showcase/timeline-desktop.jpg) | Workflow detail | Maintenance request details and a chronological progress timeline |
 | [New request, desktop](showcase/new-request-desktop.jpg) | Feature gallery | A labelled maintenance description form with guidance and a simulated submission notice |
 | [Overview, mobile](showcase/overview-mobile.jpg) | Responsive-design evidence | RentRight overview adapted to a narrow mobile screen |
+| [Guided overview, desktop](showcase/guided-overview-desktop.png) | Current guided-demo hero | Resident overview with an expanded four-step demo guide and synthetic tenancy data |
+| [Guided timeline, desktop](showcase/guided-timeline-desktop.png) | Current workflow detail | Guided demo showing a kitchen-tap repair and chronological property-team updates |
+| [Guided overview, mobile](showcase/guided-overview-mobile.png) | Current responsive evidence | Mobile resident overview with compact walkthrough and reset controls |
 
 Keep the demo disclosure visible when presenting screenshots. These assets show
-the tenant experience. The landlord and administrator workflows remain in Razor;
-they are not represented by this screenshot set.
+the tenant experience. Landlord and administrator business workflows are available
+in the authenticated React workspaces, but are not simulated or represented by
+this screenshot set. Identity account screens remain server-rendered.
 
 ## Static export and hosting
 
@@ -65,9 +88,11 @@ No hosting or portfolio-website deployment is performed by this change. Test the
 chosen host's base path and deep-link rewrites before adding a public demo link.
 A different deployment prefix requires an intentional route/base-path update.
 
-The local handoff archive is `artifacts/rentright-portfolio-kit.zip`. It contains
+The earlier local handoff archive was `artifacts/rentright-portfolio-kit.zip`. It contained
 the screenshots, the static build mounted under `demo/app/`, this report, and
-example static-host rewrite rules. It is a generated artifact, not tracked source.
+example static-host rewrite rules. It is a generated artifact, not tracked source;
+it is not refreshed by this follow-up. Use the current screenshots and a fresh
+static build rather than treating that earlier archive as the current release.
 
 ## Accessibility and verification
 
@@ -99,6 +124,28 @@ checks confirmed 3px focus indicators on both targets and that, at 1440×420, th
 needed by this preview. Earlier screenshots remain representative of the design.
 
 ## Files changed
+
+### Guided-demo follow-up (2026-10-23)
+
+- `ClientApp/src/demo/DemoGuide.tsx`: optional tour, current-step semantics, reset confirmation and cancel focus.
+- `ClientApp/src/App.tsx`: replace only the demo adapter on confirmed reset; preserve live session/API behavior.
+- `ClientApp/src/demo/DemoJourney.test.tsx`: six integration-style demo/navigation/isolation regressions.
+- `ClientApp/src/style.css`: scoped guide/reset styling with responsive controls and existing visible focus treatment.
+- `ClientApp/index.html`, `ClientApp/public/favicon.svg`: locally served icon so standalone preview does not request the absent backend favicon.
+- `docs/showcase/guided-overview-desktop.png`, `docs/showcase/guided-timeline-desktop.png`, `docs/showcase/guided-overview-mobile.png`: current unedited synthetic-data browser captures.
+- `docs/PORTFOLIO_CASE_STUDY.md`: short product/architecture/evidence narrative with reproducible demo steps and explicit limits.
+- `README.md`, `docs/TASKS.md`, this report: entry points, scope decision and verification handoff.
+
+Verified locally: 91 frontend tests, lint, strict TypeScript, normal/static builds,
+and audit with no reported vulnerabilities. Browser observations include the
+full demo journey, confirmed/cancelled reset, zero API/failed requests, desktop and
+320/390/768px responsive overflow checks, keyboard activation, drawer Escape and
+focus restoration. The local icon returns 200 as `image/svg+xml` under `/app/`.
+The Release .NET solution build passes with zero warnings/errors and all 596
+fast backend tests pass. No server, schema, dependency, or public API contract
+changed; the SQL suite is not part of this local frontend-only verification.
+
+### Original showcase
 
 - `ClientApp/src/App.tsx`: selects the explicit demo entry and retains live-session handling.
 - `ClientApp/src/Portal.tsx`: presents overview, request list, timeline, form, and empty/error states with a replaceable request adapter.

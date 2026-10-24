@@ -375,6 +375,11 @@ The tenant portal now has a responsive resident-workspace design and an isolated
 portfolio demo at `/app/demo/`. The demo uses fictional in-memory data and makes
 no session, maintenance, or database calls. See [portfolio showcase](docs/PORTFOLIO_SHOWCASE.md)
 for the local demo command, static export, screenshots, and testing boundaries.
+The optional four-step walkthrough and confirmed reset make the tenant scenario
+easy to present repeatedly. Start with the [portfolio case study](docs/PORTFOLIO_CASE_STUDY.md)
+for the product story, architecture decisions, current screenshots, and honest
+demo limits. Azure hosting is deferred; no paid cloud account is needed for the
+standalone demo or local Docker environment.
 
 The authenticated tenant portal lives at `/app/`; Razor, Identity and `/api/v1`
 retain their existing routes and server authorization. Overview shows accepted,

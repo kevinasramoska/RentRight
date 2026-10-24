@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { apiRequest } from './api/client';
 import { Portal, Failure } from './Portal';
 import { Workspace } from './components/Workspace';
 import { createDemoRequest } from './demo/demo';
+import { DemoGuide } from './demo/DemoGuide';
 import { PublicProperties, ManagedProperties } from './business/Properties';
 import { Tenancies, AcceptInvitation } from './business/Tenancies';
 import { Overview, Maintenance, Administration } from './business/Management';
@@ -15,11 +16,16 @@ export default function App() {
   const [route, setRoute] = useState(location.pathname + location.search);
   const [signingOut, setSigningOut] = useState(false);
   const demo = route.split('?')[0] === '/app/demo' || route.startsWith('/app/demo/');
-  const demoRequest = useMemo(createDemoRequest, []);
+  const [demoRequest, setDemoRequest] = useState(createDemoRequest);
   const clearSession = useCallback(() => { document.title = 'Tenant portal · RentRight'; setSession(undefined); }, []);
   const refresh = useCallback(() => { clearSession(); setError(undefined); setAttempt(v => v + 1); }, [clearSession]);
   const accessLost = useCallback((reason: unknown) => { clearSession(); setError(reason); }, [clearSession]);
   function navigate(path: string) { history.pushState(null, '', path); setRoute(path); refresh(); }
+  function resetDemo() {
+    if (!demo) return;
+    setDemoRequest(() => createDemoRequest());
+    navigate('/app/demo/');
+  }
   useEffect(() => {
     if (demo) return;
     const focus = () => refresh();
@@ -67,7 +73,7 @@ export default function App() {
     return <><PageHeading title="Page unavailable" /><p>This page is missing or not available for your role.</p></>;
   }
   return <Workspace route={route} navigate={navigate} demo={demo} showTenantNavigation={demo || tenant} manager={manager} admin={admin} authenticated={session?.isAuthenticated === true} onSignOut={() => void signOut()} signingOut={signingOut}>
-    {demo ? <Portal key={`${route}:${attempt}`} route={route} navigate={navigate} onAccessLost={accessLost} request={demoRequest} basePath="/app/demo" demo />
+    {demo ? <><DemoGuide route={route} onReset={resetDemo} /><Portal key={`${route}:${attempt}`} route={route} navigate={navigate} onAccessLost={accessLost} request={demoRequest} basePath="/app/demo" demo /></>
       : publicPage ? <PublicProperties key={`${route}:${attempt}`} {...pageProps} manager={manager} />
       : error ? <div className="welcome-state"><p className="eyebrow">LET’S GET YOU HOME</p><h1>Tenant portal</h1><Failure error={error} retry={refresh} /></div>
         : !session ? <div className="loading-state" role="status"><span className="loading-ring" />Loading your session…</div>

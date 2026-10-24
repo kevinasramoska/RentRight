@@ -517,6 +517,12 @@ Implementation checkpoint (2026-08-11): the focused core-domain request is imple
 
 ## Phase 12 — Azure deployment preparation
 
+**Scope decision (2026-10-23):** Azure infrastructure and cloud deployment are
+deferred by user choice. Do not provision paid resources or treat Azure as a
+prerequisite for the local/standalone portfolio demo. The main release rehearsal
+passed on 2026-10-21; GHCR publication remains deferred (rehearsal only). No cloud
+deployment or live private-registry verification is claimed.
+
 ### P12-01 — Define minimal Azure infrastructure as Bicep
 
 - **Why it matters:** Azure readiness is credible when infrastructure is repeatable, reviewable, least-privilege, and cost-aware—not a list of portal screenshots.
@@ -636,6 +642,8 @@ Implementation checkpoint (2026-08-11): the focused core-domain request is imple
 - **Resume/portfolio value:** Makes the engineering discoverable and signals professional Git/PR collaboration practices.
 
 ### P15-02 — Publish a concise portfolio case study and reproducible demo
+
+- **Incremental implementation (2026-10-23):** Added an optional four-step tenant demo guide, confirmed in-memory reset, scoped responsive controls, local favicon, six journey/isolation regressions, three current browser screenshots and an evidence-linked [case study](PORTFOLIO_CASE_STUDY.md). All 91 frontend tests, lint, type checks and normal/static builds pass; the frontend audit reports no vulnerabilities. The demo still makes no API calls and simulates only the tenant experience. This is partial portfolio preparation, not completion of all P15 gates: public hosting, stable release/tag, all-role authenticated captures and complete operational readiness remain separate. Azure is deferred by choice. See [showcase scope and file inventory](PORTFOLIO_SHOWCASE.md).
 
 - **Why it matters:** The strongest implementation has limited hiring value if reviewers cannot quickly see the problem, architecture, evidence, and working journey.
 - **Files/components likely affected:** README portfolio section, screenshots/GIF/video links, demo seed profile, release/tag, architecture/performance/test reports, hosted demo/runbook/status note.
