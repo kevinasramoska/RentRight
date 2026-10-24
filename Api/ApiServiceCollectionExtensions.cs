@@ -73,7 +73,10 @@ public static class ApiServiceCollectionExtensions
                 '/' + ApiConventions.RoutePrefix),
             branch =>
             {
-                branch.UseExceptionHandler();
+                branch.UseExceptionHandler(new ExceptionHandlerOptions
+                {
+                    SuppressDiagnosticsCallback = _ => true
+                });
                 branch.UseStatusCodePages();
             });
 

@@ -27,6 +27,7 @@ public class HomeController(IPropertyService propertyService) : Controller
     public IActionResult Privacy() => View();
 
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+    [IgnoreAntiforgeryToken] // Error re-execution must preserve a failed POST's 500 response.
     public IActionResult Error()
     {
         return View(new ErrorViewModel

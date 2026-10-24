@@ -12,15 +12,19 @@ using RentRight.Features.Tenancies;
 using RentRight.Models;
 using RentRight.Security;
 using RentRight.Integrations.Geocoding;
+using RentRight.Diagnostics;
 
 var initializeLocal = args.Contains("--initialize-local", StringComparer.Ordinal);
 var builder = WebApplication.CreateBuilder(args.Where(argument => argument != "--initialize-local").ToArray());
+builder.Services.AddRentalDiagnostics(builder.Configuration);
 
 // -----------------
 // Database setup
 // -----------------
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddDbContext<ApplicationDbContext>((services, options) =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"))
+        .AddInterceptors(services.GetRequiredService<SafeDatabaseCommandInterceptor>(),
+            services.GetRequiredService<SafeDatabaseConnectionInterceptor>()));
 
 // -----------------
 // Identity setup (with UI + Roles)
@@ -115,9 +119,14 @@ if (initializeLocal) return;
 // Middleware pipeline
 // -----------------
 app.UseBrowserSecurityHeaders();
+app.UseRentalDiagnostics();
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Home/Error");
+    app.UseExceptionHandler(new ExceptionHandlerOptions
+    {
+        ExceptionHandlingPath = "/Home/Error",
+        SuppressDiagnosticsCallback = _ => true
+    });
     app.UseHsts();
 }
 
