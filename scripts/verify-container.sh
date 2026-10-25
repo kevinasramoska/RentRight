@@ -79,6 +79,9 @@ for ((attempt=0; attempt<60; attempt++)); do
 done
 [[ "$ready" == 1 ]] || { echo 'Application did not become ready; inspect startup configuration.' >&2; exit 1; }
 echo "Checking HTTP pages and API responses at $base."
+for probe in live ready; do
+  [[ "$(curl --silent --show-error --fail --max-time 5 "$base/health/$probe")" == Healthy ]]
+done
 grep -Fq '"isAuthenticated":false' "$work/session.json"
 curl --silent --show-error --fail "$base/api/v1/properties" > "$work/properties.json"
 grep -Fq 'Container smoke home' "$work/properties.json"

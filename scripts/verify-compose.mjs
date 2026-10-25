@@ -106,6 +106,12 @@ try {
   assert.equal(query('SELECT COUNT(*) FROM __EFMigrationsHistory'), migrationCount);
   assert.equal(query('SELECT COUNT(*) FROM AspNetUsers'), 1);
   assert.equal(query('SELECT COUNT(*) FROM AspNetRoles'), 3);
+  for (const probe of ['live', 'ready']) {
+    const response = await http('GET', `/health/${probe}`);
+    assert.equal(response.status, 200);
+    assert.equal(response.text, 'Healthy');
+    assert.match(response.headers['cache-control'], /no-store/);
+  }
   assert.equal((await http('GET', '/app/properties')).status, 200);
   assert.equal((await http('GET', '/api/v1/workspace')).status, 401);
   const loginPage = await http('GET', '/Identity/Account/Login');
