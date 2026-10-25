@@ -13,10 +13,12 @@ using RentRight.Models;
 using RentRight.Security;
 using RentRight.Integrations.Geocoding;
 using RentRight.Diagnostics;
+using RentRight.Health;
 
 var initializeLocal = args.Contains("--initialize-local", StringComparer.Ordinal);
 var builder = WebApplication.CreateBuilder(args.Where(argument => argument != "--initialize-local").ToArray());
 builder.Services.AddRentalDiagnostics(builder.Configuration);
+builder.Services.AddRentalHealthChecks();
 
 // -----------------
 // Database setup
@@ -142,6 +144,7 @@ app.UseAuthorization();
 // -----------------
 // Routes
 // -----------------
+app.MapRentalHealthChecks();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();

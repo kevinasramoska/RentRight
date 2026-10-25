@@ -111,7 +111,10 @@ recorded in [DEPLOYMENT.md](DEPLOYMENT.md).
   executable's file capability, and otherwise drops capabilities.
 - SQL health runs a real `SELECT 1`. The app healthcheck checks its startup TLS
   socket; the helper separately verifies the HTTPS session API. These are not
-  ongoing deep DB readiness/liveness endpoints; operational health is P13-01.
+  ongoing HTTP probes. Separate `/health/live` and `/health/ready` endpoints are
+  available and exercised by the lifecycle smoke, but the Compose health command
+  still checks only the TLS socket. See [RUNBOOK.md](RUNBOOK.md) for the distinction
+  and the remaining probe-wiring work.
 - The local web connection uses SA and `TrustServerCertificate=True` on the
   isolated SQL network. Do not copy this configuration into production; provision
   least-privilege runtime credentials and certificate validation there.

@@ -584,6 +584,8 @@ deployment or live private-registry verification is claimed.
 
 ### P13-02 — Add health checks, dependency resilience, and an operational runbook
 
+- **Incremental implementation (2026-10-25):** Separate GET/HEAD liveness and SQL readiness endpoints, minimal noncacheable status bodies, a three-second SQL cancellation budget with no retries, two concurrent readiness probes per process and no queue, plus an operational [runbook](RUNBOOK.md). Liveness bypasses SQL-backed cookie validation. Tests cover timeout/cancellation, safe failures, overload, real disposable-SQL outage/recovery and optional-provider isolation; existing image/Compose smoke scripts now exercise both HTTP probes. No schema, package, cloud or shared-database changes. Ongoing Docker/Azure HTTP probe wiring, broader load/pool-pressure testing, hosted alerts and deployment-specific recovery rehearsals remain separate; this is not completion of all P13-02 gates.
+
 - **Why it matters:** Deployment and support need clear liveness/readiness semantics, bounded dependency failures, and documented recovery actions.
 - **Files/components likely affected:** health-check registration/endpoints, SQL readiness check, external-client resilience settings, container/Azure probes, retry/timeout options, `docs/RUNBOOK.md`, load/failure tests.
 - **Implementation steps:**

@@ -150,8 +150,11 @@ bounded request/database metrics. Request summaries omit raw URLs, headers,
 credentials and tenant content; provider/exception payloads are not copied into
 diagnostic events. See [observability](docs/OBSERVABILITY.md) for sampling, safe
 failure handling, local collection, privacy limits and verification. No cloud
-telemetry account, external exporter or paid resource is required. Readiness,
-automated alerts and hosted retention remain separate work.
+telemetry account, external exporter or paid resource is required. Separate
+`/health/live` and `/health/ready` endpoints provide minimal, noncacheable process
+and SQL status. See the [operational runbook](docs/RUNBOOK.md) for probe limits,
+SQL outage recovery and remaining deployment work. Automated alerts and hosted
+retention remain separate work.
 
 Manual private GHCR release tooling is described in [Release images](docs/RELEASES.md).
 Only a successful protected-main CI run can authorize a release, and publication

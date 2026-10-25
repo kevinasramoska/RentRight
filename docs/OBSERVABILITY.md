@@ -7,9 +7,10 @@ database table, public diagnostics endpoint or paid resource is added.
 
 This is the local diagnostics foundation, not completion of every Phase 13 goal.
 Workflow-specific audit/metric expansion, a selected collector, dashboards,
-automated alerts, retention/access controls for hosted telemetry and the P13-02
-liveness/readiness and resilience runbook remain separate work. SQL status history
-is still the audit record; logs are not a substitute for it.
+automated alerts and retention/access controls for hosted telemetry remain separate
+work. The incremental P13-02 [runbook](RUNBOOK.md) now covers liveness/readiness and
+manual recovery actions; it does not complete deployment probes or load testing.
+SQL status history is still the audit record; logs are not a substitute for it.
 
 ## Events and correlation
 
