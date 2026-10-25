@@ -1,20 +1,40 @@
+using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
+using RentRight.Diagnostics;
 
 namespace RentRight.Integrations.Geocoding;
 
 public sealed class GeoapifyGeocodingClient(HttpClient http, IOptions<GeocodingOptions> settings,
-    GeocodingState state, TimeProvider clock) : IGeocodingClient
+    GeocodingState state, TimeProvider clock, RentalDiagnostics? diagnostics = null) : IGeocodingClient
 {
     private static readonly Meter Meter = new("RentRight.Geocoding");
     private static readonly Counter<long> Lookups = Meter.CreateCounter<long>("rentright.geocoding.lookups");
     public bool IsEnabled => settings.Value.Enabled;
 
     public async Task<GeocodingResult> LookupAsync(string address, CancellationToken cancellationToken)
+    {
+        using var activity = diagnostics?.StartGeocoding();
+        try
+        {
+            var result = await LookupCoreAsync(address, cancellationToken);
+            activity?.SetTag("outcome", result.Status.ToString());
+            if (result.Status is GeocodingStatus.Unavailable or GeocodingStatus.InvalidResponse)
+                activity?.SetStatus(ActivityStatusCode.Error);
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            activity?.SetTag("outcome", "Cancelled");
+            throw;
+        }
+    }
+
+    private async Task<GeocodingResult> LookupCoreAsync(string address, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!IsEnabled) return Report(new(GeocodingStatus.Disabled));

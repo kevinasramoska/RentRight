@@ -145,6 +145,14 @@ RentRight/
 
 ## Tests and Coverage
 
+Local request diagnostics use UTC JSON console events, W3C correlation, and
+bounded request/database metrics. Request summaries omit raw URLs, headers,
+credentials and tenant content; provider/exception payloads are not copied into
+diagnostic events. See [observability](docs/OBSERVABILITY.md) for sampling, safe
+failure handling, local collection, privacy limits and verification. No cloud
+telemetry account, external exporter or paid resource is required. Readiness,
+automated alerts and hosted retention remain separate work.
+
 Manual private GHCR release tooling is described in [Release images](docs/RELEASES.md).
 Only a successful protected-main CI run can authorize a release, and publication
 requires explicit environment approval. Image release is separate from hosting

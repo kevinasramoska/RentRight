@@ -563,6 +563,8 @@ deployment or live private-registry verification is claimed.
 
 ### P13-01 — Add structured logging, safe exception handling, tracing, and metrics
 
+- **Incremental implementation (2026-10-24):** Local diagnostics foundation: UTC JSON console events; allow-listed request summaries with successful-log sampling; W3C correlation and safe API/MVC failure handling; bounded HTTP/SQL metrics; sync/async EF timing/failure spans and optional geocoding spans without SQL/URI/credential payloads; startup version metadata and privacy/configuration regressions. No new package, schema change, cloud exporter, account or paid resource. This does not complete all P13 goals: workflow-specific event expansion, collector/export selection, hosted telemetry controls, dashboards and automated alerts remain unimplemented; P13-02 health/resilience remains separate. See [OBSERVABILITY.md](OBSERVABILITY.md) for exact scope, operating limits, tests and every changed file.
+
 - **Why it matters:** Production failures must be diagnosable across MVC, API, EF, Identity, and external calls without leaking tenant content or credentials.
 - **Files/components likely affected:** `Program.cs`, global exception handler/Problem Details customization, logging event definitions, OpenTelemetry/Application Insights registration, request correlation middleware, redaction rules, service/external-client instrumentation, dashboards/alerts documentation.
 - **Implementation steps:**
