@@ -584,6 +584,8 @@ deployment or live private-registry verification is claimed.
 
 ### P13-02 — Add health checks, dependency resilience, and an operational runbook
 
+- **Incremental implementation (2026-10-27):** Liveness `/health/live` and readiness `/health/ready` (SQL connectivity with a 5-second bound) using built-in ASP.NET Core health checks, no new package. Responses are anonymous, uncached and status-word only; optional geocoding is excluded from readiness. Covered by HTTP tests (healthy, unhealthy, throwing check, no detail leakage, registration bounds) and a real SQL Server test. Used as the smoke check of the free-tier [Azure deployment](AZURE_DEPLOYMENT.md). Dependency resilience, fault/load testing and the runbook remain open.
+
 - **Why it matters:** Deployment and support need clear liveness/readiness semantics, bounded dependency failures, and documented recovery actions.
 - **Files/components likely affected:** health-check registration/endpoints, SQL readiness check, external-client resilience settings, container/Azure probes, retry/timeout options, `docs/RUNBOOK.md`, load/failure tests.
 - **Implementation steps:**

@@ -1,0 +1,169 @@
+name: Deploy Azure demo
+
+# Free-tier public demo: App Service F1 (Linux) + Azure SQL Database free offer.
+# Deploys only main commits whose "Continuous Integration" run succeeded, or a manual run on main.
+# Setup, costs and recovery: docs/AZURE_DEPLOYMENT.md.
+on:
+  workflow_run:
+    workflows: [Continuous Integration]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - infra/**
+      - scripts/azure/**
+      - .github/workflows/deploy-azure.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: azure-demo-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'deploy' }}
+  cancel-in-progress: false
+
+jobs:
+  validate-infrastructure:
+    name: Validate Bicep
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Compile and lint the template
+        run: az bicep build --file infra/main.bicep --stdout > /dev/null
+
+  deploy:
+    name: Deploy to Azure
+    if: >-
+      ${{ github.repository == 'kevinasramoska/RentRight' && (
+        (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+         github.event.workflow_run.event == 'push')) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment:
+      name: azure-demo
+      url: ${{ steps.smoke.outputs.url }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      SOURCE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ClientApp/package-lock.json
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      # Build everything before signing in: the OIDC assertion is short-lived.
+      - name: Build React and publish the app
+        env:
+          ContinuousIntegrationBuild: 'true'
+        run: |
+          (cd ClientApp && npm ci && npm run build)
+          dotnet restore RentRight.csproj --locked-mode
+          dotnet publish RentRight.csproj --configuration Release --no-restore --output artifacts/publish \
+            /p:BuildReactOnPublish=false /p:ContinuousIntegrationBuild=true /p:UseAppHost=false
+          (cd artifacts/publish && zip -qr ../app.zip .)
+      - name: Build the reviewed EF migrations bundle
+        run: |
+          dotnet tool restore
+          dotnet ef migrations bundle --project RentRight.csproj --configuration Release \
+            --output artifacts/efbundle --force
+
+      - name: Sign in to Azure (OIDC, no stored secret)
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Provision free-tier infrastructure
+        id: infra
+        env:
+          SQL_ADMIN_GROUP_NAME: ${{ vars.AZURE_SQL_ADMIN_GROUP_NAME }}
+          SQL_ADMIN_GROUP_ID: ${{ vars.AZURE_SQL_ADMIN_GROUP_ID }}
+        run: |
+          outputs="$(az deployment group create --resource-group "$RESOURCE_GROUP" \
+            --name "rentright-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" --template-file infra/main.bicep \
+            --parameters sqlAdminGroupName="$SQL_ADMIN_GROUP_NAME" sqlAdminGroupObjectId="$SQL_ADMIN_GROUP_ID" \
+            --query properties.outputs --output json)"
+          for key in webAppName webAppHostName sqlServerName sqlServerFqdn databaseName appIdentityName appIdentityClientId; do
+            echo "${key}=$(jq -r ".${key}.value" <<<"$outputs")" >> "$GITHUB_OUTPUT"
+          done
+
+      # Infrastructure creation can outlast the first assertion; refresh it before SQL and deploy steps.
+      - name: Refresh the Azure sign-in
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Allow only this runner through the SQL firewall
+        id: firewall
+        env:
+          SQL_SERVER: ${{ steps.infra.outputs.sqlServerName }}
+        run: |
+          runner_ip="$(curl -fsS --max-time 10 https://api.ipify.org)"
+          rule="github-run-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          az sql server firewall-rule create --resource-group "$RESOURCE_GROUP" --server "$SQL_SERVER" \
+            --name "$rule" --start-ip-address "$runner_ip" --end-ip-address "$runner_ip" --output none
+          echo "rule=${rule}" >> "$GITHUB_OUTPUT"
+      - name: Apply EF migrations
+        env:
+          SQL_FQDN: ${{ steps.infra.outputs.sqlServerFqdn }}
+          DATABASE: ${{ steps.infra.outputs.databaseName }}
+        run: >-
+          ./artifacts/efbundle --connection
+          "Server=tcp:${SQL_FQDN},1433;Database=${DATABASE};Authentication=Active Directory Default;Encrypt=True;TrustServerCertificate=False;Connect Timeout=120"
+      - name: Grant the app identity read/write access
+        env:
+          SQL_FQDN: ${{ steps.infra.outputs.sqlServerFqdn }}
+          DATABASE: ${{ steps.infra.outputs.databaseName }}
+          IDENTITY_NAME: ${{ steps.infra.outputs.appIdentityName }}
+          IDENTITY_CLIENT_ID: ${{ steps.infra.outputs.appIdentityClientId }}
+        run: dotnet run scripts/azure/GrantAppDatabaseAccess.cs -- "$SQL_FQDN" "$DATABASE" "$IDENTITY_NAME" "$IDENTITY_CLIENT_ID"
+      - name: Remove the runner firewall rule
+        if: ${{ always() && steps.firewall.outputs.rule != '' }}
+        env:
+          SQL_SERVER: ${{ steps.infra.outputs.sqlServerName }}
+          RULE: ${{ steps.firewall.outputs.rule }}
+        run: az sql server firewall-rule delete --resource-group "$RESOURCE_GROUP" --server "$SQL_SERVER" --name "$RULE"
+
+      - name: Deploy the published app
+        env:
+          WEB_APP: ${{ steps.infra.outputs.webAppName }}
+        run: >-
+          az webapp deploy --resource-group "$RESOURCE_GROUP" --name "$WEB_APP"
+          --src-path artifacts/app.zip --type zip --restart true
+      - name: Smoke test liveness, readiness and the home page
+        id: smoke
+        env:
+          HOST_NAME: ${{ steps.infra.outputs.webAppHostName }}
+        run: |
+          url="https://${HOST_NAME}"
+          # Free tier: the app cold-starts and a paused database takes about a minute to resume.
+          for attempt in $(seq 1 30); do
+            if [[ "$(curl -sS --max-time 30 "$url/health/ready" || true)" == "Healthy" ]]; then
+              ready=true
+              break
+            fi
+            echo "Readiness attempt ${attempt} not healthy yet; retrying."
+            sleep 10
+          done
+          [[ "${ready:-false}" == true ]] || { echo "::error::$url/health/ready never reported Healthy"; exit 1; }
+          [[ "$(curl -fsS --max-time 30 "$url/health/live")" == "Healthy" ]]
+          curl -fsS --max-time 30 --output /dev/null "$url/"
+          echo "url=${url}" >> "$GITHUB_OUTPUT"
+          echo "Deployed ${SOURCE_SHA} to ${url}" >> "$GITHUB_STEP_SUMMARY"
