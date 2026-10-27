@@ -10,6 +10,8 @@
 
   <ItemGroup>
     <Compile Remove="RentRight.Tests/**" />
+    <!-- Standalone deployment helpers run with `dotnet run <file>.cs`; never part of the web app. -->
+    <Compile Remove="scripts/**" />
     <Content Remove="ClientApp/**" />
     <Content Remove="artifacts/**" />
     <Content Remove="TestResults/**" />

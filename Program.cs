@@ -13,6 +13,7 @@ using RentRight.Models;
 using RentRight.Security;
 using RentRight.Integrations.Geocoding;
 using RentRight.Diagnostics;
+using RentRight.Health;
 
 var initializeLocal = args.Contains("--initialize-local", StringComparer.Ordinal);
 var builder = WebApplication.CreateBuilder(args.Where(argument => argument != "--initialize-local").ToArray());
@@ -54,6 +55,7 @@ builder.Services.AddControllersWithViews(options =>
 builder.Services.AddApiConventions();
 builder.Services.AddBrowserSecurity(builder.Configuration, builder.Environment);
 builder.Services.AddRazorPages(); // ✅ needed for Identity UI
+builder.Services.AddRentalHealthChecks();
 
 var app = builder.Build();
 
@@ -150,6 +152,7 @@ if (app.Environment.IsDevelopment())
 // Restrict the React fallback to extensionless routes below /app.
 app.MapFallbackToFile("/app/{*path:nonfile}", "app/index.html");
 
+app.MapRentalHealthChecks();
 app.MapControllers();
 app.MapControllerRoute(
     name: "default",

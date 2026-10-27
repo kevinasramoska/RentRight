@@ -1,8 +1,9 @@
 # Production demo deployment
 
 The demo needs a backend host that runs .NET 10/Linux containers and a managed
-SQL Server database. No hosting account, database, or public demo URL is currently
-configured. The application image is built locally; the image smoke procedure
+SQL Server database. The free-tier Azure demo (App Service F1 code deployment, Azure SQL
+free offer, passwordless managed identity) is defined in [Azure deployment](AZURE_DEPLOYMENT.md);
+this page covers the container path. The application image is built locally; the image smoke procedure
 and its exact verification boundary are recorded in [Container verification](CONTAINER_VERIFICATION.md).
 The separate [SQL integration suite](SQL_INTEGRATION_TESTS.md) exercises disposable
 SQL Server containers; it does not verify the application Dockerfile or deployment.
@@ -70,8 +71,9 @@ Read-only execution needs writable temporary storage and a writable external key
 ring owned by UID/GID 1654. The smoke uses `/tmp` and an ephemeral
 `/home/app/.aspnet` tmpfs only. Do not use ephemeral, unencrypted keys for a public
 deployment; provision the encrypted persistent key ring below. The runtime has
-no Node, npm, .NET SDK or Git. No health endpoint/HEALTHCHECK is invented here;
-operational health remains a later phase.
+no Node, npm, .NET SDK or Git. The app exposes anonymous `/health/live` (process) and
+`/health/ready` (bounded SQL connectivity) endpoints that return only a status word; the image
+does not declare a Docker `HEALTHCHECK`, so configure the host's probe to call them.
 
 Configure TLS at the host, and set `ASPNETCORE_ENVIRONMENT=Production` and
 `ConnectionStrings__DefaultConnection` in the host's secret settings. Use an

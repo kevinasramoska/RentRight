@@ -293,6 +293,12 @@ SQL Server-backed HTTP tests are a separate explicit command; see [SQL integrati
 dotnet test RentRight.Tests/SqlIntegration/RentRight.SqlIntegration.Tests.csproj --configuration Release
 ```
 
+## Azure free-tier demo
+
+[docs/AZURE_DEPLOYMENT.md](docs/AZURE_DEPLOYMENT.md) deploys the app to Azure App Service F1 and the
+Azure SQL Database free offer with Bicep and GitHub Actions: OIDC sign-in, a passwordless managed identity
+for SQL, the reviewed EF migrations bundle, and a `/health/ready` smoke test after every successful `main` CI run.
+
 ## Deployment and MVC/API routing
 
 See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the .NET 10 container, SQL Server,
